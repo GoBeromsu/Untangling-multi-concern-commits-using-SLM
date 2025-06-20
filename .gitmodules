@@ -7,3 +7,9 @@
 [submodule "datasets/candidate/flexeme"]
 	path = datasets/candidate/flexeme
 	url = https://github.com/PPPI/Flexeme
+[submodule "datasets/candidate/codefuse-hqcm"]
+	path = datasets/candidate/codefuse-hqcm
+	url = https://github.com/codefuse-ai/codefuse-hqcm
+[submodule "datasets/candidate/conventional-commit-classification"]
+	path = datasets/candidate/conventional-commit-classification
+	url = https://github.com/0x404/conventional-commit-classification
