@@ -1,0 +1,9 @@
+[submodule "datasets/candidate/utango"]
+	path = datasets/candidate/utango
+	url = https://github.com/Commit-Untangling/commit-untangling
+[submodule "datasets/candidate/hdgnn"]
+	path = datasets/candidate/hdgnn
+	url = https://github.com/fanmengdan/HD-GNN
+[submodule "datasets/candidate/flexeme"]
+	path = datasets/candidate/flexeme
+	url = https://github.com/PPPI/Flexeme
