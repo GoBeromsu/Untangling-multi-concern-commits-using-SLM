@@ -1,15 +1,15 @@
-[submodule "datasets/candidate/utango"]
-	path = datasets/candidate/utango
+[submodule "datasets/candidates/utango"]
+	path = datasets/candidates/utango
 	url = https://github.com/Commit-Untangling/commit-untangling
-[submodule "datasets/candidate/hdgnn"]
-	path = datasets/candidate/hdgnn
+[submodule "datasets/candidates/hdgnn"]
+	path = datasets/candidates/hdgnn
 	url = https://github.com/fanmengdan/HD-GNN
-[submodule "datasets/candidate/flexeme"]
-	path = datasets/candidate/flexeme
+[submodule "datasets/candidates/flexeme"]
+	path = datasets/candidates/flexeme
 	url = https://github.com/PPPI/Flexeme
-[submodule "datasets/candidate/codefuse-hqcm"]
-	path = datasets/candidate/codefuse-hqcm
+[submodule "datasets/candidates/codefuse-hqcm"]
+	path = datasets/candidates/codefuse-hqcm
 	url = https://github.com/codefuse-ai/codefuse-hqcm
-[submodule "datasets/candidate/conventional-commit-classification"]
-	path = datasets/candidate/conventional-commit-classification
+[submodule "datasets/candidates/conventional-commit-classification"]
+	path = datasets/candidates/conventional-commit-classification
 	url = https://github.com/0x404/conventional-commit-classification
