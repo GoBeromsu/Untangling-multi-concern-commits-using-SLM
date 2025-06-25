@@ -2,10 +2,6 @@ import openai
 from typing import Any, Dict
 
 COMMIT_TYPES = [
-    "feat",
-    "fix",
-    "style",
-    "refactor",
     "docs",
     "test",
     "cicd",
