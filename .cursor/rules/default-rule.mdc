@@ -19,7 +19,6 @@ alwaysApply: true
 - **Code Formatting:** Ruff (replaces `black`, `isort`, `flake8`)
 - **Type Hinting:** Strictly use the `typing` module. All functions, methods, and class members must have type annotations.
 - **Testing Framework:** `pytest`
-- **Documentation:** Google style docstring
 - **Environment Management:** `conda` / `venv`
 - **Containerization:** `docker`, `docker-compose`
 - **Asynchronous Programming:** Prefer `async` and `await`
@@ -52,7 +51,6 @@ alwaysApply: true
 ## 3. Code Quality
 
 - **Comprehensive Type Annotations:** All functions, methods, and class members must have type annotations, using the most specific types possible.
-- **Detailed Docstrings:** All functions, methods, and classes must have Google-style docstrings, thoroughly explaining their purpose, parameters, return values, and any exceptions raised. Include usage examples where helpful.
 - **Thorough Unit Testing:** Aim for high test coverage (90% or higher) using `pytest`. Test both common cases and edge cases.
 - **Robust Exception Handling:** Use specific exception types, provide informative error messages, and handle exceptions gracefully. Implement custom exception classes when needed. Avoid bare `except` clauses.
 - **Logging:** Employ the `logging` module judiciously to log important events, warnings, and errors.
@@ -89,7 +87,6 @@ alwaysApply: true
 # Code Example Requirements
 
 - All functions must include type annotations.
-- Must provide clear, Google-style docstrings.
 - Key logic should be annotated with comments.
 - Provide usage examples (e.g., in the `tests/` directory or as a `__main__` section).
 - Include error handling.
