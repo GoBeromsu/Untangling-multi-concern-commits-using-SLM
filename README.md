@@ -1,43 +1,40 @@
-# Concern is All You Need : Semantic Untangling with Small Language Model
+# Concern is All You Need: Semantic Untangling with Small Language Models
 
-## Dataset
+## Tangled Dataset Naming Convention
 
-### Purpose
+Each dataset filename is structured to encode its key configuration.
 
-The CCC Tangled Dataset (Variant A) is designed for training and evaluating concern separation models. This dataset artificially combines multiple commit concerns into single tangled samples, simulating real-world scenarios where developers need to untangle mixed concerns in code changes.
+**Format**: `c{N}_t{T}_s{S}_{u|m}_{types}.json`
 
-### Data Source
+#### Components
+- `c{N}`: number of concerns per sample (e.g., `c2` = 2 concerns)
+- `t{T}`: number of concern types available in dataset (e.g., `t4` = 4 types)
+- `s{S}`: number of total samples (e.g., `s10` = 10 cases)
+- `u` or `m`: concern composition strategy
+	- `u`: unique types only (no repeated type in a sample)
+	- `m`: mixed types allowed (types can repeat)
+- `{types}`: ordered concern type abbreviations
 
-The dataset is generated from the [Conventional Commit Classification (CCC) dataset](https://huggingface.co/datasets/0x404/ccs_dataset) available on HuggingFace, which contains 1,400 labeled commit samples across 10 conventional commit types.
+#### Concern Type Abbreviations
 
-### Dataset Structure
+The ranking of concern types is based on the classification performance of GPT-4, following the evaluation protocol from [this paper](https://dl.acm.org/doi/10.1145/3691620.3694999). Specifically, the F1 scores achieved by GPT-4 (G4) across concern categories are used to determine the prioritised order.
 
-#### `tangled.csv`
+| Abbrev | Type   |
+|--------|--------|
+| `ci`   | cicd   |
+| `bu`   | build  |
+| `do`   | docs   |
+| `te`   | test   |
+| `fe`   | feat   |
+| `fi`   | fix    |
+| `re`   | refactor |
+| `st`   | style  |
 
-Input samples for Small Language Models (SLM) training and inference.
+#### Filename Examples
 
-| Field           | Type   | Description                                                         |
-| --------------- | ------ | ------------------------------------------------------------------- |
-| `sample_id`     | int    | Unique identifier for each tangled sample                           |
-| `concern_count` | int    | Number of individual concerns combined in this sample (typically 3) |
-| `tangled_diff`  | string | Combined git diff containing multiple shuffled concerns             |
+| Filename                          | Description                                         |
+| --------------------------------- | --------------------------------------------------- |
+| `c2_t2_s10_u_ci_bu.json`          | 2 concerns, 2 types, 10 samples, unique types       |
+| `c3_t4_s10_m_ci_bu_do_te.json`    | 3 concerns, 4 types, 10 samples, mixed types        |
+| `c3_t5_s10_u_ci_bu_do_te_fe.json` | 3 concerns, 5 types, 10 samples, unique types       |
 
-#### `ground_truth.csv`
-
-Ground truth data for evaluation and concern separation validation.
-
-| Field           | Type   | Description                                                                                                   |
-| --------------- | ------ | ------------------------------------------------------------------------------------------------------------- |
-| `sample_id`     | int    | References the corresponding tangled sample                                                                   |
-| `concern_index` | int    | Sequential index of the concern within the sample (0, 1, 2...)                                                |
-| `concern_type`  | string | Conventional commit type (`feat`, `fix`, `refactor`, `style`, `test`, `docs`, `chore`, `perf`, `ci`, `build`) |
-| `diff`          | string | Individual git diff for this specific concern                                                                 |
-
-### Generation
-
-The dataset is generated using `scripts/generate_variant_a.py`, which:
-
-1. Loads the original CCC dataset from HuggingFace
-2. Randomly selects distinct commit types for each sample
-3. Combines and shuffles git diffs to create tangled versions
-4. Maintains ground truth mappings for evaluation
