@@ -141,7 +141,7 @@ def main() -> None:
     parser.add_argument(
         "--num-cases",
         type=int,
-        default=5,
+        default=10,
         help="Number of tangled cases to generate.",
     )
     parser.add_argument(
@@ -182,11 +182,24 @@ def main() -> None:
         changes, allowed_types, args.concerns, args.num_cases, ensure_different_types
     )
 
+    # Create output structure with metadata
+    output_data = {
+        "metadata": {
+            "num_cases": len(cases),
+            "concerns_per_case": args.concerns,
+            "types": allowed_types,
+            "ensure_different_types": ensure_different_types,
+            "seed": args.seed,
+            "source_dataset": str(args.dataset_path),
+        },
+        "cases": cases,
+    }
+
     # Create output directory if it doesn't exist
     args.output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with args.output_path.open("w", encoding="utf-8") as f:
-        json.dump(cases, fp=f, ensure_ascii=False, indent=2)
+        json.dump(output_data, fp=f, ensure_ascii=False, indent=2)
 
 
 if __name__ == "__main__":

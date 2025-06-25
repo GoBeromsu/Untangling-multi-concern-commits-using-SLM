@@ -43,10 +43,11 @@ def load_test_data(file_path: str) -> List[Dict[str, Any]]:
     """Load test data from JSON file."""
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        return data["cases"], data.get("metadata", {})
     except Exception as e:
         st.error(f"Error loading test data: {str(e)}")
-        return []
+        return [], {}
 
 
 def compare_predictions(predicted_types: List[str], actual_labels: List[str]) -> bool:
@@ -227,11 +228,21 @@ def main() -> None:
 
         # Auto-load data when file is selected
         if test_file:
-            test_data = load_test_data(test_file)
+            test_data, metadata = load_test_data(test_file)
             if test_data:
-                st.info(
-                    f"📊 Loaded {len(test_data)} test items from {os.path.basename(test_file)}"
+                st.success(
+                    f"📊 Loaded **{len(test_data)}** test items from `{test_file}`"
                 )
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.caption(f"⚙️ {metadata.get('concerns_per_case', '?')} concerns")
+                with col2:
+                    types = ", ".join(metadata.get("types", []))
+                    st.caption(f"🏷️ {types}")
+                with col3:
+                    st.caption(
+                        f"🔀 {'different types' if metadata.get('ensure_different_types') else 'same types allowed'}"
+                    )
             else:
                 st.error("❌ Failed to load test data")
                 test_data = []
@@ -247,7 +258,7 @@ def main() -> None:
             key="prompt_test",
         )
 
-        if st.button("Run Sequential Test", type="primary", use_container_width=True):
+        if st.button("Run Test", type="primary", use_container_width=True):
             if not test_data:
                 st.error("Please select a valid test file first.")
             else:
