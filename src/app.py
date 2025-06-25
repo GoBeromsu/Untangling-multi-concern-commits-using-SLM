@@ -51,23 +51,15 @@ def load_test_data(file_path: str) -> List[Dict[str, Any]]:
 
 
 def compare_predictions(predicted_types: List[str], actual_labels: List[str]) -> bool:
-    """Compare predicted types with actual labels and return if correct."""
+    """Compare predicted types with actual labels using exact set comparison."""
     if not predicted_types or not actual_labels:
         return False
 
     predicted_set = set(predicted_types)
     actual_set = set(actual_labels)
 
-    # Calculate Jaccard similarity (intersection over union)
-    if len(predicted_set.union(actual_set)) == 0:
-        return True
-
-    intersection = len(predicted_set.intersection(actual_set))
-    union = len(predicted_set.union(actual_set))
-    similarity = intersection / union
-
-    # Consider it correct if similarity >= 0.5
-    return similarity >= 0.5
+    # Exact set comparison: both sets must contain exactly the same elements
+    return predicted_set == actual_set
 
 
 def run_sequential_test(
@@ -83,7 +75,9 @@ def run_sequential_test(
     table_container = st.empty()
 
     # Initialize results DataFrame
-    results_df = pd.DataFrame(columns=["Index", "Predicted", "Actual", "Status"])
+    results_df = pd.DataFrame(
+        columns=["Index", "Predicted", "Actual", "P_Count", "A_Count", "Status"]
+    )
 
     for i, item in enumerate(test_data):
         status_text.text(f"Testing item {i+1}/{len(test_data)}...")
@@ -99,19 +93,30 @@ def run_sequential_test(
         try:
             prediction_data = json.loads(response)
             predicted_types = prediction_data.get("types", [])
+            predicted_count = prediction_data.get("count", 0)
         except json.JSONDecodeError:
             predicted_types = []
+            predicted_count = 0
 
         # Compare with ground truth
-        is_correct = compare_predictions(predicted_types, actual_labels)
+        actual_count = len(actual_labels)
+        types_match = compare_predictions(predicted_types, actual_labels)
+        count_match = predicted_count == actual_count
+        is_correct = types_match and count_match
 
-        # Add to DataFrame
+        # Add to DataFrame - intuitive status with types and count indicators
+        types_icon = "✅" if types_match else "❌"
+        count_icon = "✅" if count_match else "❌"
+        status_detail = f"{types_icon}T {count_icon}C"
+
         new_row = pd.DataFrame(
             {
                 "Index": [i + 1],
                 "Predicted": [", ".join(predicted_types)],
                 "Actual": [", ".join(actual_labels)],
-                "Status": ["✅ Correct" if is_correct else "❌ Wrong"],
+                "P_Count": [predicted_count],
+                "A_Count": [actual_count],
+                "Status": [status_detail],
             }
         )
 
@@ -152,7 +157,9 @@ def run_sequential_test(
                     "Actual": st.column_config.TextColumn(
                         "Actual Types", width="medium"
                     ),
-                    "Status": st.column_config.TextColumn("Result", width="small"),
+                    "P_Count": st.column_config.NumberColumn("P#", width="small"),
+                    "A_Count": st.column_config.NumberColumn("A#", width="small"),
+                    "Status": st.column_config.TextColumn("Result", width="medium"),
                 },
             )
     st.session_state.final_results_df = results_df
