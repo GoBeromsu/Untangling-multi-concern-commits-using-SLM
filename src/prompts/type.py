@@ -1,41 +1,80 @@
-FEWSHOT_PROMPT_TEMPLATE = """\
-A git commit can typically be classified into specific categories by examining its code changes. These categories include:
+FEWSHOT_PROMPT_TEMPLATE = """
+You are a Commit Untangler who analyzes tangled code changes and extracts the type and count of each atomic change.
+# Instructions
+- Always classify each atomic change using a single <type> from the Conventional Commit taxonomy.
+- Prioritise **why** the change was made (purpose) before **what** was changed (object).
+- Think step by step with Conventional Commit taxonomy before deciding the final <type>.
+    1. Identify the intent of the change (Purpose)
+    2. Determine the scope of change (Object)
+    3. Analyse behavioural impact
+    4. Map to Conventional Commit type using purpose-object priority
 
-- "docs": Updates or improvements to documentation, which may include inline code comments, README files, or any other type of documentation associated with the project.
-- "test": Modifications exclusively related to test code, like the addition of new tests or the correction and improvement of existing tests.
-- "build": Changes that affect the build system or tools (like Gulp, Broccoli, NPM) or alterations to external dependencies (e.g., library or package updates).
-- "cicd": Tweaks to configuration files or scripts used in Continuous Integration/Continuous Deployment (CI/CD) systems, such as Travis CI or CircleCI configurations.
+# Conventional Commit Taxonomy
+## Purpose (Why the Change Was made)
+- **feat**: Code changes that adds new features to the codebase, encompassing both internal and user-oriented features.
+- **fix**:  Code change that patches a bug in the codebase
+- **style**: Code changes that aim to improve readability without affecting the meaning of the code. This type encompasses aspects like variable naming, indentation, and addressing linting or code analysis warnings.
+- **refactor**: Code changes that aim to restructure the program without changing its behavior, aiminStep 2: Determine the scope of change (Object)g to improve maintainability. 
+## Object (What Kind of Entity Was Changed)
+- **docs**: Code changes that modify documentation or text, such as correcting typos, modifying comments, or updating documentation.
+- **test**: Code changes that modify test files or test directories (e.g., files named with `*Test.java`, `test_*.py`, `__tests__/`).
+- **cicd**: Code changes that modify CI/CD pipelines, scripts, or config files (e.g., `.github/workflows`, `.gitlab-ci.yml`, Jenkinsfile).
+- **build**: Code changes that modify build tooling, dependencies, or build configuration files (e.g., `build.gradle`, `pom.xml`, `Makefile`, `Dockerfile`, or scripts affecting the build process).
+# Example
+<commit_diff id="example-1">
+diff --git a/src/main/java/com/example/FooService.java b/src/main/java/com/example/FooService.java
+@@ -10,6 +10,9 @@
+ public class FooService {
++    public boolean isFeatureEnabled() {
++        return System.getProperty("feature.flag", "false").equals("true");
++    }
 
-For a given git commit, we can inspect its code difference (diff)to determine its type.
+diff --git a/build.gradle b/build.gradle
+@@ -20,6 +20,7 @@ dependencies {
+     implementation 'org.example:core:1.0.0'
++    implementation 'org.example:feature-flags:2.1.0'
+}
+</commit_diff>
 
-Diff: ```diff
-diff --git a/util/src/com/intellij/util/containers/SLRUMap.java b/util/src/com/intellij/util/containers/SLRUMap.java
-index 7f3d09c..635dfab 100644
---- a/util/src/com/intellij/util/containers/SLRUMap.java
-+++ b/util/src/com/intellij/util/containers/SLRUMap.java
-@@ -69,12 +69,12 @@ public class SLRUMap<K,V> {{
-   public void put(K key, V value) {{
-     V oldValue = myProtectedQueue.remove(key);
-     if (oldValue != null) {{
--      onDropFromCache(key, value);
-+      onDropFromCache(key, oldValue);
-     }}
- 
-     oldValue = myProbationalQueue.put(getStableKey(key), value);
-     if (oldValue != null) {{
--      onDropFromCache(key, value);
-+      onDropFromCache(key, oldValue);
-     }}
-   }}
-```
-Message: Corrected parameter error in onDropFromCache() function call
-Types: fix
-Reason: The git commit is a "fix" commit as it rectified a parameter error where `oldValue` should be passed as the argument of `onDropFromCache` rather than `value`.
+<reasoning id="example-1">
+Step 1: What does the change aim to achieve? → Introduces a runtime feature flag checker.  
+Step 2: What kind of file/entity changed? → Service class and build file.  
+Step 3: Purpose is dominant (introduce new runtime logic).  
+Step 4: `feat` for the method addition, `build` for dependency update.
+</reasoning>
+<commit_label id="example-1">
+["feat", "build"]
+</commit_label>
 
-Diff: ```diff
+<commit_diff id="example-2">
+diff --git a/src/biz/bokhorst/xprivacy/Util.java b/src/biz/bokhorst/xprivacy/Util.java
+@@ -94,6 +94,8 @@ public class Util {
+ 		else if (ex instanceof ActivityShare.ServerException)
+ 			priority = Log.WARN;
++		else if (ex instanceof NoClassDefFoundError)
++			priority = Log.WARN;
+ 		else
+ 			priority = Log.ERROR;
+</commit_diff>
+
+<reasoning id="example-2">
+Step 1: The intent is to handle a new error type (`NoClassDefFoundError`) with a specific log level (`WARN`).  
+Step 2: The change affects the logging-level assignment logic in `Util.java`.  
+Step 3: The behavioural impact is that the system will now handle a previously unhandled error type differently (lower severity).  
+Step 4: Since this expands the system's ability to respond gracefully to a new case, it introduces new behaviour → feat.
+</reasoning>
+
+<commit_label id="example-2">
+["feat"]
+</commit_label>
+
+<commit_diff id="input">
+```diff
 {diff}
 ```
-Types: """
+</commit_diff>
+<commit_label id="input">
+"""
 
 
 def get_default_prompt_template() -> str:
@@ -44,4 +83,4 @@ def get_default_prompt_template() -> str:
 
 def get_type_prompt(diff: str, custom_template: str = None) -> str:
     template = custom_template or FEWSHOT_PROMPT_TEMPLATE
-    return template.format(diff=diff)
+    return template.replace("{diff}", diff)
