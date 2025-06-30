@@ -33,19 +33,36 @@ def format_concern_types(concern_types: List[str]) -> str:
 
 
 def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
-    """Calculate comprehensive evaluation metrics from results DataFrame."""
+    """Calculate comprehensive evaluation metrics using pre-computed case metrics."""
     total_cases = len(results_df)
     if total_cases == 0:
         return {
             "total": 0,
-            "accuracy": 0.0,
+            "type_precision": 0.0,
+            "type_recall": 0.0,
+            "type_f1_macro": 0.0,
+            "count_accuracy": 0.0,
         }
 
-    correct_count = sum(1 for status in results_df["Status"] if "✅T ✅C" in status)
+    # Count prediction accuracy: exact match between predicted and actual counts
+    count_correct = sum(
+        1
+        for _, row in results_df.iterrows()
+        if row["Predicted_Count"] == row["Actual_Count"]
+    )
+    count_accuracy = count_correct / total_cases
+
+    # Macro-average: simply average the pre-calculated case metrics
+    macro_precision = results_df["Case_Precision"].mean()
+    macro_recall = results_df["Case_Recall"].mean()
+    macro_f1 = results_df["Case_F1"].mean()
 
     return {
         "total": total_cases,
-        "accuracy": correct_count / total_cases,
+        "type_precision": macro_precision,
+        "type_recall": macro_recall,
+        "type_f1_macro": macro_f1,
+        "count_accuracy": count_accuracy,
     }
 
 
@@ -68,6 +85,9 @@ def execute_batch_concern_evaluation(
             "Predicted_Count",
             "Actual_Count",
             "Status",
+            "Case_Precision",
+            "Case_Recall",
+            "Case_F1",
             "Model_Reasoning",
         ]
     )
@@ -93,19 +113,46 @@ def execute_batch_concern_evaluation(
             predicted_concern_count = 0
             model_reasoning = "Failed to parse model response"
 
-        # Calculate evaluation results
+        # Calculate evaluation results using Counter once (linear approach)
         actual_concern_count = len(actual_concern_types)
-        concern_types_match = Counter(predicted_concern_types) == Counter(
-            actual_concern_types
-        )
+
+        # Single Counter calculation for all metrics
+        predicted_counter = Counter(predicted_concern_types)
+        actual_counter = Counter(actual_concern_types)
+
+        # Type matching and count matching
+        concern_types_match = predicted_counter == actual_counter
         concern_count_match = predicted_concern_count == actual_concern_count
+
+        # STRICT MULTISET MATCHING: Calculate TP, FP, FN with exact count requirements
+        # Example: if actual=['feat'] but predicted=['feat','feat'], then TP=1, FP=1, FN=0
+        # This means: feat→feat,feat is WRONG (over-prediction causes FP)
+        all_types = set(predicted_counter.keys()) | set(actual_counter.keys())
+        tp = sum(
+            min(predicted_counter[t], actual_counter[t]) for t in all_types
+        )  # Correctly matched count
+        fp = sum(
+            max(0, predicted_counter[t] - actual_counter[t]) for t in all_types
+        )  # Over-predicted count
+        fn = sum(
+            max(0, actual_counter[t] - predicted_counter[t]) for t in all_types
+        )  # Under-predicted count
+
+        # Calculate individual case metrics
+        case_precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        case_recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        case_f1 = (
+            2 * (case_precision * case_recall) / (case_precision + case_recall)
+            if (case_precision + case_recall) > 0
+            else 0.0
+        )
 
         # Create evaluation status display
         types_status_icon = "✅" if concern_types_match else "❌"
         count_status_icon = "✅" if concern_count_match else "❌"
         evaluation_status = f"{types_status_icon}T {count_status_icon}C"
 
-        # Add result to DataFrame
+        # Add result to DataFrame with case metrics for internal calculation
         new_evaluation_result = pd.DataFrame(
             {
                 "Test_Index": [test_index + 1],
@@ -115,6 +162,9 @@ def execute_batch_concern_evaluation(
                 "Actual_Count": [actual_concern_count],
                 "Status": [evaluation_status],
                 "Model_Reasoning": [model_reasoning],
+                "Case_Precision": [case_precision],
+                "Case_Recall": [case_recall],
+                "Case_F1": [case_f1],
             }
         )
 
@@ -126,20 +176,58 @@ def execute_batch_concern_evaluation(
         # Update evaluation summary
         metrics = calculate_evaluation_metrics(evaluation_results_df)
         with summary_container.container():
-            col1, col2 = st.columns(2)
+            # Evaluation metrics display: Progress and Type Classification metrics
+            col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
             with col1:
-                st.metric("Progress", f"{metrics['total']}/{len(test_dataset)}")
+                st.metric(
+                    "Progress",
+                    f"{metrics['total']}/{len(test_dataset)}",
+                    help="Current evaluation progress through test dataset",
+                )
             with col2:
-                st.metric("Accuracy", f"{metrics['accuracy']:.1%}")
+                st.metric(
+                    "Type Precision",
+                    f"{metrics['type_precision']:.1%}",
+                    help="Sample-based precision using strict multiset matching: average of per-case precision scores. Over-prediction (feat→feat,feat) causes FP penalty.",
+                )
+            with col3:
+                st.metric(
+                    "Type Recall",
+                    f"{metrics['type_recall']:.1%}",
+                    help="Sample-based recall using strict multiset matching: average of per-case recall scores. Under-prediction causes FN penalty.",
+                )
+            with col4:
+                st.metric(
+                    "Type F1 (Macro)",
+                    f"{metrics['type_f1_macro']:.1%}",
+                    help="Sample-based F1 using strict multiset matching: average of per-case F1 scores. Exact count matching required (feat ≠ feat,feat).",
+                )
+            with col5:
+                st.metric(
+                    "Count Accuracy",
+                    f"{metrics['count_accuracy']:.1%}",
+                    help="Percentage of test cases with exact count match between predicted and actual",
+                )
 
-        # Update results table
+        # Update results table (exclude case metrics from display)
         with table_container.container():
             st.subheader("Evaluation Results")
-            display_results_df = (
+            # Select only display columns (exclude case metrics)
+            display_columns = [
+                "Test_Index",
+                "Predicted_Types",
+                "Actual_Types",
+                "Predicted_Count",
+                "Actual_Count",
+                "Status",
+                "Model_Reasoning",
+            ]
+            recent_results = (
                 evaluation_results_df.tail(15)
                 if len(evaluation_results_df) > 15
                 else evaluation_results_df
             )
+            display_results_df = recent_results[display_columns]
 
             column_config = {
                 "Test_Index": st.column_config.NumberColumn("Test #", width="small"),
