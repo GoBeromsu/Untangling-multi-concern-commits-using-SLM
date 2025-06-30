@@ -6,7 +6,7 @@ import pandas as pd
 from typing import List, Dict, Any, Tuple
 from collections import Counter
 from dotenv import load_dotenv
-from prompts.type import get_default_prompt_template, get_type_prompt
+from prompts.type import get_system_prompt
 from llms.openai import openai_api_call
 
 
@@ -67,7 +67,7 @@ def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
 
 
 def execute_batch_concern_evaluation(
-    api_key: str, test_dataset: List[Dict[str, Any]], prompt_template: str
+    api_key: str, test_dataset: List[Dict[str, Any]], system_prompt: str
 ) -> None:
     """Execute batch evaluation of concern classification with real-time updates."""
 
@@ -95,13 +95,12 @@ def execute_batch_concern_evaluation(
     for test_index, test_case in enumerate(test_dataset):
         status_text.text(f"Evaluating case {test_index+1}/{len(test_dataset)}...")
 
-        tangle_change = test_case.get("tangleChange", "")
+        diff = test_case.get("tangleChange", "")
         atomic_changes = test_case.get("atomicChanges", [])
         actual_concern_types = [change.get("label", "") for change in atomic_changes]
 
         # Get model prediction
-        formatted_prompt = get_type_prompt(tangle_change, prompt_template)
-        model_response = openai_api_call(api_key, formatted_prompt)
+        model_response = openai_api_call(api_key, diff, system_prompt)
 
         try:
             prediction_data = json.loads(model_response)
@@ -262,17 +261,16 @@ def execute_batch_concern_evaluation(
 
 def render_direct_input_interface(api_key: str) -> None:
     """Render UI interface for direct code diff input and concern analysis."""
-    user_code_diff = st.text_area(
+    diff = st.text_area(
         "Enter your code diff:",
         placeholder="Paste the output of `git diff` here...",
         height=300,
     )
 
-    st.subheader("Prompt Template")
-    default_prompt_template = get_default_prompt_template()
-    concern_analysis_prompt = st.text_area(
-        "Modify the prompt template (use {diff} placeholder):",
-        value=default_prompt_template,
+    st.subheader("System Prompt")
+    system_prompt = st.text_area(
+        "Modify the system prompt:",
+        value=get_system_prompt(),
         height=200,
         key="direct_input_prompt",
     )
@@ -281,8 +279,7 @@ def render_direct_input_interface(api_key: str) -> None:
         st.divider()
         st.header("📊 Analysis Results")
         with st.spinner("Analyzing code diff..."):
-            formatted_prompt = get_type_prompt(user_code_diff, concern_analysis_prompt)
-            model_response = openai_api_call(api_key, formatted_prompt)
+            model_response = openai_api_call(api_key, diff, system_prompt)
 
             try:
                 analysis_data = json.loads(model_response)
@@ -385,10 +382,9 @@ def render_batch_evaluation_interface(api_key: str) -> None:
         test_dataset = []
 
     st.subheader("Concern Analysis Prompt Template")
-    default_prompt_template = get_default_prompt_template()
-    batch_evaluation_prompt = st.text_area(
+    system_prompt = st.text_area(
         "Modify the prompt template (use {diff} placeholder):",
-        value=default_prompt_template,
+        value=get_system_prompt(),
         height=200,
         key="batch_evaluation_prompt",
     )
@@ -399,9 +395,7 @@ def render_batch_evaluation_interface(api_key: str) -> None:
         else:
             st.divider()
             st.header("📊 Evaluation Results")
-            execute_batch_concern_evaluation(
-                api_key, test_dataset, batch_evaluation_prompt
-            )
+            execute_batch_concern_evaluation(api_key, test_dataset, system_prompt)
 
 
 def main() -> None:

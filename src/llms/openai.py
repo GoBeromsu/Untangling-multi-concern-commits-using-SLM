@@ -6,6 +6,10 @@ COMMIT_TYPES = [
     "test",
     "cicd",
     "build",
+    "style",
+    "refactor",
+    "feat",
+    "fix",
 ]
 
 RESPONSE_SCHEMA = {
@@ -37,7 +41,8 @@ STRUCTURED_OUTPUT_FORMAT = {
 
 def openai_api_call(
     api_key: str,
-    prompt: str,
+    diff: str,
+    system_prompt: str,
     model: str = "gpt-4.1-2025-04-14",  # State of art openai model https://platform.openai.com/docs/models/gpt-4.1
     temperature: float = 0.0,  # for greedy decoding to remove potential randomness
 ) -> str:
@@ -47,8 +52,8 @@ def openai_api_call(
         response = client.chat.completions.create(
             model=model,
             messages=[
-                # Using user role only following https://github.com/0x404/conventional-commit-classification methodology
-                {"role": "user", "content": prompt},
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": diff},
             ],
             temperature=temperature,
             response_format=STRUCTURED_OUTPUT_FORMAT,

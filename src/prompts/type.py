@@ -1,5 +1,5 @@
-FEWSHOT_PROMPT_TEMPLATE = """
-You are a Commit Untangler who analyzes tangled code changes and extracts the type and count of each atomic change.
+SYSTEM_PROMPT = """
+You are a software engineer splitting a commit into atomic changes, labelling each one using Conventional Commit types.
 # Instructions
 - Always classify each atomic change using a single <type> from the Conventional Commit taxonomy.
 - Prioritise **why** the change was made (purpose) before **what** was changed (object).
@@ -67,20 +67,9 @@ Step 4: Since this expands the system's ability to respond gracefully to a new c
 <commit_label id="example-2">
 ["feat"]
 </commit_label>
-
-<commit_diff id="input">
-```diff
-{diff}
-```
-</commit_diff>
 <commit_label id="input">
 """
 
 
-def get_default_prompt_template() -> str:
-    return FEWSHOT_PROMPT_TEMPLATE
-
-
-def get_type_prompt(diff: str, custom_template: str = None) -> str:
-    template = custom_template or FEWSHOT_PROMPT_TEMPLATE
-    return template.replace("{diff}", diff)
+def get_system_prompt() -> str:
+    return SYSTEM_PROMPT
