@@ -165,6 +165,95 @@ def run_sequential_test(
     st.session_state.final_results_df = results_df
 
 
+def display_direct_input(api_key: str) -> None:
+    user_diff = st.text_area(
+            "Enter your code diff:",
+            placeholder="Paste the output of `git diff` here...",
+            height=300,
+        )
+    st.subheader("Prompt Template")
+    default_prompt = get_default_prompt_template()
+    prompt_template = st.text_area(
+        "Modify the prompt template (use {diff} placeholder):",
+        value=default_prompt,
+        height=200,
+        key="prompt_direct",
+    )
+
+    if st.button("Analyze Diff", type="primary", use_container_width=True):
+        if user_diff.strip() and prompt_template.strip():
+            st.divider()
+            st.header("📊 Output")
+            with st.spinner("Analyzing..."):
+                formatted_prompt = get_type_prompt(user_diff, prompt_template)
+                result = openai_api_call(api_key, formatted_prompt)
+                display_result(result)
+        else:
+            st.error("Please enter both a diff and a prompt template.")
+
+def display_test_from_file(api_key: str) -> None:
+            
+    # Get all JSON files dynamically from datasets directory
+    json_files = []
+    for pattern in ["datasets/**/*.json"]:
+        matches = glob.glob(pattern, recursive=True)
+        json_files.extend([f for f in matches if "candidate" not in f])
+
+    # Sort files for consistent display and filter out empty results
+    json_files = [f for f in json_files if f.endswith(".json")]
+    json_files.sort()
+
+    if not json_files:
+        st.error("No JSON files found in datasets directory")
+        st.stop()
+
+    test_file = st.selectbox(
+        "Select test data file:",
+        json_files,
+        format_func=lambda x: f"{os.path.basename(x)} ({os.path.dirname(x)})",
+    )
+
+    # Auto-load data when file is selected
+    if test_file:
+        test_data, metadata = load_test_data(test_file)
+        if test_data:
+            st.success(
+                f"📊 Loaded **{len(test_data)}** test items from `{test_file}`"
+            )
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.caption(f"⚙️ {metadata.get('concerns_per_case', '?')} concerns")
+            with col2:
+                types = ", ".join(metadata.get("types", []))
+                st.caption(f"🏷️ {types}")
+            with col3:
+                st.caption(
+                    f"🔀 {'different types' if metadata.get('ensure_different_types') else 'same types allowed'}"
+                )
+        else:
+            st.error("❌ Failed to load test data")
+            test_data = []
+    else:
+        test_data = []
+
+    st.subheader("Prompt Template")
+    default_prompt = get_default_prompt_template()
+    prompt_template = st.text_area(
+        "Modify the prompt template (use {diff} placeholder):",
+        value=default_prompt,
+        height=200,
+        key="prompt_test",
+    )
+
+    if st.button("Run Test", type="primary", use_container_width=True):
+        if not test_data:
+            st.error("Please select a valid test file first.")
+        else:
+            st.divider()
+            st.header("📊 Output")
+            run_sequential_test(api_key, test_data, prompt_template)
+
+
 def main() -> None:
     st.title("Concern is All You Need")
 
@@ -186,94 +275,9 @@ def main() -> None:
     tab1, tab2 = st.tabs(["Direct Input", "Test from File"])
 
     with tab1:
-        user_diff = st.text_area(
-            "Enter your code diff:",
-            placeholder="Paste the output of `git diff` here...",
-            height=300,
-        )
-
-        st.subheader("Prompt Template")
-        default_prompt = get_default_prompt_template()
-        prompt_template = st.text_area(
-            "Modify the prompt template (use {diff} placeholder):",
-            value=default_prompt,
-            height=200,
-            key="prompt_direct",
-        )
-
-        if st.button("Analyze Diff", type="primary", use_container_width=True):
-            if user_diff.strip() and prompt_template.strip():
-                st.divider()
-                st.header("📊 Output")
-                with st.spinner("Analyzing..."):
-                    formatted_prompt = get_type_prompt(user_diff, prompt_template)
-                    result = openai_api_call(api_key, formatted_prompt)
-                    display_result(result)
-            else:
-                st.error("Please enter both a diff and a prompt template.")
-
+        display_direct_input(api_key)
     with tab2:
-        # Get all JSON files dynamically from datasets directory
-        json_files = []
-        for pattern in ["datasets/**/*.json"]:
-            matches = glob.glob(pattern, recursive=True)
-            json_files.extend([f for f in matches if "candidate" not in f])
-
-        # Sort files for consistent display and filter out empty results
-        json_files = [f for f in json_files if f.endswith(".json")]
-        json_files.sort()
-
-        if not json_files:
-            st.error("No JSON files found in datasets directory")
-            st.stop()
-
-        test_file = st.selectbox(
-            "Select test data file:",
-            json_files,
-            format_func=lambda x: f"{os.path.basename(x)} ({os.path.dirname(x)})",
-        )
-
-        # Auto-load data when file is selected
-        if test_file:
-            test_data, metadata = load_test_data(test_file)
-            if test_data:
-                st.success(
-                    f"📊 Loaded **{len(test_data)}** test items from `{test_file}`"
-                )
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.caption(f"⚙️ {metadata.get('concerns_per_case', '?')} concerns")
-                with col2:
-                    types = ", ".join(metadata.get("types", []))
-                    st.caption(f"🏷️ {types}")
-                with col3:
-                    st.caption(
-                        f"🔀 {'different types' if metadata.get('ensure_different_types') else 'same types allowed'}"
-                    )
-            else:
-                st.error("❌ Failed to load test data")
-                test_data = []
-        else:
-            test_data = []
-
-        st.subheader("Prompt Template")
-        default_prompt = get_default_prompt_template()
-        prompt_template = st.text_area(
-            "Modify the prompt template (use {diff} placeholder):",
-            value=default_prompt,
-            height=200,
-            key="prompt_test",
-        )
-
-        if st.button("Run Test", type="primary", use_container_width=True):
-            if not test_data:
-                st.error("Please select a valid test file first.")
-            else:
-                st.divider()
-                st.header("📊 Output")
-                run_sequential_test(api_key, test_data, prompt_template)
-
-
+        display_test_from_file(api_key)
 if __name__ == "__main__":
     st.set_page_config(
         page_title="Concern is All You Need",
