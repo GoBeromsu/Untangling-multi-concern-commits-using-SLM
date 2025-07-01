@@ -22,28 +22,54 @@ You are a software engineer splitting a commit into atomic changes, labelling ea
 - **build**: Code changes that modify build tooling, dependencies, or build configuration files (e.g., `build.gradle`, `pom.xml`, `Makefile`, `Dockerfile`, or scripts affecting the build process).
 # Example
 <commit_diff id="example-1">
-diff --git a/src/main/java/com/example/FooService.java b/src/main/java/com/example/FooService.java
-@@ -10,6 +10,9 @@
- public class FooService {
-+    public boolean isFeatureEnabled() {
-+        return System.getProperty("feature.flag", "false").equals("true");
-+    }
+diff --git a/services/java/com/android/server/updates/SELinuxPolicyInstallReceiver.java b/services/java/com/android/server/updates/SELinuxPolicyInstallReceiver.java
+index e8337f6..0ab86e4 100644
+--- a/services/java/com/android/server/updates/SELinuxPolicyInstallReceiver.java
++++ b/services/java/com/android/server/updates/SELinuxPolicyInstallReceiver.java
+@@ -122,9 +122,16 @@ public class SELinuxPolicyInstallReceiver extends ConfigUpdateInstallReceiver {
+     }
+ 
+     private void setEnforcingMode(Context context) {
+-        boolean mode = Settings.Global.getInt(context.getContentResolver(),
+-            Settings.Global.SELINUX_STATUS, 0) == 1;
+-        SELinux.setSELinuxEnforce(mode);
++        String mode = Settings.Global.getString(context.getContentResolver(),
++            Settings.Global.SELINUX_STATUS);
++        if (mode.equals("1")) {
++            Slog.i(TAG, "Setting enforcing mode");
++            SystemProperties.set("persist.selinux.enforcing", mode);
++        } else if (mode.equals("0")) {
++            Slog.i(TAG, "Tried to set permissive mode, ignoring");
++        } else {
++            Slog.e(TAG, "Got invalid enforcing mode: " + mode);
++        }
+     }
+ 
+     @Override
 
-diff --git a/build.gradle b/build.gradle
-@@ -20,6 +20,7 @@ dependencies {
-     implementation 'org.example:core:1.0.0'
-+    implementation 'org.example:feature-flags:2.1.0'
-}
+diff --git a/common/buildcraft/api/recipes/AssemblyRecipe.java b/common/buildcraft/api/recipes/AssemblyRecipe.java
+index a384f7125..573db2827 100644
+--- a/common/buildcraft/api/recipes/AssemblyRecipe.java
++++ b/common/buildcraft/api/recipes/AssemblyRecipe.java
+@@ -1,8 +1,6 @@
+ package buildcraft.api.recipes;
+ 
+ import java.util.LinkedList;
+-
+-import buildcraft.core.inventory.StackHelper;
+ import net.minecraft.item.ItemStack;
+ 
+ public class AssemblyRecipe {
 </commit_diff>
 
 <reasoning id="example-1">
-Step 1: What does the change aim to achieve? → Introduces a runtime feature flag checker.  
-Step 2: What kind of file/entity changed? → Service class and build file.  
-Step 3: Purpose is dominant (introduce new runtime logic).  
-Step 4: `feat` for the method addition, `build` for dependency update.
+Step 1: What does the change aim to achieve? → Enhances SELinux mode handling with better validation and logging, and cleans up unused import.  
+Step 2: What kind of file/entity changed? → Security policy receiver class and recipe API class.  
+Step 3: Purpose analysis: SELinux changes add new logging capabilities and improved error handling, while import removal is code cleanup.  
+Step 4: `feat` for enhanced SELinux functionality with new logging, `refactor` for removing unused import.
 </reasoning>
 <commit_label id="example-1">
-["feat", "build"]
+["feat", "refactor"]
 </commit_label>
 
 <commit_diff id="example-2">
