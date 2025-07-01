@@ -1,0 +1,104 @@
+{
+  "metadata": {
+    "num_cases": 10,
+    "concerns_per_case": 1,
+    "types": [
+      "build"
+    ],
+    "allow_same_types": false,
+    "seed": 42,
+    "source_dataset": "datasets/candidates/codefuse-hqcm/dataset/test.json"
+  },
+  "cases": [
+    {
+      "tangleChange": "diff --git a/build.gradle b/build.gradle\nindex 227a903..37bc2yx 100644\n--- a/build.gradle\n+++ b/build.gradle\n@@ -1,7 +1,7 @@\n apply plugin: 'java'\n\n repositories {\n-    mavenCentral()\n+    jcenter()\n }\n\n dependencies {\n-    compile 'org.springframework.boot:spring-boot-starter-web:2.2.2'\n+    compile 'org.springframework.boot:spring-boot-starter-web:2.3.4'\n }",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/build.gradle b/build.gradle\nindex 227a903..37bc2yx 100644\n--- a/build.gradle\n+++ b/build.gradle\n@@ -1,7 +1,7 @@\n apply plugin: 'java'\n\n repositories {\n-    mavenCentral()\n+    jcenter()\n }\n\n dependencies {\n-    compile 'org.springframework.boot:spring-boot-starter-web:2.2.2'\n+    compile 'org.springframework.boot:spring-boot-starter-web:2.3.4'\n }",
+          "label": "build"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/build.gradle b/build.gradle\nindex 6g74558..897aebc 100644\n--- a/build.gradle\n+++ b/build.gradle\n@@ -1,13 +1,13 @@\n apply plugin: 'java'\n apply plugin: 'eclipse'\n \n-group = 'com.example'\n-version = '1.0.0-SNAPSHOT'\n+group = 'com.mycompany'\n+version = '1.0.1'\n \n sourceCompatibility = 1.8\n \n repositories {\n-    mavenCentral()\n+    maven { url \"https://maven.springframework.org/release\" }\n }\n \n dependencies {\n-    testCompile group: 'junit', name: 'junit', version: '4.13.1'\n+    testCompile group: 'org.springframework.boot', name: 'spring-boot-starter-test', version: '2.4.5'\n }",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/build.gradle b/build.gradle\nindex 6g74558..897aebc 100644\n--- a/build.gradle\n+++ b/build.gradle\n@@ -1,13 +1,13 @@\n apply plugin: 'java'\n apply plugin: 'eclipse'\n \n-group = 'com.example'\n-version = '1.0.0-SNAPSHOT'\n+group = 'com.mycompany'\n+version = '1.0.1'\n \n sourceCompatibility = 1.8\n \n repositories {\n-    mavenCentral()\n+    maven { url \"https://maven.springframework.org/release\" }\n }\n \n dependencies {\n-    testCompile group: 'junit', name: 'junit', version: '4.13.1'\n+    testCompile group: 'org.springframework.boot', name: 'spring-boot-starter-test', version: '2.4.5'\n }",
+          "label": "build"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/shenyu-client/pom.xml b/shenyu-client/pom.xml\nindex 971011e..91c0874 100644\n--- a/shenyu-client/pom.xml\n+++ b/shenyu-client/pom.xml\n@@ -37,6 +37,7 @@\n         <module>shenyu-client-websocket</module>\n         <module>shenyu-client-brpc</module>\n         <module>shenyu-client-api-docs-annotations</module>\n+        <module>shenyu-client-autoconfig</module>\n     </modules>\n \n     <dependencies>",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/shenyu-client/pom.xml b/shenyu-client/pom.xml\nindex 971011e..91c0874 100644\n--- a/shenyu-client/pom.xml\n+++ b/shenyu-client/pom.xml\n@@ -37,6 +37,7 @@\n         <module>shenyu-client-websocket</module>\n         <module>shenyu-client-brpc</module>\n         <module>shenyu-client-api-docs-annotations</module>\n+        <module>shenyu-client-autoconfig</module>\n     </modules>\n \n     <dependencies>",
+          "label": "build"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/build.gradle b/build.gradle\nindex e84e462..0f68828 100644\n--- a/build.gradle\n+++ b/build.gradle\n@@ -15,14 +15,14 @@\n\n-sourceCompatibility = 1.5\n+sourceCompatibility = 1.8\n version = '1.0'\n jar {\n     manifest {\n         attributes 'Implementation-Title': 'Gradle Quickstart',\n                    'Implementation-Version': version\n     }\n }\n \n-dependencies {\n+dependencies { \n     testCompile group: 'junit', name: 'junit', version: '4.12'\n-    compile group: 'com.google.guava', name: 'guava', version: '18.0'\n+    compile group: 'com.google.guava', name: 'guava', version: '28.2-jre'\n }",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/build.gradle b/build.gradle\nindex e84e462..0f68828 100644\n--- a/build.gradle\n+++ b/build.gradle\n@@ -15,14 +15,14 @@\n\n-sourceCompatibility = 1.5\n+sourceCompatibility = 1.8\n version = '1.0'\n jar {\n     manifest {\n         attributes 'Implementation-Title': 'Gradle Quickstart',\n                    'Implementation-Version': version\n     }\n }\n \n-dependencies {\n+dependencies { \n     testCompile group: 'junit', name: 'junit', version: '4.12'\n-    compile group: 'com.google.guava', name: 'guava', version: '18.0'\n+    compile group: 'com.google.guava', name: 'guava', version: '28.2-jre'\n }",
+          "label": "build"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/docs/pom.xml b/docs/pom.xml\nindex f172775..54bd64c 100644\n--- a/docs/pom.xml\n+++ b/docs/pom.xml\n@@ -5,7 +5,7 @@\n     <parent>\n         <groupId>io.trino</groupId>\n         <artifactId>trino-root</artifactId>\n-        <version>416</version>\n+        <version>417-SNAPSHOT</version>\n     </parent>\n \n     <artifactId>trino-docs</artifactId>",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/docs/pom.xml b/docs/pom.xml\nindex f172775..54bd64c 100644\n--- a/docs/pom.xml\n+++ b/docs/pom.xml\n@@ -5,7 +5,7 @@\n     <parent>\n         <groupId>io.trino</groupId>\n         <artifactId>trino-root</artifactId>\n-        <version>416</version>\n+        <version>417-SNAPSHOT</version>\n     </parent>\n \n     <artifactId>trino-docs</artifactId>",
+          "label": "build"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/client/trino-cli/pom.xml b/client/trino-cli/pom.xml\nindex 11ded11..212dacf 100644\n--- a/client/trino-cli/pom.xml\n+++ b/client/trino-cli/pom.xml\n@@ -5,7 +5,7 @@\n     <parent>\n         <groupId>io.trino</groupId>\n         <artifactId>trino-root</artifactId>\n-        <version>416</version>\n+        <version>417-SNAPSHOT</version>\n         <relativePath>../../pom.xml</relativePath>\n     </parent>\n ",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/client/trino-cli/pom.xml b/client/trino-cli/pom.xml\nindex 11ded11..212dacf 100644\n--- a/client/trino-cli/pom.xml\n+++ b/client/trino-cli/pom.xml\n@@ -5,7 +5,7 @@\n     <parent>\n         <groupId>io.trino</groupId>\n         <artifactId>trino-root</artifactId>\n-        <version>416</version>\n+        <version>417-SNAPSHOT</version>\n         <relativePath>../../pom.xml</relativePath>\n     </parent>\n ",
+          "label": "build"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/build.gradle b/build.gradle\nindex 8ee4d6c..564123e 100644\n--- a/build.gradle\n+++ b/build.gradle\n@@ -3,7 +3,9 @@ plugins {\n     id 'java'\n }\n \n-dependencies {\n+// Adding new libraries\n+dependencies {\n+    compile 'com.google.guava:guava:23.0'\n     testCompile group: 'junit', name: 'junit', version: '4.13.1'\n     compile 'org.projectlombok:lombok:1.18.12'\n     annotationProcessor 'org.projectlombok:lombok:1.18.12'\n@@ -14,6 +16,6 @@ dependencies {\n }\n \n java {\n-    sourceCompatibility = JavaVersion.VERSION_1_8\n+    sourceCompatibility = JavaVersion.VERSION_1_11\n     targetCompatibility = JavaVersion.VERSION_1_8\n }",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/build.gradle b/build.gradle\nindex 8ee4d6c..564123e 100644\n--- a/build.gradle\n+++ b/build.gradle\n@@ -3,7 +3,9 @@ plugins {\n     id 'java'\n }\n \n-dependencies {\n+// Adding new libraries\n+dependencies {\n+    compile 'com.google.guava:guava:23.0'\n     testCompile group: 'junit', name: 'junit', version: '4.13.1'\n     compile 'org.projectlombok:lombok:1.18.12'\n     annotationProcessor 'org.projectlombok:lombok:1.18.12'\n@@ -14,6 +16,6 @@ dependencies {\n }\n \n java {\n-    sourceCompatibility = JavaVersion.VERSION_1_8\n+    sourceCompatibility = JavaVersion.VERSION_1_11\n     targetCompatibility = JavaVersion.VERSION_1_8\n }",
+          "label": "build"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/server/sonar-webserver-webapi/build.gradle b/server/sonar-webserver-webapi/build.gradle\nindex a4e223b..2ae902d 100644\n--- a/server/sonar-webserver-webapi/build.gradle\n+++ b/server/sonar-webserver-webapi/build.gradle\n@@ -39,7 +39,7 @@ dependencies {\n   testImplementation 'javax.servlet:javax.servlet-api'\n   testImplementation 'org.mockito:mockito-core'\n   testImplementation 'org.sonarsource.api.plugin:sonar-plugin-api-test-fixtures'\n-  testImplementation 'org.springframework:spring-test:${springVersion}'\n+  testImplementation 'org.springframework:spring-test'\n   testImplementation testFixtures(project(':server:sonar-server-common'))\n   testImplementation testFixtures(project(':server:sonar-webserver-auth'))\n   testImplementation testFixtures(project(':server:sonar-webserver-es'))",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/server/sonar-webserver-webapi/build.gradle b/server/sonar-webserver-webapi/build.gradle\nindex a4e223b..2ae902d 100644\n--- a/server/sonar-webserver-webapi/build.gradle\n+++ b/server/sonar-webserver-webapi/build.gradle\n@@ -39,7 +39,7 @@ dependencies {\n   testImplementation 'javax.servlet:javax.servlet-api'\n   testImplementation 'org.mockito:mockito-core'\n   testImplementation 'org.sonarsource.api.plugin:sonar-plugin-api-test-fixtures'\n-  testImplementation 'org.springframework:spring-test:${springVersion}'\n+  testImplementation 'org.springframework:spring-test'\n   testImplementation testFixtures(project(':server:sonar-server-common'))\n   testImplementation testFixtures(project(':server:sonar-webserver-auth'))\n   testImplementation testFixtures(project(':server:sonar-webserver-es'))",
+          "label": "build"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/pom.xml b/pom.xml\nindex 330f26a..2df976a 100644\n--- a/pom.xml\n+++ b/pom.xml\n@@ -44,6 +44,7 @@\n         <module>shenyu-dist</module>\n         <module>shenyu-alert</module>\n         <module>shenyu-sdk</module>\n+        <module>shenyu-discovery</module>\n     </modules>\n \n     <licenses>",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/pom.xml b/pom.xml\nindex 330f26a..2df976a 100644\n--- a/pom.xml\n+++ b/pom.xml\n@@ -44,6 +44,7 @@\n         <module>shenyu-dist</module>\n         <module>shenyu-alert</module>\n         <module>shenyu-sdk</module>\n+        <module>shenyu-discovery</module>\n     </modules>\n \n     <licenses>",
+          "label": "build"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/Build.gradle b/Build.gradle\nindex 7e640d3..4644dd5 100644\n--- a/Build.gradle\n+++ b/Build.gradle\n@@ -4,9 +4,9 @@ apply plugin: 'eclipse'\n apply plugin: 'org.springframework.boot'\n \n dependencies {\n-    compile('org.springframework.boot:spring-boot-starter-data-jpa')\n-    compile('org.springframework.boot:spring-boot-starter-web')\n-    runtime('com.h2database:h2')\n+    compile('org.springframework.boot:spring-boot-starter-data-jpa:2.5.2')\n+    compile('org.springframework.boot:spring-boot-starter-web:2.5.2')\n+    runtime('com.h2database:h2:1.4.200')\n     testCompile('org.springframework.boot:spring-boot-starter-test')\n }\n \n@@ -14,6 +14,9 @@ bootJar {\n }\n \n bootRun {\n+    systemProperties = System.properties\n+    systemProperties['spring.profiles.active'] = 'dev'\n+    jvmArgs('-Xdebug','-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005')\n     main = project.findProperty('mainClassName')\n }\n \n@@ -23,7 +26,7 @@ springBoot {\n }\n \n jar {\n-    manifest {\n+    manifest {\n         attributes 'Implementation-Title': 'Grails', 'Implementation-Version': version\n     }\n }\n@@ -31,4 +34,4 @@ jar {\n \n task wrapper(type: Wrapper) {\n     gradleVersion = '7.0'\n-}\n\\ No newline at end of file\n+}\n",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/Build.gradle b/Build.gradle\nindex 7e640d3..4644dd5 100644\n--- a/Build.gradle\n+++ b/Build.gradle\n@@ -4,9 +4,9 @@ apply plugin: 'eclipse'\n apply plugin: 'org.springframework.boot'\n \n dependencies {\n-    compile('org.springframework.boot:spring-boot-starter-data-jpa')\n-    compile('org.springframework.boot:spring-boot-starter-web')\n-    runtime('com.h2database:h2')\n+    compile('org.springframework.boot:spring-boot-starter-data-jpa:2.5.2')\n+    compile('org.springframework.boot:spring-boot-starter-web:2.5.2')\n+    runtime('com.h2database:h2:1.4.200')\n     testCompile('org.springframework.boot:spring-boot-starter-test')\n }\n \n@@ -14,6 +14,9 @@ bootJar {\n }\n \n bootRun {\n+    systemProperties = System.properties\n+    systemProperties['spring.profiles.active'] = 'dev'\n+    jvmArgs('-Xdebug','-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005')\n     main = project.findProperty('mainClassName')\n }\n \n@@ -23,7 +26,7 @@ springBoot {\n }\n \n jar {\n-    manifest {\n+    manifest {\n         attributes 'Implementation-Title': 'Grails', 'Implementation-Version': version\n     }\n }\n@@ -31,4 +34,4 @@ jar {\n \n task wrapper(type: Wrapper) {\n     gradleVersion = '7.0'\n-}\n\\ No newline at end of file\n+}\n",
+          "label": "build"
+        }
+      ]
+    }
+  ]
+}

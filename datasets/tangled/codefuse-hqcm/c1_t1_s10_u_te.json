@@ -1,0 +1,104 @@
+{
+  "metadata": {
+    "num_cases": 10,
+    "concerns_per_case": 1,
+    "types": [
+      "test"
+    ],
+    "allow_same_types": false,
+    "seed": 42,
+    "source_dataset": "datasets/candidates/codefuse-hqcm/dataset/test.json"
+  },
+  "cases": [
+    {
+      "tangleChange": "diff --git a/hystrix-core/src/test/java/com/netflix/hystrix/HystrixCommandTestWithCustomConcurrencyStrategy.java b/hystrix-core/src/test/java/com/netflix/hystrix/HystrixCommandTestWithCustomConcurrencyStrategy.java\nindex 662c493..093b857 100644\n--- a/hystrix-core/src/test/java/com/netflix/hystrix/HystrixCommandTestWithCustomConcurrencyStrategy.java\n+++ b/hystrix-core/src/test/java/com/netflix/hystrix/HystrixCommandTestWithCustomConcurrencyStrategy.java\n@@ -41,6 +41,7 @@ public class HystrixCommandTestWithCustomConcurrencyStrategy {\n     public void reset() {\n         HystrixRequestContext.setContextOnCurrentThread(null);\n         HystrixPropertiesFactory.reset();\n+        HystrixPlugins.reset();\n     }\n \n     /**\n",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/hystrix-core/src/test/java/com/netflix/hystrix/HystrixCommandTestWithCustomConcurrencyStrategy.java b/hystrix-core/src/test/java/com/netflix/hystrix/HystrixCommandTestWithCustomConcurrencyStrategy.java\nindex 662c493..093b857 100644\n--- a/hystrix-core/src/test/java/com/netflix/hystrix/HystrixCommandTestWithCustomConcurrencyStrategy.java\n+++ b/hystrix-core/src/test/java/com/netflix/hystrix/HystrixCommandTestWithCustomConcurrencyStrategy.java\n@@ -41,6 +41,7 @@ public class HystrixCommandTestWithCustomConcurrencyStrategy {\n     public void reset() {\n         HystrixRequestContext.setContextOnCurrentThread(null);\n         HystrixPropertiesFactory.reset();\n+        HystrixPlugins.reset();\n     }\n \n     /**\n",
+          "label": "test"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/platform/testFramework/src/com/intellij/testFramework/LightPlatformTestCase.java b/platform/testFramework/src/com/intellij/testFramework/LightPlatformTestCase.java\nindex 3617e5c..4f3279d 100644\n--- a/platform/testFramework/src/com/intellij/testFramework/LightPlatformTestCase.java\n+++ b/platform/testFramework/src/com/intellij/testFramework/LightPlatformTestCase.java\n@@ -45,7 +45,6 @@ import com.intellij.openapi.command.undo.UndoManager;\n import com.intellij.openapi.editor.Document;\n import com.intellij.openapi.editor.Editor;\n import com.intellij.openapi.editor.EditorFactory;\n-import com.intellij.openapi.editor.ex.EditorSettingsExternalizable;\n import com.intellij.openapi.editor.impl.ComplementaryFontsRegistry;\n import com.intellij.openapi.editor.impl.EditorFactoryImpl;\n import com.intellij.openapi.editor.impl.EditorImpl;\n@@ -307,8 +306,6 @@ public abstract class LightPlatformTestCase extends UsefulTestCase implements Da\n         // various tests can use different mocking techniques for font-related code\n         // so we must reset our font cache, to avoid potential impact of tests on other tests \n         ComplementaryFontsRegistry.resetCaches();\n-\n-        System.out.println(\"soft wraps enabled: \" + EditorSettingsExternalizable.getInstance().isUseSoftWraps()); // temporary code to find out cause of test blinking\n       }\n     });\n   }\n",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/platform/testFramework/src/com/intellij/testFramework/LightPlatformTestCase.java b/platform/testFramework/src/com/intellij/testFramework/LightPlatformTestCase.java\nindex 3617e5c..4f3279d 100644\n--- a/platform/testFramework/src/com/intellij/testFramework/LightPlatformTestCase.java\n+++ b/platform/testFramework/src/com/intellij/testFramework/LightPlatformTestCase.java\n@@ -45,7 +45,6 @@ import com.intellij.openapi.command.undo.UndoManager;\n import com.intellij.openapi.editor.Document;\n import com.intellij.openapi.editor.Editor;\n import com.intellij.openapi.editor.EditorFactory;\n-import com.intellij.openapi.editor.ex.EditorSettingsExternalizable;\n import com.intellij.openapi.editor.impl.ComplementaryFontsRegistry;\n import com.intellij.openapi.editor.impl.EditorFactoryImpl;\n import com.intellij.openapi.editor.impl.EditorImpl;\n@@ -307,8 +306,6 @@ public abstract class LightPlatformTestCase extends UsefulTestCase implements Da\n         // various tests can use different mocking techniques for font-related code\n         // so we must reset our font cache, to avoid potential impact of tests on other tests \n         ComplementaryFontsRegistry.resetCaches();\n-\n-        System.out.println(\"soft wraps enabled: \" + EditorSettingsExternalizable.getInstance().isUseSoftWraps()); // temporary code to find out cause of test blinking\n       }\n     });\n   }\n",
+          "label": "test"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/components/camel-jetty/src/test/java/org/apache/camel/component/jetty/HttpProxyRouteTest.java b/components/camel-jetty/src/test/java/org/apache/camel/component/jetty/HttpProxyRouteTest.java\nindex 8f932cf339..da93bce36c 100644\n--- a/components/camel-jetty/src/test/java/org/apache/camel/component/jetty/HttpProxyRouteTest.java\n+++ b/components/camel-jetty/src/test/java/org/apache/camel/component/jetty/HttpProxyRouteTest.java\n@@ -24,7 +24,7 @@ import org.junit.Test;\n \n public class HttpProxyRouteTest extends BaseJettyTest {\n \n-    private int size = 500;\n+    private int size = 10;\n \n     @Test\n     public void testHttpProxy() throws Exception {\n",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/components/camel-jetty/src/test/java/org/apache/camel/component/jetty/HttpProxyRouteTest.java b/components/camel-jetty/src/test/java/org/apache/camel/component/jetty/HttpProxyRouteTest.java\nindex 8f932cf339..da93bce36c 100644\n--- a/components/camel-jetty/src/test/java/org/apache/camel/component/jetty/HttpProxyRouteTest.java\n+++ b/components/camel-jetty/src/test/java/org/apache/camel/component/jetty/HttpProxyRouteTest.java\n@@ -24,7 +24,7 @@ import org.junit.Test;\n \n public class HttpProxyRouteTest extends BaseJettyTest {\n \n-    private int size = 500;\n+    private int size = 10;\n \n     @Test\n     public void testHttpProxy() throws Exception {\n",
+          "label": "test"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/platform/platform-tests/testSrc/com/intellij/openapi/keymap/impl/IdeMouseEventDispatcherTest.java b/platform/platform-tests/testSrc/com/intellij/openapi/keymap/impl/IdeMouseEventDispatcherTest.java\nindex 352fa5a..92ef56e 100644\n--- a/platform/platform-tests/testSrc/com/intellij/openapi/keymap/impl/IdeMouseEventDispatcherTest.java\n+++ b/platform/platform-tests/testSrc/com/intellij/openapi/keymap/impl/IdeMouseEventDispatcherTest.java\n@@ -25,8 +25,11 @@ import com.intellij.openapi.keymap.ex.KeymapManagerEx;\n import com.intellij.testFramework.LightPlatformTestCase;\n \n import javax.swing.*;\n+import java.awt.*;\n import java.awt.event.MouseEvent;\n \n+import static org.junit.Assume.assumeFalse;\n+\n public class IdeMouseEventDispatcherTest extends LightPlatformTestCase {\n   private static final String OUR_KEYMAP_NAME = \"IdeMouseEventDispatcherTestKeymap\";\n   private static final String OUR_TEST_ACTION = \"IdeMouseEventDispatcherTestAction\";\n@@ -38,6 +41,8 @@ public class IdeMouseEventDispatcherTest extends LightPlatformTestCase {\n   private int myActionExecutionCount;\n \n   public void setUp() throws Exception {\n+    assumeFalse(GraphicsEnvironment.isHeadless());\n+\n     super.setUp();\n \n     ActionManager.getInstance().registerAction(OUR_TEST_ACTION, new EmptyAction());\n",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/platform/platform-tests/testSrc/com/intellij/openapi/keymap/impl/IdeMouseEventDispatcherTest.java b/platform/platform-tests/testSrc/com/intellij/openapi/keymap/impl/IdeMouseEventDispatcherTest.java\nindex 352fa5a..92ef56e 100644\n--- a/platform/platform-tests/testSrc/com/intellij/openapi/keymap/impl/IdeMouseEventDispatcherTest.java\n+++ b/platform/platform-tests/testSrc/com/intellij/openapi/keymap/impl/IdeMouseEventDispatcherTest.java\n@@ -25,8 +25,11 @@ import com.intellij.openapi.keymap.ex.KeymapManagerEx;\n import com.intellij.testFramework.LightPlatformTestCase;\n \n import javax.swing.*;\n+import java.awt.*;\n import java.awt.event.MouseEvent;\n \n+import static org.junit.Assume.assumeFalse;\n+\n public class IdeMouseEventDispatcherTest extends LightPlatformTestCase {\n   private static final String OUR_KEYMAP_NAME = \"IdeMouseEventDispatcherTestKeymap\";\n   private static final String OUR_TEST_ACTION = \"IdeMouseEventDispatcherTestAction\";\n@@ -38,6 +41,8 @@ public class IdeMouseEventDispatcherTest extends LightPlatformTestCase {\n   private int myActionExecutionCount;\n \n   public void setUp() throws Exception {\n+    assumeFalse(GraphicsEnvironment.isHeadless());\n+\n     super.setUp();\n \n     ActionManager.getInstance().registerAction(OUR_TEST_ACTION, new EmptyAction());\n",
+          "label": "test"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/trunk/JLanguageTool/src/test/de/danielnaber/languagetool/synthesis/en/EnglishSynthesizerTest.java b/trunk/JLanguageTool/src/test/de/danielnaber/languagetool/synthesis/en/EnglishSynthesizerTest.java\nindex 039aa4c45c..76c5218583 100644\n--- a/trunk/JLanguageTool/src/test/de/danielnaber/languagetool/synthesis/en/EnglishSynthesizerTest.java\n+++ b/trunk/JLanguageTool/src/test/de/danielnaber/languagetool/synthesis/en/EnglishSynthesizerTest.java\n@@ -26,6 +26,7 @@ public class EnglishSynthesizerTest extends TestCase {\n     //with special indefinite article\n     assertEquals(\"[a university, the university]\", Arrays.toString(synth.synthesize(dummyToken(\"university\"), \"+DT\", false)));\n     assertEquals(\"[an hour, the hour]\", Arrays.toString(synth.synthesize(dummyToken(\"hour\"), \"+DT\", false)));\n+    assertEquals(\"[an hour]\", Arrays.toString(synth.synthesize(dummyToken(\"hour\"), \"+INDT\", false)));\n   }\n \n }\n",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/trunk/JLanguageTool/src/test/de/danielnaber/languagetool/synthesis/en/EnglishSynthesizerTest.java b/trunk/JLanguageTool/src/test/de/danielnaber/languagetool/synthesis/en/EnglishSynthesizerTest.java\nindex 039aa4c45c..76c5218583 100644\n--- a/trunk/JLanguageTool/src/test/de/danielnaber/languagetool/synthesis/en/EnglishSynthesizerTest.java\n+++ b/trunk/JLanguageTool/src/test/de/danielnaber/languagetool/synthesis/en/EnglishSynthesizerTest.java\n@@ -26,6 +26,7 @@ public class EnglishSynthesizerTest extends TestCase {\n     //with special indefinite article\n     assertEquals(\"[a university, the university]\", Arrays.toString(synth.synthesize(dummyToken(\"university\"), \"+DT\", false)));\n     assertEquals(\"[an hour, the hour]\", Arrays.toString(synth.synthesize(dummyToken(\"hour\"), \"+DT\", false)));\n+    assertEquals(\"[an hour]\", Arrays.toString(synth.synthesize(dummyToken(\"hour\"), \"+INDT\", false)));\n   }\n \n }\n",
+          "label": "test"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/src/main/java/com/simpligility/maven/plugins/android/asm/AndroidTestFinder.java b/src/main/java/com/simpligility/maven/plugins/android/asm/AndroidTestFinder.java\nindex 9e028974..cdad97c9 100644\n--- a/src/main/java/com/simpligility/maven/plugins/android/asm/AndroidTestFinder.java\n+++ b/src/main/java/com/simpligility/maven/plugins/android/asm/AndroidTestFinder.java\n@@ -28,7 +28,7 @@ import java.util.LinkedList;\n import java.util.List;\n \n /**\n- * Finds Android instrumentation test classes in a directory of compiled Java classes.\n+ * Finds Android instrumentation test classes to be run by InstrumentationTestRunner in a directory of compiled Java classes.\n  *\n  * @author hugo.josefson@jayway.com\n  */\n",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/src/main/java/com/simpligility/maven/plugins/android/asm/AndroidTestFinder.java b/src/main/java/com/simpligility/maven/plugins/android/asm/AndroidTestFinder.java\nindex 9e028974..cdad97c9 100644\n--- a/src/main/java/com/simpligility/maven/plugins/android/asm/AndroidTestFinder.java\n+++ b/src/main/java/com/simpligility/maven/plugins/android/asm/AndroidTestFinder.java\n@@ -28,7 +28,7 @@ import java.util.LinkedList;\n import java.util.List;\n \n /**\n- * Finds Android instrumentation test classes in a directory of compiled Java classes.\n+ * Finds Android instrumentation test classes to be run by InstrumentationTestRunner in a directory of compiled Java classes.\n  *\n  * @author hugo.josefson@jayway.com\n  */\n",
+          "label": "test"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/jOOQ-test/src/org/jooq/test/jOOQAbstractTest.java b/jOOQ-test/src/org/jooq/test/jOOQAbstractTest.java\nindex e4fbc9e50..9d9afc00e 100644\n--- a/jOOQ-test/src/org/jooq/test/jOOQAbstractTest.java\n+++ b/jOOQ-test/src/org/jooq/test/jOOQAbstractTest.java\n@@ -6947,6 +6947,7 @@ public abstract class jOOQAbstractTest<\n \r\n     @Test\r\n     public void testLoader() throws Exception {\r\n+        reset = false;\r\n         connection.setAutoCommit(false);\r\n \r\n         Field<Integer> count = create().count();\r\n",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/jOOQ-test/src/org/jooq/test/jOOQAbstractTest.java b/jOOQ-test/src/org/jooq/test/jOOQAbstractTest.java\nindex e4fbc9e50..9d9afc00e 100644\n--- a/jOOQ-test/src/org/jooq/test/jOOQAbstractTest.java\n+++ b/jOOQ-test/src/org/jooq/test/jOOQAbstractTest.java\n@@ -6947,6 +6947,7 @@ public abstract class jOOQAbstractTest<\n \r\n     @Test\r\n     public void testLoader() throws Exception {\r\n+        reset = false;\r\n         connection.setAutoCommit(false);\r\n \r\n         Field<Integer> count = create().count();\r\n",
+          "label": "test"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/src/test/java/hex/GLMTest.java b/src/test/java/hex/GLMTest.java\nindex 98d56c70a..e4946bdce 100644\n--- a/src/test/java/hex/GLMTest.java\n+++ b/src/test/java/hex/GLMTest.java\n@@ -390,8 +390,7 @@ public class GLMTest extends TestUtil {\n       JsonObject glm = computeGLMlog(lsms,va,true); // Solve it!\n       JsonObject jcoefs = glm.get(\"coefficients\").getAsJsonObject();\n       double icept = jcoefs.get(\"Intercept\").getAsDouble();\n-\n-      assertCat(jcoefs,icept,\"Low\" ,0.0      );\n+//      assertCat(jcoefs,icept,\"Low\" ,0.0      );\n       assertCat(jcoefs,icept,\"Med\" ,0.3333333);\n       assertCat(jcoefs,icept,\"High\",1.0      );\n       UKV.remove(Key.make(glm.get(Constants.MODEL_KEY).getAsString()));\n",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/src/test/java/hex/GLMTest.java b/src/test/java/hex/GLMTest.java\nindex 98d56c70a..e4946bdce 100644\n--- a/src/test/java/hex/GLMTest.java\n+++ b/src/test/java/hex/GLMTest.java\n@@ -390,8 +390,7 @@ public class GLMTest extends TestUtil {\n       JsonObject glm = computeGLMlog(lsms,va,true); // Solve it!\n       JsonObject jcoefs = glm.get(\"coefficients\").getAsJsonObject();\n       double icept = jcoefs.get(\"Intercept\").getAsDouble();\n-\n-      assertCat(jcoefs,icept,\"Low\" ,0.0      );\n+//      assertCat(jcoefs,icept,\"Low\" ,0.0      );\n       assertCat(jcoefs,icept,\"Med\" ,0.3333333);\n       assertCat(jcoefs,icept,\"High\",1.0      );\n       UKV.remove(Key.make(glm.get(Constants.MODEL_KEY).getAsString()));\n",
+          "label": "test"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/tests/gdx-tests/src/com/badlogic/gdx/tests/bullet/BaseBulletTest.java b/tests/gdx-tests/src/com/badlogic/gdx/tests/bullet/BaseBulletTest.java\nindex 89a93d0..13ccd9f 100644\n--- a/tests/gdx-tests/src/com/badlogic/gdx/tests/bullet/BaseBulletTest.java\n+++ b/tests/gdx-tests/src/com/badlogic/gdx/tests/bullet/BaseBulletTest.java\n@@ -72,7 +72,7 @@ public class BaseBulletTest extends BulletTest {\n \tpublic ModelBuilder modelBuilder = new ModelBuilder();\n \tpublic ModelBatch modelBatch;\n \tpublic Array<Disposable> disposables = new Array<Disposable>();\n-\tprivate int debugMode = DebugDrawModes.DBG_DrawFeaturesText;\n+\tprivate int debugMode = DebugDrawModes.DBG_NoDebug;\n \t\n \tprotected final static Vector3 tmpV1 = new Vector3(), tmpV2 = new Vector3();\n \n",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/tests/gdx-tests/src/com/badlogic/gdx/tests/bullet/BaseBulletTest.java b/tests/gdx-tests/src/com/badlogic/gdx/tests/bullet/BaseBulletTest.java\nindex 89a93d0..13ccd9f 100644\n--- a/tests/gdx-tests/src/com/badlogic/gdx/tests/bullet/BaseBulletTest.java\n+++ b/tests/gdx-tests/src/com/badlogic/gdx/tests/bullet/BaseBulletTest.java\n@@ -72,7 +72,7 @@ public class BaseBulletTest extends BulletTest {\n \tpublic ModelBuilder modelBuilder = new ModelBuilder();\n \tpublic ModelBatch modelBatch;\n \tpublic Array<Disposable> disposables = new Array<Disposable>();\n-\tprivate int debugMode = DebugDrawModes.DBG_DrawFeaturesText;\n+\tprivate int debugMode = DebugDrawModes.DBG_NoDebug;\n \t\n \tprotected final static Vector3 tmpV1 = new Vector3(), tmpV2 = new Vector3();\n \n",
+          "label": "test"
+        }
+      ]
+    },
+    {
+      "tangleChange": "diff --git a/picasso/src/test/java/com/squareup/picasso/DispatcherTest.java b/picasso/src/test/java/com/squareup/picasso/DispatcherTest.java\nindex c9643ed..4dbefbd 100644\n--- a/picasso/src/test/java/com/squareup/picasso/DispatcherTest.java\n+++ b/picasso/src/test/java/com/squareup/picasso/DispatcherTest.java\n@@ -68,6 +68,11 @@ public class DispatcherTest {\n     verify(service).shutdown();\n   }\n \n+  @Test public void shutdownUnregistersReceiver() throws Exception {\n+    dispatcher.shutdown();\n+    verify(context).unregisterReceiver(dispatcher.receiver);\n+  }\n+\n   @Test public void performSubmitWithNewRequestQueuesHunter() throws Exception {\n     Action action = TestUtils.mockAction(URI_KEY_1, URI_1);\n     dispatcher.performSubmit(action);\n",
+      "atomicChanges": [
+        {
+          "change": "diff --git a/picasso/src/test/java/com/squareup/picasso/DispatcherTest.java b/picasso/src/test/java/com/squareup/picasso/DispatcherTest.java\nindex c9643ed..4dbefbd 100644\n--- a/picasso/src/test/java/com/squareup/picasso/DispatcherTest.java\n+++ b/picasso/src/test/java/com/squareup/picasso/DispatcherTest.java\n@@ -68,6 +68,11 @@ public class DispatcherTest {\n     verify(service).shutdown();\n   }\n \n+  @Test public void shutdownUnregistersReceiver() throws Exception {\n+    dispatcher.shutdown();\n+    verify(context).unregisterReceiver(dispatcher.receiver);\n+  }\n+\n   @Test public void performSubmitWithNewRequestQueuesHunter() throws Exception {\n     Action action = TestUtils.mockAction(URI_KEY_1, URI_1);\n     dispatcher.performSubmit(action);\n",
+          "label": "test"
+        }
+      ]
+    }
+  ]
+}
