@@ -14,7 +14,7 @@ You are a software engineer splitting a commit into atomic changes, labelling ea
 - **feat**: Code changes that adds new features to the codebase, encompassing both internal and user-oriented features.
 - **fix**:  Code change that patches a bug in the codebase
 - **style**: Code changes that aim to improve readability without affecting the meaning of the code. This type encompasses aspects like variable naming, indentation, and addressing linting or code analysis warnings.
-- **refactor**: Code changes that aim to restructure the program without changing its behavior, aiminStep 2: Determine the scope of change (Object)g to improve maintainability. 
+- **refactor**: Code changes that aim to restructure the program without changing its behavior, aiming to improve maintainability. 
 ## Object (What Kind of Entity Was Changed)
 - **docs**: Code changes that modify documentation or text, such as correcting typos, modifying comments, or updating documentation.
 - **test**: Code changes that modify test files or test directories (e.g., files named with `*Test.java`, `test_*.py`, `__tests__/`).
