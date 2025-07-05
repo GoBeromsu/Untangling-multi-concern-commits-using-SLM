@@ -338,7 +338,7 @@ def main() -> None:
     input_file = Path("datasets/tangled_dataset.csv")
     output_file = Path("datasets/tangled_dataset_with_reasoning.csv")
 
-    sample_size = 100
+    sample_size = None
     max_concurrent_requests = 10
 
     process_dataset(
