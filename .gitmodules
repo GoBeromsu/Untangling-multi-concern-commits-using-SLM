@@ -1,10 +1,3 @@
-
-[submodule "datasets/candidates/codefuse-hqcm"]
-	path = datasets/candidates/codefuse-hqcm
-	url = https://github.com/codefuse-ai/codefuse-hqcm
-[submodule "datasets/candidates/conventional-commit-classification"]
-	path = datasets/candidates/conventional-commit-classification
-	url = https://github.com/0x404/conventional-commit-classification
 [submodule ".cursor"]
 	path = .cursor
 	url = https://github.com/GoBeromsu/cursor-rules.git

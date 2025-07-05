@@ -4,6 +4,10 @@ __pycache__/
 *$py.class
 .DS_Store
 
+# Project specific
+models/
+datasets/codefuse-hqcm/*
+
 # C extensions
 *.so
 
