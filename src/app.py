@@ -8,6 +8,54 @@ from collections import Counter
 from dotenv import load_dotenv
 from prompts.type import get_system_prompt
 from llms.openai import openai_api_call
+from llms.lmstudio import (
+    check_lmstudio_connection,
+    get_lmstudio_models,
+    lmstudio_api_call,
+)
+from llms.constant import (
+    DEFAULT_LMSTUDIO_URL,
+    CODE_DIFF_INPUT_HEIGHT,
+    SYSTEM_PROMPT_INPUT_HEIGHT,
+)
+from ui.validation import (
+    is_openai_api_key_available,
+    is_valid_dataset_file,
+)
+from ui.components import (
+    render_evaluation_metrics,
+    render_results_table,
+    render_dataset_metadata,
+    create_column_config,
+)
+from ui.patterns import (
+    parse_model_response,
+    extract_test_case_data,
+)
+
+
+def get_model_response(diff: str, system_prompt: str) -> str:
+    """
+    Get model response based on selected API provider.
+
+    Args:
+        diff: Code diff to analyze
+        system_prompt: System prompt for the model
+
+    Returns:
+        JSON string containing the model response
+    """
+    selected_api = st.session_state.get("selected_api", "openai")
+
+    if selected_api == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        return openai_api_call(api_key, diff, system_prompt)
+    elif selected_api == "lmstudio":
+        model_name = st.session_state.get("selected_model", "")
+        base_url = st.session_state.get("lmstudio_url", DEFAULT_LMSTUDIO_URL)
+        return lmstudio_api_call(model_name, diff, system_prompt, base_url=base_url)
+    else:
+        raise ValueError(f"Unsupported API provider: {selected_api}")
 
 
 def load_concern_test_dataset(
@@ -21,15 +69,6 @@ def load_concern_test_dataset(
     except Exception as e:
         st.error(f"Error loading concern test dataset: {str(e)}")
         return [], {}
-
-
-def format_concern_types(concern_types: List[str]) -> str:
-    """Format concern types list for table display, preserving duplicates."""
-    if not concern_types:
-        return "None"
-
-    # Sort for consistent display but preserve duplicates
-    return ", ".join(sorted(concern_types))
 
 
 def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
@@ -67,7 +106,7 @@ def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
 
 
 def execute_batch_concern_evaluation(
-    api_key: str, test_dataset: List[Dict[str, Any]], system_prompt: str
+    test_dataset: List[Dict[str, Any]], system_prompt: str
 ) -> None:
     """Execute batch evaluation of concern classification with real-time updates."""
 
@@ -95,22 +134,13 @@ def execute_batch_concern_evaluation(
     for test_index, test_case in enumerate(test_dataset):
         status_text.text(f"Evaluating case {test_index+1}/{len(test_dataset)}...")
 
-        diff = test_case.get("tangleChange", "")
-        atomic_changes = test_case.get("atomicChanges", [])
-        actual_concern_types = [change.get("label", "") for change in atomic_changes]
+        diff, actual_concern_types = extract_test_case_data(test_case)
 
         # Get model prediction
-        model_response = openai_api_call(api_key, diff, system_prompt)
-
-        try:
-            prediction_data = json.loads(model_response)
-            predicted_concern_types = prediction_data.get("types", [])
-            predicted_concern_count = prediction_data.get("count", 0)
-            model_reasoning = prediction_data.get("reason", "No reasoning provided")
-        except json.JSONDecodeError:
-            predicted_concern_types = []
-            predicted_concern_count = 0
-            model_reasoning = "Failed to parse model response"
+        model_response = get_model_response(diff, system_prompt)
+        predicted_concern_types, predicted_concern_count, model_reasoning = (
+            parse_model_response(model_response)
+        )
 
         # Calculate evaluation results using Counter once (linear approach)
         actual_concern_count = len(actual_concern_types)
@@ -155,8 +185,20 @@ def execute_batch_concern_evaluation(
         new_evaluation_result = pd.DataFrame(
             {
                 "Test_Index": [test_index + 1],
-                "Predicted_Types": [format_concern_types(predicted_concern_types)],
-                "Actual_Types": [format_concern_types(actual_concern_types)],
+                "Predicted_Types": [
+                    (
+                        ", ".join(sorted(predicted_concern_types))
+                        if predicted_concern_types
+                        else "None"
+                    )
+                ],
+                "Actual_Types": [
+                    (
+                        ", ".join(sorted(actual_concern_types))
+                        if actual_concern_types
+                        else "None"
+                    )
+                ],
                 "Predicted_Count": [predicted_concern_count],
                 "Actual_Count": [actual_concern_count],
                 "Status": [evaluation_status],
@@ -175,103 +217,29 @@ def execute_batch_concern_evaluation(
         # Update evaluation summary
         metrics = calculate_evaluation_metrics(evaluation_results_df)
         with summary_container.container():
-            # Evaluation metrics display: Progress and Type Classification metrics
-            col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
-            with col1:
-                st.metric(
-                    "Progress",
-                    f"{metrics['total']}/{len(test_dataset)}",
-                    help="Current evaluation progress through test dataset",
-                )
-            with col2:
-                st.metric(
-                    "Type Precision",
-                    f"{metrics['type_precision']:.1%}",
-                    help="Sample-based precision using strict multiset matching: average of per-case precision scores. Over-prediction (feat→feat,feat) causes FP penalty.",
-                )
-            with col3:
-                st.metric(
-                    "Type Recall",
-                    f"{metrics['type_recall']:.1%}",
-                    help="Sample-based recall using strict multiset matching: average of per-case recall scores. Under-prediction causes FN penalty.",
-                )
-            with col4:
-                st.metric(
-                    "Type F1 (Macro)",
-                    f"{metrics['type_f1_macro']:.1%}",
-                    help="Sample-based F1 using strict multiset matching: average of per-case F1 scores. Exact count matching required (feat ≠ feat,feat).",
-                )
-            with col5:
-                st.metric(
-                    "Count Accuracy",
-                    f"{metrics['count_accuracy']:.1%}",
-                    help="Percentage of test cases with exact count match between predicted and actual",
-                )
+            render_evaluation_metrics(metrics, len(test_dataset))
 
         # Update results table (exclude case metrics from display)
         with table_container.container():
-            st.subheader("Evaluation Results")
-            # Select only display columns (exclude case metrics)
-            display_columns = [
-                "Test_Index",
-                "Predicted_Types",
-                "Actual_Types",
-                "Predicted_Count",
-                "Actual_Count",
-                "Status",
-                "Model_Reasoning",
-            ]
-            recent_results = (
-                evaluation_results_df.tail(15)
-                if len(evaluation_results_df) > 15
-                else evaluation_results_df
-            )
-            display_results_df = recent_results[display_columns]
-
-            column_config = {
-                "Test_Index": st.column_config.NumberColumn("Test #", width="small"),
-                "Predicted_Types": st.column_config.TextColumn(
-                    "Predicted Types", width="medium"
-                ),
-                "Actual_Types": st.column_config.TextColumn(
-                    "Actual Types", width="medium"
-                ),
-                "Predicted_Count": st.column_config.NumberColumn(
-                    "Predicted Count", width="small"
-                ),
-                "Actual_Count": st.column_config.NumberColumn(
-                    "Actual Count", width="small"
-                ),
-                "Status": st.column_config.TextColumn("Status", width="small"),
-                "Model_Reasoning": st.column_config.TextColumn(
-                    "Reasoning", width="large"
-                ),
-            }
-
-            st.dataframe(
-                display_results_df,
-                use_container_width=True,
-                hide_index=True,
-                column_config=column_config,
-            )
+            render_results_table(evaluation_results_df)
 
     # Store final results for analysis
     st.session_state.final_evaluation_results = evaluation_results_df
 
 
-def render_direct_input_interface(api_key: str) -> None:
+def render_direct_input_interface() -> None:
     """Render UI interface for direct code diff input and concern analysis."""
     diff = st.text_area(
         "Enter your code diff:",
         placeholder="Paste the output of `git diff` here...",
-        height=300,
+        height=CODE_DIFF_INPUT_HEIGHT,
     )
 
     st.subheader("System Prompt")
     system_prompt = st.text_area(
         "Modify the system prompt:",
         value=get_system_prompt(),
-        height=200,
+        height=SYSTEM_PROMPT_INPUT_HEIGHT,
         key="direct_input_prompt",
     )
 
@@ -279,37 +247,38 @@ def render_direct_input_interface(api_key: str) -> None:
         st.divider()
         st.header("📊 Analysis Results")
         with st.spinner("Analyzing code diff..."):
-            model_response = openai_api_call(api_key, diff, system_prompt)
+            model_response = get_model_response(diff, system_prompt)
 
-            try:
-                analysis_data = json.loads(model_response)
-                predicted_concern_types = analysis_data.get("types", [])
-                predicted_concern_count = analysis_data.get("count", 0)
-                model_reasoning = analysis_data.get("reason", "No reasoning provided")
+            predicted_concern_types, predicted_concern_count, model_reasoning = (
+                parse_model_response(model_response)
+            )
 
+            if model_reasoning == "Failed to parse model response":
+                st.error("Failed to parse model response")
+                st.write("**Raw Model Response:**")
+                st.text(model_response)
+            else:
                 st.subheader("Concern Classification Results")
 
                 analysis_results_df = pd.DataFrame(
                     {
                         "Predicted_Concern_Types": [
-                            format_concern_types(predicted_concern_types)
+                            (
+                                ", ".join(sorted(predicted_concern_types))
+                                if predicted_concern_types
+                                else "None"
+                            )
                         ],
                         "Predicted_Count": [predicted_concern_count],
                         "Model_Reasoning": [model_reasoning],
                     }
                 )
-
-                column_config = {
-                    "Predicted_Concern_Types": st.column_config.TextColumn(
-                        "Predicted Concern Types", width="medium"
-                    ),
-                    "Predicted_Count": st.column_config.NumberColumn(
-                        "Count", width="small"
-                    ),
-                    "Model_Reasoning": st.column_config.TextColumn(
-                        "Reasoning", width="large"
-                    ),
-                }
+                analysis_columns = [
+                    "Predicted_Concern_Types",
+                    "Predicted_Count",
+                    "Model_Reasoning",
+                ]
+                column_config = create_column_config(analysis_columns)
 
                 st.dataframe(
                     analysis_results_df,
@@ -318,28 +287,15 @@ def render_direct_input_interface(api_key: str) -> None:
                     column_config=column_config,
                 )
 
-            except json.JSONDecodeError:
-                st.error("Failed to parse model response")
-                st.write("**Raw Model Response:**")
-                st.text(model_response)
-            except Exception as e:
-                st.error(f"Error processing analysis results: {str(e)}")
-                st.write("**Raw Model Response:**")
-                st.text(model_response)
 
-
-def render_batch_evaluation_interface(api_key: str) -> None:
+def render_batch_evaluation_interface() -> None:
     """Render UI interface for batch evaluation from test dataset files."""
     available_dataset_files = []
     for search_pattern in ["datasets/**/*.json"]:
         matched_files = glob.glob(search_pattern, recursive=True)
         available_dataset_files.extend(
-            [f for f in matched_files if "candidate" not in f]
+            [f for f in matched_files if is_valid_dataset_file(f)]
         )
-
-    available_dataset_files = [
-        f for f in available_dataset_files if f.endswith(".json")
-    ]
     available_dataset_files.sort()
 
     if not available_dataset_files:
@@ -360,21 +316,7 @@ def render_batch_evaluation_interface(api_key: str) -> None:
             st.success(
                 f"📊 Loaded **{len(test_dataset)}** test cases from `{selected_dataset_file}`"
             )
-            metadata_col1, metadata_col2, metadata_col3 = st.columns(3)
-            with metadata_col1:
-                st.caption(
-                    f"⚙️ {dataset_metadata.get('concerns_per_case', '?')} concerns per case"
-                )
-            with metadata_col2:
-                concern_types_list = ", ".join(dataset_metadata.get("types", []))
-                st.caption(f"🏷️ {concern_types_list}")
-            with metadata_col3:
-                types_constraint = (
-                    "different types"
-                    if dataset_metadata.get("ensure_different_types")
-                    else "same types allowed"
-                )
-                st.caption(f"🔀 {types_constraint}")
+            render_dataset_metadata(dataset_metadata)
         else:
             st.error("❌ Failed to load test dataset")
             test_dataset = []
@@ -385,7 +327,7 @@ def render_batch_evaluation_interface(api_key: str) -> None:
     system_prompt = st.text_area(
         "Modify the prompt template (use {diff} placeholder):",
         value=get_system_prompt(),
-        height=200,
+        height=SYSTEM_PROMPT_INPUT_HEIGHT,
         key="batch_evaluation_prompt",
     )
 
@@ -395,7 +337,7 @@ def render_batch_evaluation_interface(api_key: str) -> None:
         else:
             st.divider()
             st.header("📊 Evaluation Results")
-            execute_batch_concern_evaluation(api_key, test_dataset, system_prompt)
+            execute_batch_concern_evaluation(test_dataset, system_prompt)
 
 
 def main() -> None:
@@ -404,13 +346,61 @@ def main() -> None:
 
     st.header("🔧 Setup")
     load_dotenv()
-    openai_api_key = os.getenv("OPENAI_API_KEY")
 
-    if openai_api_key:
-        st.success("✅ OpenAI API Key detected")
-    else:
-        st.error("❌ No OpenAI API Key found. Please set OPENAI_API_KEY in .env file")
-        st.stop()
+    # API Provider Selection
+    api_provider = st.selectbox(
+        "Select API Provider:",
+        ["OpenAI", "LM Studio"],
+        help="Choose between OpenAI API or local LM Studio",
+    )
+
+    if api_provider == "OpenAI":
+        if is_openai_api_key_available():
+            st.success("✅ OpenAI API Key detected")
+        else:
+            st.error(
+                "❌ No OpenAI API Key found. Please set OPENAI_API_KEY in .env file"
+            )
+            st.stop()
+
+        st.session_state.selected_api = "openai"
+        st.session_state.selected_model = None
+
+    elif api_provider == "LM Studio":
+        lmstudio_url = st.text_input(
+            "LM Studio URL:",
+            value=DEFAULT_LMSTUDIO_URL,
+            help="Base URL for LM Studio API",
+        )
+
+        # Automatically check connection when LM Studio is selected
+        with st.spinner("Checking LM Studio connection..."):
+            is_connected = check_lmstudio_connection(lmstudio_url)
+
+            if is_connected:
+                st.success("✅ LM Studio connection successful")
+
+                # Load available models
+                with st.spinner("Loading available models..."):
+                    models, error_msg = get_lmstudio_models(lmstudio_url)
+
+                    if models:
+                        selected_model = st.selectbox(
+                            "Select Model:",
+                            models,
+                            help="Choose a model loaded in LM Studio",
+                        )
+                        st.session_state.selected_api = "lmstudio"
+                        st.session_state.selected_model = selected_model
+                        st.session_state.lmstudio_url = lmstudio_url
+                    else:
+                        st.error(f"❌ No models available: {error_msg}")
+                        st.stop()
+            else:
+                st.error(
+                    "❌ Cannot connect to LM Studio. Please ensure LM Studio is running."
+                )
+                st.stop()
 
     st.divider()
 
@@ -420,9 +410,9 @@ def main() -> None:
     )
 
     with direct_input_tab:
-        render_direct_input_interface(openai_api_key)
+        render_direct_input_interface()
     with batch_evaluation_tab:
-        render_batch_evaluation_interface(openai_api_key)
+        render_batch_evaluation_interface()
 
 
 if __name__ == "__main__":

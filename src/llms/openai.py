@@ -1,7 +1,7 @@
 import openai
 from typing import Any, Dict
 
-from llms.constant import OPENAI_STRUCTURED_OUTPUT_FORMAT
+from llms.constant import OPENAI_STRUCTURED_OUTPUT_FORMAT, DEFAULT_TEMPERATURE
 
 
 def openai_api_call(
@@ -9,7 +9,7 @@ def openai_api_call(
     diff: str,
     system_prompt: str,
     model: str = "gpt-4.1-2025-04-14",  # State of art openai model https://platform.openai.com/docs/models/gpt-4.1
-    temperature: float = 0.0,  # for greedy decoding to remove potential randomness
+    temperature: float = DEFAULT_TEMPERATURE,  # for greedy decoding to remove potential randomness
 ) -> str:
     client = openai.OpenAI(api_key=api_key)
 

@@ -1,5 +1,16 @@
 from typing import Dict, List, Any
 
+# API Configuration Constants
+DEFAULT_LMSTUDIO_URL: str = "http://localhost:1234"
+DEFAULT_TEMPERATURE: float = 0.7
+DEFAULT_MAX_TOKENS: int = 1000
+CONNECTION_TIMEOUT_SECONDS: int = 5
+
+# UI Configuration Constants
+CODE_DIFF_INPUT_HEIGHT: int = 300
+SYSTEM_PROMPT_INPUT_HEIGHT: int = 200
+RECENT_RESULTS_DISPLAY_LIMIT: int = 15
+
 # Commit types for classification
 COMMIT_TYPES: List[str] = [
     "docs",

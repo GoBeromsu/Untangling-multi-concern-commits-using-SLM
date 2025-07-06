@@ -2,10 +2,16 @@ import requests
 import json
 from typing import Any, Dict, List, Tuple
 
-from llms.constant import LMSTUDIO_STRUCTURED_OUTPUT_FORMAT
+from llms.constant import (
+    LMSTUDIO_STRUCTURED_OUTPUT_FORMAT,
+    DEFAULT_LMSTUDIO_URL,
+    DEFAULT_TEMPERATURE,
+    DEFAULT_MAX_TOKENS,
+    CONNECTION_TIMEOUT_SECONDS,
+)
 
 
-def check_lmstudio_connection(base_url: str = "http://localhost:1234") -> bool:
+def check_lmstudio_connection(base_url: str = DEFAULT_LMSTUDIO_URL) -> bool:
     """
     Check if LM Studio API is accessible.
 
@@ -17,7 +23,7 @@ def check_lmstudio_connection(base_url: str = "http://localhost:1234") -> bool:
     """
     try:
         url = f"{base_url}/v1/models"
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=CONNECTION_TIMEOUT_SECONDS)
         response.raise_for_status()
         return True
     except Exception:
@@ -25,7 +31,7 @@ def check_lmstudio_connection(base_url: str = "http://localhost:1234") -> bool:
 
 
 def get_lmstudio_models(
-    base_url: str = "http://localhost:1234",
+    base_url: str = DEFAULT_LMSTUDIO_URL,
 ) -> Tuple[List[str], str]:
     """
     Get available models from LM Studio API.
@@ -39,7 +45,7 @@ def get_lmstudio_models(
     """
     try:
         url = f"{base_url}/v1/models"
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=CONNECTION_TIMEOUT_SECONDS)
         response.raise_for_status()
 
         models_data = response.json()
@@ -56,9 +62,9 @@ def lmstudio_api_call(
     model_name: str,
     diff: str,
     system_prompt: str,
-    temperature: float = 0.0,
-    max_tokens: int = 1000,
-    base_url: str = "http://localhost:1234",
+    temperature: float = DEFAULT_TEMPERATURE,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
+    base_url: str = DEFAULT_LMSTUDIO_URL,
 ) -> str:
     """
     Call LM Studio API for commit classification using HTTP requests.
