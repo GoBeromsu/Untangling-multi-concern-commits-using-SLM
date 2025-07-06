@@ -1,0 +1,107 @@
+import requests
+import json
+from typing import Any, Dict, List, Tuple
+
+from llms.constant import LMSTUDIO_STRUCTURED_OUTPUT_FORMAT
+
+
+def check_lmstudio_connection(base_url: str = "http://localhost:1234") -> bool:
+    """
+    Check if LM Studio API is accessible.
+
+    Args:
+        base_url: Base URL for LM Studio API
+
+    Returns:
+        True if connection is successful, False otherwise
+    """
+    try:
+        url = f"{base_url}/v1/models"
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        return True
+    except Exception:
+        return False
+
+
+def get_lmstudio_models(
+    base_url: str = "http://localhost:1234",
+) -> Tuple[List[str], str]:
+    """
+    Get available models from LM Studio API.
+
+    Args:
+        base_url: Base URL for LM Studio API
+
+    Returns:
+        Tuple of (model_names_list, error_message)
+        If successful, error_message is empty
+    """
+    try:
+        url = f"{base_url}/v1/models"
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+
+        models_data = response.json()
+        model_names = [model["id"] for model in models_data.get("data", [])]
+
+        return model_names, ""
+    except requests.exceptions.RequestException as e:
+        return [], f"Request error: {e}"
+    except Exception as e:
+        return [], f"Error: {e}"
+
+
+def lmstudio_api_call(
+    model_name: str,
+    diff: str,
+    system_prompt: str,
+    temperature: float = 0.0,
+    max_tokens: int = 1000,
+    base_url: str = "http://localhost:1234",
+) -> str:
+    """
+    Call LM Studio API for commit classification using HTTP requests.
+
+    Args:
+        model_name: Name of the model to use (e.g., "codellama-7b@f16")
+        diff: Git diff content to analyze
+        system_prompt: System prompt for the model
+        temperature: Sampling temperature (0.0 for greedy decoding)
+        max_tokens: Maximum tokens to generate (use -1 for unlimited)
+        base_url: Base URL for LM Studio API
+
+    Returns:
+        JSON string containing the structured response
+    """
+    try:
+        url = f"{base_url}/v1/chat/completions"
+
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        data = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": diff},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": False,
+            "response_format": LMSTUDIO_STRUCTURED_OUTPUT_FORMAT,
+        }
+
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+
+        response_json = response.json()
+        response_content = response_json["choices"][0]["message"]["content"]
+
+        return response_content
+
+    except requests.exceptions.RequestException as e:
+        return f"An error occurred while calling LM Studio API: {e}"
+    except Exception as e:
+        return f"An error occurred while processing the response: {e}"

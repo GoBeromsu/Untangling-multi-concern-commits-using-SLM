@@ -1,42 +1,7 @@
 import openai
 from typing import Any, Dict
 
-COMMIT_TYPES = [
-    "docs",
-    "test",
-    "cicd",
-    "build",
-    "style",
-    "refactor",
-    "feat",
-    "fix",
-]
-
-RESPONSE_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "types": {
-            "type": "array",
-            "items": {
-                "type": "string",
-                "enum": COMMIT_TYPES,
-            },
-        },
-        "count": {"type": "integer"},
-        "reason": {"type": "string"},
-    },
-    "required": ["types", "count", "reason"],
-    "additionalProperties": False,
-}
-
-STRUCTURED_OUTPUT_FORMAT = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "commit_classification_response",
-        "schema": RESPONSE_SCHEMA,
-        "strict": True,
-    },
-}
+from llms.constant import OPENAI_STRUCTURED_OUTPUT_FORMAT
 
 
 def openai_api_call(
@@ -56,7 +21,7 @@ def openai_api_call(
                 {"role": "user", "content": diff},
             ],
             temperature=temperature,
-            response_format=STRUCTURED_OUTPUT_FORMAT,
+            response_format=OPENAI_STRUCTURED_OUTPUT_FORMAT,
         )
         return response.choices[0].message.content or "No response from API."
     except openai.APIError as e:
