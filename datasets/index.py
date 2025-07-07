@@ -65,7 +65,7 @@ def sample_one_concern(
     return chosen_type, chosen_change
 
 
-def sample_concerns_freq_aware(
+def sample_concerns_uniform_unique(
     commits_by_type: Dict[str, List[Dict[str, Any]]],
     num_examples: int,
     concern_count: int,
@@ -116,13 +116,13 @@ def main() -> None:
     # Generate examples for each concern count (1000 each)
     examples = []
     examples.extend(
-        sample_concerns_freq_aware(commits_by_type, EXAMPLES_PER_CONCERN_COUNT, 1)
+        sample_concerns_uniform_unique(commits_by_type, EXAMPLES_PER_CONCERN_COUNT, 1)
     )
     examples.extend(
-        sample_concerns_freq_aware(commits_by_type, EXAMPLES_PER_CONCERN_COUNT, 2)
+        sample_concerns_uniform_unique(commits_by_type, EXAMPLES_PER_CONCERN_COUNT, 2)
     )
     examples.extend(
-        sample_concerns_freq_aware(commits_by_type, EXAMPLES_PER_CONCERN_COUNT, 3)
+        sample_concerns_uniform_unique(commits_by_type, EXAMPLES_PER_CONCERN_COUNT, 3)
     )
     logging.info(
         f"Generated {len(examples)} examples (1000 each for 1, 2, 3 concerns)."
