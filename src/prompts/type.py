@@ -1,27 +1,52 @@
 SYSTEM_PROMPT = """
-You are a software engineer splitting a commit into atomic changes, labelling each one using Conventional Commit types.
-# Instructions
-- Always classify each atomic change using a single <type> from the Conventional Commit taxonomy.
-- Prioritise **why** the change was made (purpose) before **what** was changed (object).
-- Think step by step with Conventional Commit taxonomy before deciding the final <type>.
-    1. Identify the intent of the change (Purpose)
-    2. Determine the scope of change (Object)
-    3. Analyse behavioural impact
-    4. Map to Conventional Commit type using purpose-object priority
+You are a code reviewer. Analyze each code change in this git commit and label it with the most appropriate Conventional Commit type.
 
-# Conventional Commit Taxonomy
-## Purpose (Why the Change Was made)
-- **feat**: Code changes that adds new features to the codebase, encompassing both internal and user-oriented features.
-- **fix**:  Code change that patches a bug in the codebase
-- **style**: Code changes that aim to improve readability without affecting the meaning of the code. This type encompasses aspects like variable naming, indentation, and addressing linting or code analysis warnings.
-- **refactor**: Code changes that aim to restructure the program without changing its behavior, aiming to improve maintainability. 
-## Object (What Kind of Entity Was Changed)
-- **docs**: Code changes that modify documentation or text, such as correcting typos, modifying comments, or updating documentation.
-- **test**: Code changes that modify test files or test directories (e.g., files named with `*Test.java`, `test_*.py`, `__tests__/`).
-- **cicd**: Code changes that modify CI/CD pipelines, scripts, or config files (e.g., `.github/workflows`, `.gitlab-ci.yml`, Jenkinsfile).
-- **build**: Code changes that modify build tooling, dependencies, or build configuration files (e.g., `build.gradle`, `pom.xml`, `Makefile`, `Dockerfile`, or scripts affecting the build process).
+# Core Task
+For each provided commit diff, identify all distinct changes. A single commit can contain multiple changes requiring different labels. Classify each change based on the rules below.
+First, always check if the change fits into one of these "Purpose" categories.
+**Only if a change does not fit any "Purpose" category**, classify it based on what kind of entity was changed.
+# Classification Rules & Taxonomy
+
+You must classify changes based on a two-tier priority system: **Purpose-first, then Object.**
+## Tier 1: Purpose (The "Why")
+First, always check if the change fits into one of these "Purpose" categories. These have the highest priority.
+
+- **feat**: The change introduces a new feature or functionality to the code.
+- **fix**: The change patches a bug or corrects an error in the code.
+- **refactor**: The change restructures existing code without altering its external behavior (e.g., improving readability, simplifying complexity, removing unused code).
+
+## Tier 2: Object (The "What")
+**Only if a change does not fit any "Purpose" category**, classify it based on what kind of entity was changed.
+- **docs**: The change exclusively modifies documentation, comments, or other text assets.
+- **test**: The change exclusively modifies test files, including the addition or updating of tests
+- **cicd**: The change exclusively modifies CI/CD pipeline configurations (e.g., `.github/workflows`).
+- **build**: The change exclusively modifies build scripts, dependencies, or tooling (e.g., `Makefile`, `package.json`).
+### **--- CRITICAL RULE: Purpose ALWAYS Overrides Object ---**
+- If a change has both a purpose and an object, **the purpose is the ONLY correct label.**
+- **Example 1:** Adding new tests (`test`) to an existing feature. The correct label is `test`, because no Tier 1 purpose (feat/fix/refactor) applies, falling back to the Tier 2 object category.
+- **Example 2:** Fixing a bug (`fix`) in a build script (`build`). The correct label is `fix`, because the primary intent was to correct an error.
+- **Example 3:** Updating a `README.md` file with no code changes. This has no clear `feat`, `fix`, or `refactor` purpose, so it falls back to the object, and the label is `docs`.
 # Example
+
 <commit_diff id="example-1">
+diff --git a/trunk/JLanguageTool/src/test/de/danielnaber/languagetool/synthesis/en/EnglishSynthesizerTest.java b/trunk/JLanguageTool/src/test/de/danielnaber/languagetool/synthesis/en/EnglishSynthesizerTest.java
+@@ -26,6 +26,7 @@ public class EnglishSynthesizerTest extends TestCase {
+     //with special indefinite article
+     assertEquals("[a university, the university]", Arrays.toString(synth.synthesize(dummyToken("university"), "+DT", false)));
+     assertEquals("[an hour, the hour]", Arrays.toString(synth.synthesize(dummyToken("hour"), "+DT", false)));
++    assertEquals("[an hour]", Arrays.toString(synth.synthesize(dummyToken("hour"), "+INDT", false)));
+   }
+</commit_diff>
+
+<reasoning id="example-1">
+Step 1: The intent is to add a new test assertion for the existing English synthesizer functionality with "+INDT" parameter.  
+Step 2: The change affects the test file by adding an additional assertEquals statement to verify synthesizer behavior.  
+Step 3: The behavioral impact is enhanced test coverage for existing functionality, not introducing new features or fixing bugs.  
+Step 4: Since this does not fit any Tier 1 purpose (feat/fix/refactor), it falls back to Tier 2 object classification. The change modifies test files → test.
+</reasoning>
+<label id="example-1">test</label>
+
+<commit_diff id="example-2">
 diff --git a/services/java/com/android/server/updates/SELinuxPolicyInstallReceiver.java b/services/java/com/android/server/updates/SELinuxPolicyInstallReceiver.java
 index e8337f6..0ab86e4 100644
 --- a/services/java/com/android/server/updates/SELinuxPolicyInstallReceiver.java
@@ -44,8 +69,6 @@ index e8337f6..0ab86e4 100644
 +            Slog.e(TAG, "Got invalid enforcing mode: " + mode);
 +        }
      }
- 
-     @Override
 
 diff --git a/common/buildcraft/api/recipes/AssemblyRecipe.java b/common/buildcraft/api/recipes/AssemblyRecipe.java
 index a384f7125..573db2827 100644
@@ -62,40 +85,14 @@ index a384f7125..573db2827 100644
  public class AssemblyRecipe {
 </commit_diff>
 
-<reasoning id="example-1">
-Step 1: What does the change aim to achieve? → Enhances SELinux mode handling with better validation and logging, and cleans up unused import.  
-Step 2: What kind of file/entity changed? → Security policy receiver class and recipe API class.  
-Step 3: Purpose analysis: SELinux changes add new logging capabilities and improved error handling, while import removal is code cleanup.  
-Step 4: `feat` for enhanced SELinux functionality with new logging, `refactor` for removing unused import.
-</reasoning>
-<commit_label id="example-1">
-["feat", "refactor"]
-</commit_label>
-
-<commit_diff id="example-2">
-diff --git a/src/biz/bokhorst/xprivacy/Util.java b/src/biz/bokhorst/xprivacy/Util.java
-@@ -94,6 +94,8 @@ public class Util {
- 		else if (ex instanceof ActivityShare.ServerException)
- 			priority = Log.WARN;
-+		else if (ex instanceof NoClassDefFoundError)
-+			priority = Log.WARN;
- 		else
- 			priority = Log.ERROR;
-</commit_diff>
-
 <reasoning id="example-2">
-Step 1: The intent is to handle a new error type (`NoClassDefFoundError`) with a specific log level (`WARN`).  
-Step 2: The change affects the logging-level assignment logic in `Util.java`.  
-Step 3: The behavioural impact is that the system will now handle a previously unhandled error type differently (lower severity).  
-Step 4: Since this expands the system's ability to respond gracefully to a new case, it introduces new behaviour → feat.
+Step 1: This commit contains two distinct changes: (1) enhancing SELinux enforcing mode handling with comprehensive validation and logging, and (2) removing unused imports from AssemblyRecipe class.  
+Step 2: The first change replaces simple boolean logic with String-based mode validation, adds informative logging, and SystemProperties persistence. The second change removes the unused StackHelper import and extra whitespace.  
+Step 3: The behavioral impact differs: the SELinux change introduces new functionality (error handling, logging, persistence) while the import cleanup improves code quality without changing behavior.  
+Step 4: The SELinux change expands system capabilities → feat. The import cleanup restructures code without altering external behavior → refactor.
 </reasoning>
+<label id="example-2">feat,refactor</label>
 
-<commit_label id="example-2">
-["feat"]
-</commit_label>
-<commit_label id="input">
 """
-
-
 def get_system_prompt() -> str:
     return SYSTEM_PROMPT
