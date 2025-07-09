@@ -6,7 +6,7 @@ __pycache__/
 
 # Project specific
 models/
-datasets/codefuse-hqcm/*
+datasets/codefuse-hqcm/
 
 # C extensions
 *.so
