@@ -2,7 +2,7 @@ from typing import Dict, List, Any
 
 # API Configuration Constants
 DEFAULT_LMSTUDIO_URL: str = "http://localhost:1234"
-DEFAULT_TEMPERATURE: float = 0.7
+DEFAULT_TEMPERATURE: float = 0.0
 DEFAULT_MAX_TOKENS: int = 1000
 CONNECTION_TIMEOUT_SECONDS: int = 5
 
@@ -17,7 +17,6 @@ COMMIT_TYPES: List[str] = [
     "test",
     "cicd",
     "build",
-    "style",
     "refactor",
     "feat",
     "fix",
