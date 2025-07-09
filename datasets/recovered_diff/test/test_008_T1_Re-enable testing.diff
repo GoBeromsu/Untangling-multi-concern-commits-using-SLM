@@ -1,0 +1,22 @@
+# Type: test
+# Subtype: T1
+# English Summary: Re-enable testing
+# Chinese Summary: 重新启用测试
+# Entry Number: 8
+
+# === Git Diff Content ===
+
+diff --git a/src/test/java/org/mapdb/AsyncWriteEngineTest.java b/src/test/java/org/mapdb/AsyncWriteEngineTest.java
+index 738c286..d8a5266 100644
+--- a/src/test/java/org/mapdb/AsyncWriteEngineTest.java
++++ b/src/test/java/org/mapdb/AsyncWriteEngineTest.java
+@@ -104,8 +104,7 @@ public class AsyncWriteEngineTest extends TestFile{
+         //make commit just after bunch of records was added,
+         // we need to test that all records made it into transaction log
+         a.commit();
+-        //TODO reenable when newRecids are introduced
+-        //assertEquals(max, putCounter.longValue() - a.newRecids.size());
++        assertEquals(max, putCounter.longValue() - a.newRecids.size());
+         assertTrue(a.writeCache.isEmpty());
+         t.close();
+ 

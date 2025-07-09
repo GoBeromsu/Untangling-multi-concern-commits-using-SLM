@@ -1,0 +1,26 @@
+# Type: test
+# Subtype: T1
+# English Summary: Modified parameter type of fromArray() method
+# Chinese Summary: 修改 fromArray()方法的参数类型
+# Entry Number: 29
+
+# === Git Diff Content ===
+
+diff --git a/jOOQ-test/src/org/jooq/test/_/testcases/FetchTests.java b/jOOQ-test/src/org/jooq/test/_/testcases/FetchTests.java
+index 55e00a324..fcdf72523 100644
+--- a/jOOQ-test/src/org/jooq/test/_/testcases/FetchTests.java
++++ b/jOOQ-test/src/org/jooq/test/_/testcases/FetchTests.java
+@@ -910,11 +910,11 @@ extends BaseTest<A, AP, B, S, B2S, BS, L, X, DATE, BOOL, D, T, U, UU, I, IPK, T7
+         Object[] array = { 13, "A", "B" };
+ 
+         author = create().newRecord(TAuthor());
+-        author.fromArray(array, TAuthor_FIRST_NAME(), TAuthor_LAST_NAME());
++        author.fromArray(array, new Field[] { TAuthor_FIRST_NAME(), TAuthor_LAST_NAME() });
+         testRecordFromAssertions(object, author);
+ 
+         author = create().newRecord(TAuthor());
+-        author.fromArray(array, TAuthor_FIRST_NAME().getName(), TAuthor_LAST_NAME().getName());
++        author.fromArray(array, new String[] { TAuthor_FIRST_NAME().getName(), TAuthor_LAST_NAME().getName() });
+         testRecordFromAssertions(object, author);
+     }
+ 

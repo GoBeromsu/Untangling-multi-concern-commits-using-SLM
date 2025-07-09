@@ -1,0 +1,29 @@
+# Type: docs
+# Subtype: D2
+# English Summary: Add callback description to UploadProgress
+# Chinese Summary: 对UploadProgress增加callback描述
+# Entry Number: 23
+
+# === Git Diff Content ===
+
+diff --git a/lib/src/main/java/com/github/kevinsawicki/http/HttpRequest.java b/lib/src/main/java/com/github/kevinsawicki/http/HttpRequest.java
+index e1c4e86..de9e9b9 100644
+--- a/lib/src/main/java/com/github/kevinsawicki/http/HttpRequest.java
++++ b/lib/src/main/java/com/github/kevinsawicki/http/HttpRequest.java
+@@ -2603,7 +2603,7 @@ public class HttpRequest {
+   }
+ 
+   /**
+-   * Set the UploadProgress for this request
++   * Set the UploadProgress callback for this request
+    *
+    * @param callback
+    * @return this request
+@@ -2616,7 +2616,6 @@ public class HttpRequest {
+     return this;
+   }
+ 
+-
+   /**
+    * Close output stream
+    *

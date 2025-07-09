@@ -1,0 +1,21 @@
+# Type: feat
+# Subtype: Ex
+# English Summary: Added a new abstract method onClickItem
+# Chinese Summary: 添加了一个新的抽象方法onClickItem
+# Entry Number: 7
+
+# === Git Diff Content ===
+
+diff --git a/UltimateRecyclerView/ultimaterecyclerview/src/main/java/com/marshalchen/ultimaterecyclerview/appPaginator/catelogLinear.java b/UltimateRecyclerView/ultimaterecyclerview/src/main/java/com/marshalchen/ultimaterecyclerview/appPaginator/catelogLinear.java
+index f67f580..e09ca8f 100644
+--- a/UltimateRecyclerView/ultimaterecyclerview/src/main/java/com/marshalchen/ultimaterecyclerview/appPaginator/catelogLinear.java
++++ b/UltimateRecyclerView/ultimaterecyclerview/src/main/java/com/marshalchen/ultimaterecyclerview/appPaginator/catelogLinear.java
+@@ -62,6 +62,8 @@ public abstract class catelogLinear<adapter extends easyRegularAdapter, binder e
+ 
+     protected abstract void onClickItem(final String route);
+ 
++    protected abstract void onClickItem(final long route_id);
++
+     protected abstract int getColumn();
+ 
+     protected abstract adapter getAdatperWithdata();

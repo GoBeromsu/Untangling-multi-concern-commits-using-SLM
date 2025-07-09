@@ -1,0 +1,21 @@
+# Type: cicd
+# Subtype: C1
+# English Summary: Modified commands in CircleCI configuration file
+# Chinese Summary: 修改 CircleCI 配置文件中的命令
+# Entry Number: 9
+
+# === Git Diff Content ===
+
+diff --git a/.circleci/config.yml b/.circleci/config.yml
+index 9b3b027..29a7c44 100644
+--- a/.circleci/config.yml
++++ b/.circleci/config.yml
+@@ -11,7 +11,7 @@ jobs:
+       - checkout
+       - restore_cache:
+           key: dropwizard-{{ checksum "pom.xml" }}
+-      - run: ./mvnw --no-transfer-progress -V -B -ff \
++      - run: ./mvnw --no-transfer-progress -V -B -ff
+           -Dsurefire.rerunFailingTestsCount=1 install
+       - save_cache:
+           paths:

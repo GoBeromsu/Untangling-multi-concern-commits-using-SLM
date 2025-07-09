@@ -1,0 +1,27 @@
+# Type: cicd
+# Subtype: C2
+# English Summary: Suppress the NewApi lint check for EditorWebView.execJavaScriptFromString
+# Chinese Summary: 抑制EditorWebView.execJavaScriptFromString的NewApi lint检查
+# Entry Number: 17
+
+# === Git Diff Content ===
+
+diff --git a/WordPressEditor/src/main/java/org/wordpress/android/editor/EditorWebView.java b/WordPressEditor/src/main/java/org/wordpress/android/editor/EditorWebView.java
+index 0d67adbb0..f9daf0485 100644
+--- a/WordPressEditor/src/main/java/org/wordpress/android/editor/EditorWebView.java
++++ b/WordPressEditor/src/main/java/org/wordpress/android/editor/EditorWebView.java
+@@ -1,5 +1,6 @@
+ package org.wordpress.android.editor;
+ 
++import android.annotation.SuppressLint;
+ import android.content.Context;
+ import android.os.Build;
+ import android.util.AttributeSet;
+@@ -10,6 +11,7 @@ public class EditorWebView extends EditorWebViewAbstract {
+         super(context, attrs);
+     }
+ 
++    @SuppressLint("NewApi")
+     public void execJavaScriptFromString(String javaScript) {
+         if (Build.VERSION.SDK_INT >= 19) {
+             this.evaluateJavascript(javaScript, null);

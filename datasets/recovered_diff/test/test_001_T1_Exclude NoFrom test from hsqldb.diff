@@ -1,0 +1,20 @@
+# Type: test
+# Subtype: T1
+# English Summary: Exclude NoFrom test from hsqldb
+# Chinese Summary: 从 hsqldb 中排除 NoFrom 测试
+# Entry Number: 1
+
+# === Git Diff Content ===
+
+diff --git a/querydsl-jpa/src/test/java/com/mysema/query/JPASQLBase.java b/querydsl-jpa/src/test/java/com/mysema/query/JPASQLBase.java
+index 2a64bfed1..3f1116c19 100644
+--- a/querydsl-jpa/src/test/java/com/mysema/query/JPASQLBase.java
++++ b/querydsl-jpa/src/test/java/com/mysema/query/JPASQLBase.java
+@@ -277,6 +277,7 @@ public class JPASQLBase {
+     }
+ 
+     @Test
++    @ExcludeIn(Target.HSQLDB)
+     public void No_From() {
+         assertNotNull(query().singleResult(DateExpression.currentDate()));
+     }

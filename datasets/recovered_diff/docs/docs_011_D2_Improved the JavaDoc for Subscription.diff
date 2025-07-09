@@ -1,0 +1,41 @@
+# Type: docs
+# Subtype: D2
+# English Summary: Improved the JavaDoc for Subscription
+# Chinese Summary: 改进Subscription的JavaDoc
+# Entry Number: 11
+
+# === Git Diff Content ===
+
+diff --git a/aeron-client/src/main/java/uk/co/real_logic/aeron/Subscription.java b/aeron-client/src/main/java/uk/co/real_logic/aeron/Subscription.java
+index e3cd7a0..638aa2a 100644
+--- a/aeron-client/src/main/java/uk/co/real_logic/aeron/Subscription.java
++++ b/aeron-client/src/main/java/uk/co/real_logic/aeron/Subscription.java
+@@ -24,7 +24,9 @@ import java.util.Arrays;
+ import java.util.List;
+ 
+ /**
+- * Aeron Subscriber API for receiving {@link Image}s of messages from publishers on a given channel and streamId pair.
++ * Aeron Subscriber API for receiving a reconstructed {@link Image} for a stream of messages from publishers on
++ * a given channel and streamId pair.
++ * <p>
+  * Subscribers are created via an {@link Aeron} object, and received messages are delivered
+  * to the {@link FragmentHandler}.
+  * <p>
+@@ -121,6 +123,8 @@ public class Subscription implements AutoCloseable
+     /**
+      * Poll the {@link Image}s under the subscription for available message fragments in blocks.
+      *
++     * This method is useful for operations like bulk archiving and messaging indexing.
++     *
+      * @param blockHandler     to receive a block of fragments from each {@link Image}.
+      * @param blockLengthLimit for each individual block.
+      * @return the number of bytes consumed.
+@@ -142,6 +146,8 @@ public class Subscription implements AutoCloseable
+     /**
+      * Poll the {@link Image}s under the subscription for available message fragments in blocks.
+      *
++     * This method is useful for operations like bulk archiving a stream to file.
++     *
+      * @param fileBlockHandler to receive a block of fragments from each {@link Image}.
+      * @param blockLengthLimit for each individual block.
+      * @return the number of bytes consumed.

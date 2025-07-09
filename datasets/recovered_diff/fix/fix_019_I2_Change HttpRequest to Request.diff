@@ -1,0 +1,21 @@
+# Type: fix
+# Subtype: I2
+# English Summary: Change HttpRequest to Request
+# Chinese Summary: 将 HttpRequest 改为 Request
+# Entry Number: 19
+
+# === Git Diff Content ===
+
+diff --git a/moco-core/src/main/java/com/github/dreamhead/moco/setting/BaseSetting.java b/moco-core/src/main/java/com/github/dreamhead/moco/setting/BaseSetting.java
+index 1811ff50..308d3a34 100644
+--- a/moco-core/src/main/java/com/github/dreamhead/moco/setting/BaseSetting.java
++++ b/moco-core/src/main/java/com/github/dreamhead/moco/setting/BaseSetting.java
+@@ -13,7 +13,7 @@ public class BaseSetting extends Setting implements ConfigApplier<BaseSetting> {
+         super(matcher);
+     }
+ 
+-    public boolean match(HttpRequest request) {
++    public boolean match(Request request) {
+         return this.matcher.match(request) && this.handler != null;
+     }
+ 

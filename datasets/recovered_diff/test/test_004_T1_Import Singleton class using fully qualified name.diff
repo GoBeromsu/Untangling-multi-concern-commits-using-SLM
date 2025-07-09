@@ -1,0 +1,22 @@
+# Type: test
+# Subtype: T1
+# English Summary: Import Singleton class using fully qualified name
+# Chinese Summary: 使用全限定名导入Singleton类
+# Entry Number: 4
+
+# === Git Diff Content ===
+
+diff --git a/extensions/struts2/test/com/google/inject/struts2/Struts2FactoryTest.java b/extensions/struts2/test/com/google/inject/struts2/Struts2FactoryTest.java
+index 27fc3b2..85dad36 100644
+--- a/extensions/struts2/test/com/google/inject/struts2/Struts2FactoryTest.java
++++ b/extensions/struts2/test/com/google/inject/struts2/Struts2FactoryTest.java
+@@ -52,7 +52,8 @@ public class Struts2FactoryTest extends TestCase {
+             @Override
+             protected void configureServlets() {
+               // Struts 2 setup
+-              bind(StrutsPrepareAndExecuteFilter.class).in(Singleton.class);
++              bind(StrutsPrepareAndExecuteFilter.class)
++                  .in(com.google.inject.Singleton.class);
+               filter("/*").through(StrutsPrepareAndExecuteFilter.class);
+             }
+           },

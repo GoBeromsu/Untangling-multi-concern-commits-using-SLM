@@ -1,0 +1,30 @@
+# Type: cicd
+# Subtype: Cx
+# English Summary: Update GCC version and enable code coverage metrics
+# Chinese Summary: 更新GCC版本并启用代码覆盖率指标
+# Entry Number: 3
+
+# === Git Diff Content ===
+
+diff --git a/.gitlab-ci.yml b/.gitlab-ci.yml
+index 56e1632..f34e212 100644
+--- a/.gitlab-ci.yml
++++ b/.gitlab-ci.yml
+@@ -1,11 +1,15 @@
+ image: gcc:7.5
+ 
++variables:
++  GCC_VERSION: "9"
++
+ stages:
+   - build
+   - test
+ 
+ build:
+   stage: build
+   script:
+-    - gcc --version
+-    - make all
++    - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${GCC_VERSION} 60 --slave /usr/bin/g++ g++ /usr/bin/g++-${GCC_VERSION}
++    - gcc --version  # Ensure GCC version is updated
++    - make all COVERAGE=1

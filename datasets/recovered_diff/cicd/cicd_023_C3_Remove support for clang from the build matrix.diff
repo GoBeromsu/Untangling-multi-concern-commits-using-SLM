@@ -1,0 +1,29 @@
+# Type: cicd
+# Subtype: C3
+# English Summary: Remove support for clang from the build matrix
+# Chinese Summary: 从构建矩阵中删除对clang的支持
+# Entry Number: 23
+
+# === Git Diff Content ===
+
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index a27d5c3..b7e4f2b 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -15,14 +15,14 @@ jobs:
+     strategy:
+       matrix:
+         os: [ubuntu-latest, macos-latest]
+-        compiler: [gcc, clang]
++        compiler: [gcc]
+ 
+     steps:
+     - uses: actions/checkout@v2
+     - name: Install dependencies
+       run: sudo apt-get update && sudo apt-get install -y cmake libboost-all-dev
+     - name: Set up C++ environment
+-      run: if [ ${{ matrix.compiler }} == 'gcc' ]; then sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100; elif [ ${{ matrix.compiler }} == 'clang' ]; then sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100; fi
++      run: sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 100
+     - name: Build project
+       run: cmake . && make
+     - name: Run Tests

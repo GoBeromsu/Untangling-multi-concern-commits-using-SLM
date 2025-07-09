@@ -1,0 +1,48 @@
+# Type: cicd
+# Subtype: Cx
+# English Summary: Run unit tests before deploying to production environment
+# Chinese Summary: 在部署到生产环境前运行单元测试
+# Entry Number: 14
+
+# === Git Diff Content ===
+
+diff --git a/ci_cd_pipeline.sh b/ci_cd_pipeline.sh
+index 7f3c0e9..d4113c8 100644
+--- a/ci_cd_pipeline.sh
++++ b/ci_cd_pipeline.sh
+@@ -10,7 +10,7 @@
+ # Build Project
+ build_project() {
+     echo "Building project..."
+-    make build
++    ./gradlew build
+     if [ $? -eq 0 ]; then
+         echo "Build successful"
+     else
+@@ -25,6 +25,14 @@
+     fi
+ }
+ 
++# Deploy to Test
++deploy_to_test() {
++    echo "Deploying to test environment..."
++    ./deploy.sh test
++    echo "Deployment to test environment completed."
++}
++
++# Run Unit Test
+ run_unit_tests() {
+     echo "Running unit tests..."
+     ./gradlew test
+@@ -35,8 +43,10 @@
+     fi
+ }
+ 
+-# If it is the main branch, then deploy to production
++# If it is the main branch and it passes unit test, then deploy to production
+ deploy_to_prod() {
++    run_unit_tests
++    if [ $? -ne 0 ]; then return; fi
+     echo "Deploying to production..."
+     ./deploy.sh prod
+     echo "Deployment to production completed."

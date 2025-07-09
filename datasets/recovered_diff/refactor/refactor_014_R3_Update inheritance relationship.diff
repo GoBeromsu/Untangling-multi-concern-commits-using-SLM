@@ -1,0 +1,34 @@
+# Type: refactor
+# Subtype: R3
+# English Summary: Update inheritance relationship
+# Chinese Summary: 更新继承关系
+# Entry Number: 14
+
+# === Git Diff Content ===
+
+diff --git a/src/main/java/com/j256/ormlite/db/SqliteAndroidDatabaseType.java b/src/main/java/com/j256/ormlite/db/SqliteAndroidDatabaseType.java
+index 42ecfc2..24a452e 100644
+--- a/src/main/java/com/j256/ormlite/db/SqliteAndroidDatabaseType.java
++++ b/src/main/java/com/j256/ormlite/db/SqliteAndroidDatabaseType.java
+@@ -19,7 +19,7 @@ import com.j256.ormlite.field.FieldType;
+  * 
+  * @author graywatson
+  */
+-public class SqliteAndroidDatabaseType extends SqliteDatabaseType implements DatabaseType {
++public class SqliteAndroidDatabaseType extends BaseSqliteDatabaseType implements DatabaseType {
+ 
+ 	public SqliteAndroidDatabaseType() {
+ 	}
+@@ -29,12 +29,10 @@ public class SqliteAndroidDatabaseType extends SqliteDatabaseType implements Dat
+ 		// Hang out. Nothing to do.
+ 	}
+ 
+-	@Override
+ 	public String getDriverUrlPart() {
+ 		return null;
+ 	}
+ 
+-	@Override
+ 	public String getDriverClassName() {
+ 		return null;
+ 	}

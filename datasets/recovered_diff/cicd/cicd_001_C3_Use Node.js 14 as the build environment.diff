@@ -1,0 +1,27 @@
+# Type: cicd
+# Subtype: C3
+# English Summary: Use Node.js 14 as the build environment
+# Chinese Summary: 使用Node.js 14作为构建基础环境
+# Entry Number: 1
+
+# === Git Diff Content ===
+
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index e35a515..4b9f248 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -1,8 +1,13 @@
+ name: CI
+ on: [push, pull_request]
+  jobs:
+    build:
+      runs-on: ubuntu-18.04
+      steps:
++     - uses: actions/checkout@v2
++     - name: Set up Node.js
++       uses: actions/setup-node@v2
++       with:
++         node-version: 14
+      - name: Build
+        run: |
+          cd ./src

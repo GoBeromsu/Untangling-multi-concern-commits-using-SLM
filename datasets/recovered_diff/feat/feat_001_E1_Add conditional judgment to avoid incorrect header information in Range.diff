@@ -1,0 +1,23 @@
+# Type: feat
+# Subtype: E1
+# English Summary: Add conditional judgment to avoid incorrect header information in Range
+# Chinese Summary: 添加条件判断，避免 Range 头部信息错误
+# Entry Number: 1
+
+# === Git Diff Content ===
+
+diff --git a/src/main/java/com/ning/http/client/resumable/ResumableAsyncHandler.java b/src/main/java/com/ning/http/client/resumable/ResumableAsyncHandler.java
+index 5a6416a..f11ad2c 100644
+--- a/src/main/java/com/ning/http/client/resumable/ResumableAsyncHandler.java
++++ b/src/main/java/com/ning/http/client/resumable/ResumableAsyncHandler.java
+@@ -196,7 +196,9 @@ public class ResumableAsyncHandler<T> implements AsyncHandler<T> {
+         }
+ 
+         RequestBuilder builder = new RequestBuilder(request);
+-        builder.setHeader("Range", "bytes=" + byteTransferred.get() + "-");
++        if (byteTransferred.get() != 0) {
++            builder.setHeader("Range", "bytes=" + byteTransferred.get() + "-");
++        }
+         return builder.build();
+     }
+ 

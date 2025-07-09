@@ -1,0 +1,26 @@
+# Type: test
+# Subtype: T1
+# English Summary: Move PermissionManager.setPermissions(pathManager) to the try block
+# Chinese Summary: 将PermissionManager.setPermissions(pathManager)移动到try块内
+# Entry Number: 19
+
+# === Git Diff Content ===
+
+diff --git a/compiler/android-tests/src/org/jetbrains/jet/compiler/CodegenTestsOnAndroidRunner.java b/compiler/android-tests/src/org/jetbrains/jet/compiler/CodegenTestsOnAndroidRunner.java
+index b6effc8..4e0ea0e 100644
+--- a/compiler/android-tests/src/org/jetbrains/jet/compiler/CodegenTestsOnAndroidRunner.java
++++ b/compiler/android-tests/src/org/jetbrains/jet/compiler/CodegenTestsOnAndroidRunner.java
+@@ -180,11 +180,11 @@ public class CodegenTestsOnAndroidRunner {
+         downloader.downloadAll();
+         downloader.unzipAll();
+ 
+-        PermissionManager.setPermissions(pathManager);
+-
+         String platformPrefixProperty = System.setProperty(PlatformUtils.PLATFORM_PREFIX_KEY, "Idea");
+ 
+         try {
++            PermissionManager.setPermissions(pathManager);
++
+             antRunner.packLibraries();
+ 
+             emulator.createEmulator();

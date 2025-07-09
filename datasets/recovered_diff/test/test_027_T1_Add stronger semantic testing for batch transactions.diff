@@ -1,0 +1,26 @@
+# Type: test
+# Subtype: T1
+# English Summary: Add stronger semantic testing for batch transactions
+# Chinese Summary: 添加更强的批量事务语义测试
+# Entry Number: 27
+
+# === Git Diff Content ===
+
+diff --git a/blueprints-test/src/main/java/com/tinkerpop/blueprints/pgm/TransactionalGraphTestSuite.java b/blueprints-test/src/main/java/com/tinkerpop/blueprints/pgm/TransactionalGraphTestSuite.java
+index c588c1d3..79bb55c8 100644
+--- a/blueprints-test/src/main/java/com/tinkerpop/blueprints/pgm/TransactionalGraphTestSuite.java
++++ b/blueprints-test/src/main/java/com/tinkerpop/blueprints/pgm/TransactionalGraphTestSuite.java
+@@ -413,6 +413,13 @@ public class TransactionalGraphTestSuite extends TestSuite {
+             graph.addEdge(null, graph.addVertex(null), graph.addVertex(null), convertId("test"));
+         }
+         assertEquals(BaseTest.count(graph.getEdges()), 3);
++        graph.stopTransaction(TransactionalGraph.Conclusion.FAILURE);
++        assertEquals(BaseTest.count(graph.getEdges()), 0);
++
++        for (int i = 0; i < 3; i++) {
++            graph.addEdge(null, graph.addVertex(null), graph.addVertex(null), convertId("test"));
++        }
++        assertEquals(BaseTest.count(graph.getEdges()), 3);
+         graph.stopTransaction(TransactionalGraph.Conclusion.SUCCESS);
+         assertEquals(BaseTest.count(graph.getEdges()), 3);
+ 

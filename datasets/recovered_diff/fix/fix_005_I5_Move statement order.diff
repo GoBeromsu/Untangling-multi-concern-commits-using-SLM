@@ -1,0 +1,23 @@
+# Type: fix
+# Subtype: I5
+# English Summary: Move statement order
+# Chinese Summary: 移动语句顺序
+# Entry Number: 5
+
+# === Git Diff Content ===
+
+diff --git a/java/compiler/impl/src/com/intellij/compiler/server/BuildManager.java b/java/compiler/impl/src/com/intellij/compiler/server/BuildManager.java
+index 97aadd9..e13aab0 100644
+--- a/java/compiler/impl/src/com/intellij/compiler/server/BuildManager.java
++++ b/java/compiler/impl/src/com/intellij/compiler/server/BuildManager.java
+@@ -1150,9 +1150,9 @@ public class BuildManager implements Disposable {
+ 
+     final List<String> launcherCp = new ArrayList<String>();
+     launcherCp.add(ClasspathBootstrap.getResourcePath(launcherClass));
++    launcherCp.addAll(BuildProcessClasspathManager.getLauncherClasspath(project));
+     launcherCp.add(compilerPath);
+     ClasspathBootstrap.appendJavaCompilerClasspath(launcherCp);
+-    launcherCp.addAll(BuildProcessClasspathManager.getLauncherClasspath(project));
+     cmdLine.addParameter("-classpath");
+     cmdLine.addParameter(classpathToString(launcherCp));
+ 

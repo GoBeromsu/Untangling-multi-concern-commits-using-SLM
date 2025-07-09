@@ -1,0 +1,30 @@
+# Type: cicd
+# Subtype: Cx
+# English Summary: Fix CICD deployment script
+# Chinese Summary: 修复CICD部署脚本
+# Entry Number: 26
+
+# === Git Diff Content ===
+
+diff --git a/deploy.py b/deploy.py
+index 097aad3..4f5c6d9 100644
+--- a/deploy.py
++++ b/deploy.py
+@@ -17,7 +17,7 @@
+ 
+ # define the deployment pipeline
+ pipeline = Pipeline([
+-    BuildAction('build', 'src/repo'),
++    BuildAction('build', 'src/main'),
+     TestAction('test', 'src/main'),
+     DeployAction('deploy', 'src/main')
+ ])
+@@ -41,7 +41,7 @@
+         raise Exception('Deployment failed')
+ 
+ def main():
+-    for action in pipeline.actions:
++    for action in pipeline.get_actions():
+         action.execute()
+ 
+ if __name__ == '__main__':

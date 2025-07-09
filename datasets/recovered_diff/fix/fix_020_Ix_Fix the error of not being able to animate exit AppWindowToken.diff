@@ -1,0 +1,21 @@
+# Type: fix
+# Subtype: Ix
+# English Summary: Fix the error of not being able to animate exit AppWindowToken
+# Chinese Summary: 修复无法动画退出AppWindowToken的错误
+# Entry Number: 20
+
+# === Git Diff Content ===
+
+diff --git a/services/java/com/android/server/wm/WindowAnimator.java b/services/java/com/android/server/wm/WindowAnimator.java
+index 77f94d9..9b196cc 100644
+--- a/services/java/com/android/server/wm/WindowAnimator.java
++++ b/services/java/com/android/server/wm/WindowAnimator.java
+@@ -139,7 +139,7 @@ public class WindowAnimator {
+ 
+         final int NEAT = mService.mExitingAppTokens.size();
+         for (i=0; i<NEAT; i++) {
+-            final AppWindowAnimator appAnimator = mService.mAppTokens.get(i).mAppAnimator;
++            final AppWindowAnimator appAnimator = mService.mExitingAppTokens.get(i).mAppAnimator;
+             final boolean wasAnimating = appAnimator.animation != null
+                     && appAnimator.animation != WindowManagerService.sDummyAnimation;
+             if (appAnimator.stepAnimationLocked(mCurrentTime, mInnerDw, mInnerDh)) {

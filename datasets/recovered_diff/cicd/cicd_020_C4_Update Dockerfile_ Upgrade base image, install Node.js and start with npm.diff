@@ -1,0 +1,30 @@
+# Type: cicd
+# Subtype: C4
+# English Summary: Update Dockerfile: Upgrade base image, install Node.js and start with npm
+# Chinese Summary: 更新Dockerfile：升级基础镜像，安装Node.js并用npm启动
+# Entry Number: 20
+
+# === Git Diff Content ===
+
+diff --git a/Dockerfile b/Dockerfile
+index d84b7e4..c35e3f2 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -1,10 +1,12 @@
+-FROM ubuntu:18.04
++FROM ubuntu:20.04
+ 
+-RUN apt-get update && apt-get install -y curl git
++RUN apt-get update && apt-get install -y curl git && apt-get upgrade -y
+ 
+ WORKDIR /usr/src/app
+ 
+ COPY . .
+ 
+-RUN make install
++RUN curl -sL https://deb.nodesource.com/setup_14.x | bash -
++RUN apt-get install -y nodejs
++RUN npm install && npm run build
+ 
+-CMD ["./app"]
++CMD ["npm", "start"]

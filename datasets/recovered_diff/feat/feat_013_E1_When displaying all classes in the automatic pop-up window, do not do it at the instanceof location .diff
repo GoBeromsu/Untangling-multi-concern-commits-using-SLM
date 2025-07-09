@@ -1,0 +1,33 @@
+# Type: feat
+# Subtype: E1
+# English Summary: When displaying all classes in the automatic pop-up window, do not do it at the instanceof location (very slow)
+# Chinese Summary: 在自动弹出窗口中显示所有类时，不要在instanceof位置这样做（非常慢）
+# Entry Number: 13
+
+# === Git Diff Content ===
+
+diff --git a/java/java-impl/src/com/intellij/codeInsight/completion/JavaCompletionContributor.java b/java/java-impl/src/com/intellij/codeInsight/completion/JavaCompletionContributor.java
+index b98ad7a..083649a 100644
+--- a/java/java-impl/src/com/intellij/codeInsight/completion/JavaCompletionContributor.java
++++ b/java/java-impl/src/com/intellij/codeInsight/completion/JavaCompletionContributor.java
+@@ -381,7 +381,10 @@ public class JavaCompletionContributor extends CompletionContributor {
+   static boolean isClassNamePossible(CompletionParameters parameters) {
+     boolean isSecondCompletion = parameters.getInvocationCount() >= 2;
+ 
+-    final PsiElement parent = parameters.getPosition().getParent();
++    PsiElement position = parameters.getPosition();
++    if (JavaCompletionData.isInstanceofPlace(position)) return false;
++
++    final PsiElement parent = position.getParent();
+     if (!(parent instanceof PsiJavaCodeReferenceElement)) return isSecondCompletion;
+     if (((PsiJavaCodeReferenceElement)parent).getQualifier() != null) return isSecondCompletion;
+ 
+@@ -406,7 +409,7 @@ public class JavaCompletionContributor extends CompletionContributor {
+       return false;
+     }
+ 
+-    if (JavaCompletionData.isAfterPrimitiveOrArrayType(parameters.getPosition())) {
++    if (JavaCompletionData.isAfterPrimitiveOrArrayType(position)) {
+       return false;
+     }
+     

@@ -1,0 +1,21 @@
+# Type: fix
+# Subtype: I2
+# English Summary: Remove the SKIP_DEBUG flag from ClassReader
+# Chinese Summary: 删除 ClassReader 的 SKIP_DEBUG 标志
+# Entry Number: 14
+
+# === Git Diff Content ===
+
+diff --git a/quasar-core/src/main/java/co/paralleluniverse/fibers/instrument/MethodDatabase.java b/quasar-core/src/main/java/co/paralleluniverse/fibers/instrument/MethodDatabase.java
+index 776909321..b0806a2b7 100644
+--- a/quasar-core/src/main/java/co/paralleluniverse/fibers/instrument/MethodDatabase.java
++++ b/quasar-core/src/main/java/co/paralleluniverse/fibers/instrument/MethodDatabase.java
+@@ -385,7 +385,7 @@ public class MethodDatabase implements Log {
+                 ClassReader r = new ClassReader(is);
+ 
+                 CheckInstrumentationVisitor civ = new CheckInstrumentationVisitor(this);
+-                r.accept(civ, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES | ClassReader.SKIP_CODE);
++                r.accept(civ, ClassReader.SKIP_FRAMES | ClassReader.SKIP_CODE);
+ 
+                 return civ;
+             } finally {

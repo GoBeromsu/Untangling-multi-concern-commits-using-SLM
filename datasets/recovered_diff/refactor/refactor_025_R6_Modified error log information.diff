@@ -1,0 +1,23 @@
+# Type: refactor
+# Subtype: R6
+# English Summary: Modified error log information
+# Chinese Summary: 修改错误日志信息
+# Entry Number: 25
+
+# === Git Diff Content ===
+
+diff --git a/compiler/src/main/java/com/raizlabs/android/dbflow/processor/validator/ColumnValidator.java b/compiler/src/main/java/com/raizlabs/android/dbflow/processor/validator/ColumnValidator.java
+index 86536e9..773955b 100644
+--- a/compiler/src/main/java/com/raizlabs/android/dbflow/processor/validator/ColumnValidator.java
++++ b/compiler/src/main/java/com/raizlabs/android/dbflow/processor/validator/ColumnValidator.java
+@@ -30,8 +30,8 @@ public class ColumnValidator implements Validator<ColumnDefinition> {
+ 
+             if(columnDefinition.column.name().length() > 0) {
+                 success = false;
+-                processorManager.logError("Foreign Key cannot specify the column() field. " +
+-                        "Use a @ForeignKeyReference(columnName = {NAME} instead");
++                processorManager.logError("Foreign Key %1s cannot specify the column() field. " +
++                        "Use a @ForeignKeyReference(columnName = {NAME} instead", columnDefinition.columnFieldName);
+             }
+ 
+         } else if (columnType == Column.NORMAL) {

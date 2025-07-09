@@ -1,0 +1,33 @@
+# Type: fix
+# Subtype: I4
+# English Summary: Fix the parameter index for long integer and double precision floating point number
+# Chinese Summary: 修复长整型和双精度浮点数的参数索引
+# Entry Number: 10
+
+# === Git Diff Content ===
+
+diff --git a/compiler/preloader/instrumentation/src/org/jetbrains/jet/preloading/instrumentation/InterceptionInstrumenter.java b/compiler/preloader/instrumentation/src/org/jetbrains/jet/preloading/instrumentation/InterceptionInstrumenter.java
+index 700f2db..b35bd2c 100644
+--- a/compiler/preloader/instrumentation/src/org/jetbrains/jet/preloading/instrumentation/InterceptionInstrumenter.java
++++ b/compiler/preloader/instrumentation/src/org/jetbrains/jet/preloading/instrumentation/InterceptionInstrumenter.java
+@@ -389,7 +389,7 @@ public class InterceptionInstrumenter {
+             Type[] parameterTypes = Type.getArgumentTypes(instrumentedMethodDesc);
+             boolean isStatic = (access & ACC_STATIC) != 0;
+             int base = isStatic ? 0 : 1;
+-            int parametersUsed = 0;
++            int parameterOffset = 0;
+             for (int i = 0; i < parameterCount; i++) {
+                 if (i == methodData.getThisParameterIndex()) {
+                     if (isStatic) {
+@@ -408,8 +408,9 @@ public class InterceptionInstrumenter {
+                     ia.aconst(instrumentedMethodDesc);
+                 }
+                 else {
+-                    ia.load(base + parametersUsed, parameterTypes[parametersUsed]);
+-                    parametersUsed++;
++                    Type type = parameterTypes[parameterOffset];
++                    ia.load(base + parameterOffset, type);
++                    parameterOffset += type.getSize();
+                 }
+ 
+             }

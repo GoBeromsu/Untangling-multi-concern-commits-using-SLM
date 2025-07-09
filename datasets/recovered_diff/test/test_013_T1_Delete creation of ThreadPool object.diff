@@ -1,0 +1,20 @@
+# Type: test
+# Subtype: T1
+# English Summary: Delete creation of ThreadPool object
+# Chinese Summary: 删除 ThreadPool 对象的创建
+# Entry Number: 13
+
+# === Git Diff Content ===
+
+diff --git a/plugins/mapper-attachments/src/test/java/org/elasticsearch/mapper/attachments/MultifieldAttachmentMapperTests.java b/plugins/mapper-attachments/src/test/java/org/elasticsearch/mapper/attachments/MultifieldAttachmentMapperTests.java
+index 2dc1081..f701c32 100644
+--- a/plugins/mapper-attachments/src/test/java/org/elasticsearch/mapper/attachments/MultifieldAttachmentMapperTests.java
++++ b/plugins/mapper-attachments/src/test/java/org/elasticsearch/mapper/attachments/MultifieldAttachmentMapperTests.java
+@@ -151,7 +151,6 @@ public class MultifieldAttachmentMapperTests extends AttachmentUnitTestCase {
+         String forcedContentType = randomAsciiOfLength(20);
+ 
+         String bytes = Base64.encodeBytes(originalText.getBytes(StandardCharsets.ISO_8859_1));
+-        threadPool = new ThreadPool("testing-only");
+ 
+         MapperService mapperService = MapperTestUtils.newMapperService(createTempDir(),
+             Settings.builder().put(AttachmentMapper.INDEX_ATTACHMENT_DETECT_LANGUAGE_SETTING.getKey(), true).build(),

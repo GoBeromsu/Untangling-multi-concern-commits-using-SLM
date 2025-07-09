@@ -1,0 +1,25 @@
+# Type: feat
+# Subtype: E1
+# English Summary: If the text is not empty, set the text and cursor position
+# Chinese Summary: 如果文本不为空，则设置文本和光标位置
+# Entry Number: 3
+
+# === Git Diff Content ===
+
+diff --git a/WordPress/src/main/java/org/wordpress/android/widgets/SuggestionAutoCompleteText.java b/WordPress/src/main/java/org/wordpress/android/widgets/SuggestionAutoCompleteText.java
+index e1d1fb06a..ac9209905 100644
+--- a/WordPress/src/main/java/org/wordpress/android/widgets/SuggestionAutoCompleteText.java
++++ b/WordPress/src/main/java/org/wordpress/android/widgets/SuggestionAutoCompleteText.java
+@@ -41,8 +41,10 @@ public class SuggestionAutoCompleteText extends MultiAutoCompleteTextView {
+             return;
+         }
+         String text = getAutoSaveTextHelper().loadString(this);
+-        setText(text);
+-        setSelection(text.length());
++        if (!text.isEmpty()) {
++            setText(text);
++            setSelection(text.length());
++        }
+     }
+ 
+     @Override

@@ -1,0 +1,37 @@
+# Type: feat
+# Subtype: E2
+# English Summary: Avoid potential NullPointerException when saving site settings
+# Chinese Summary: 保存站点设置时避免潜在的NullPointerException
+# Entry Number: 19
+
+# === Git Diff Content ===
+
+diff --git a/WordPress/src/main/java/org/wordpress/android/models/SiteSettingsModel.java b/WordPress/src/main/java/org/wordpress/android/models/SiteSettingsModel.java
+index 24f2a81ed..71f15d8be 100644
+--- a/WordPress/src/main/java/org/wordpress/android/models/SiteSettingsModel.java
++++ b/WordPress/src/main/java/org/wordpress/android/models/SiteSettingsModel.java
+@@ -293,12 +293,16 @@ public class SiteSettingsModel {
+         values.put(WHITELIST_COLUMN_NAME, commentAutoApprovalKnownUsers);
+ 
+         String moderationKeys = "";
+-        for (String key : holdForModeration) {
+-            moderationKeys += key + "
+";
++        if (holdForModeration != null) {
++            for (String key : holdForModeration) {
++                moderationKeys += key + "
+";
++            }
+         }
+         String blacklistKeys = "";
+-        for (String key : blacklist) {
+-            blacklistKeys += key + "
+";
++        if (blacklist != null) {
++            for (String key : blacklist) {
++                blacklistKeys += key + "
+";
++            }
+         }
+         values.put(MODERATION_KEYS_COLUMN_NAME, moderationKeys);
+         values.put(BLACKLIST_KEYS_COLUMN_NAME, blacklistKeys);

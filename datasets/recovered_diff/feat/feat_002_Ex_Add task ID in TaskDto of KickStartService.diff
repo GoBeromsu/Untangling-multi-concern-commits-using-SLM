@@ -1,0 +1,35 @@
+# Type: feat
+# Subtype: Ex
+# English Summary: Add task ID in TaskDto of KickStartService
+# Chinese Summary: 在 KickStartService 的 TaskDto 中添加任务 ID
+# Entry Number: 2
+
+# === Git Diff Content ===
+
+diff --git a/modules/activiti-webapp-kickstart/src/main/java/org/activiti/kickstart/service/KickstartServiceImpl.java b/modules/activiti-webapp-kickstart/src/main/java/org/activiti/kickstart/service/KickstartServiceImpl.java
+index e9c91918b..00b7c4fa9 100644
+--- a/modules/activiti-webapp-kickstart/src/main/java/org/activiti/kickstart/service/KickstartServiceImpl.java
++++ b/modules/activiti-webapp-kickstart/src/main/java/org/activiti/kickstart/service/KickstartServiceImpl.java
+@@ -133,7 +133,7 @@ public class KickstartServiceImpl implements KickstartService {
+       .processDefinitionId(id)
+       .singleResult();
+ 
+-    // Get BPMN 2.0 XML file from database and parse it with JAXB
++    // Get BPMN 2.0 XML file for this process defintion from database and parse it with JAXB
+     InputStream is = null;
+     Definitions definitions = null;
+     try {
+@@ -256,11 +256,9 @@ public class KickstartServiceImpl implements KickstartService {
+ 
+   protected TaskDto convertUserTaskToTaskDto(String deploymentId, UserTask userTask) {
+     TaskDto task = new TaskDto();
+-
+-    // task name
++    
++    task.setId(userTask.getId());
+     task.setName(userTask.getName());
+-
+-    // task description
+     if (!userTask.getDocumentation().isEmpty()) {
+       task.setDescription(userTask.getDocumentation().get(0).getText());
+     }

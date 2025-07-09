@@ -1,0 +1,32 @@
+# Type: feat
+# Subtype: Ex
+# English Summary: Add support for BigDecimal type
+# Chinese Summary: 添加 BigDecimal 类型的支持
+# Entry Number: 23
+
+# === Git Diff Content ===
+
+diff --git a/core/src/main/java/com/orientechnologies/orient/core/serialization/serializer/OStringSerializerHelper.java b/core/src/main/java/com/orientechnologies/orient/core/serialization/serializer/OStringSerializerHelper.java
+index 68ff13f..61837c9 100644
+--- a/core/src/main/java/com/orientechnologies/orient/core/serialization/serializer/OStringSerializerHelper.java
++++ b/core/src/main/java/com/orientechnologies/orient/core/serialization/serializer/OStringSerializerHelper.java
+@@ -15,6 +15,7 @@
+  */
+ package com.orientechnologies.orient.core.serialization.serializer;
+ 
++import java.math.BigDecimal;
+ import java.util.ArrayList;
+ import java.util.Collection;
+ import java.util.Collections;
+@@ -84,6 +85,11 @@ public abstract class OStringSerializerHelper {
+ 				return iValue;
+ 			return new Boolean(getStringContent(iValue));
+ 
++		case DECIMAL:
++			if (iValue instanceof BigDecimal)
++				return iValue;
++			return new BigDecimal(getStringContent(iValue));
++
+ 		case FLOAT:
+ 			if (iValue instanceof Float)
+ 				return iValue;

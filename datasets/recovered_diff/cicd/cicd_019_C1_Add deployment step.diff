@@ -1,0 +1,35 @@
+# Type: cicd
+# Subtype: C1
+# English Summary: Add deployment step
+# Chinese Summary: 添加deploy步骤
+# Entry Number: 19
+
+# === Git Diff Content ===
+
+diff --git a/Jenkinsfile b/Jenkinsfile
+index 12e4f56..89cfb1c 100644
+--- a/Jenkinsfile
++++ b/Jenkinsfile
+@@ -10,6 +11,13 @@
+     }
+     post {
+         always {
++            archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
++        }
++    }
++    stages {
++        stage('Deploy') {
++            steps {
++                // This will be auto-filled with deployment commands
+                 echo 'Deploying...'
+             }
+         }
+@@ -18,4 +25,4 @@
+     }
+     post {
+         always {
+-            echo 'Deployment completed'
++            echo 'Deployment Successful.'
+         }
+     }
+    }

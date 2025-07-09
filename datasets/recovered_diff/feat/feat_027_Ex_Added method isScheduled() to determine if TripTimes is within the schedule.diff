@@ -1,0 +1,27 @@
+# Type: feat
+# Subtype: Ex
+# English Summary: Added method isScheduled() to determine if TripTimes is within the schedule
+# Chinese Summary: 添加方法isScheduled()，用于判断TripTimes是否是计划内的
+# Entry Number: 27
+
+# === Git Diff Content ===
+
+diff --git a/opentripplanner-routing/src/main/java/org/opentripplanner/routing/trippattern/TripTimes.java b/opentripplanner-routing/src/main/java/org/opentripplanner/routing/trippattern/TripTimes.java
+index 92a716baa..af8ccba1f 100644
+--- a/opentripplanner-routing/src/main/java/org/opentripplanner/routing/trippattern/TripTimes.java
++++ b/opentripplanner-routing/src/main/java/org/opentripplanner/routing/trippattern/TripTimes.java
+@@ -90,6 +90,14 @@ public abstract class TripTimes {
+     public int getArrivalDelay(int hop) {
+         return getArrivalTime(hop) - getScheduledTripTimes().getArrivalTime(hop); 
+     }
++    
++    /** 
++     * @return true if this TripTimes represents an unmodified, scheduled trip from a published 
++     * timetable or false if it is a updated, cancelled, or otherwise modified one.
++     */
++    public boolean isScheduled() {
++        return this.getScheduledTripTimes() == this;
++    }
+ 
+     /** Builds a string concisely representing all departure and arrival times in this TripTimes. */
+     public String dumpTimes() {

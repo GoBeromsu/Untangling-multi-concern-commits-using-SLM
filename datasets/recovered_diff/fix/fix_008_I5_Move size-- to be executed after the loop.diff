@@ -1,0 +1,25 @@
+# Type: fix
+# Subtype: I5
+# English Summary: Move size-- to be executed after the loop
+# Chinese Summary: 将size--移到循环结束后执行
+# Entry Number: 8
+
+# === Git Diff Content ===
+
+diff --git a/platform/core-impl/src/com/intellij/psi/impl/smartPointers/SmartPointerManagerImpl.java b/platform/core-impl/src/com/intellij/psi/impl/smartPointers/SmartPointerManagerImpl.java
+index 469a350..fd4cb32 100644
+--- a/platform/core-impl/src/com/intellij/psi/impl/smartPointers/SmartPointerManagerImpl.java
++++ b/platform/core-impl/src/com/intellij/psi/impl/smartPointers/SmartPointerManagerImpl.java
+@@ -309,11 +309,11 @@ public class SmartPointerManagerImpl extends SmartPointerManager {
+         PointerReference reference = references[i];
+         if (reference != null && reference.get() == smartPointer) {
+           references[i] = null;
++          size--;
+           result = true;
+           break;
+         }
+       }
+-      size--;
+       return result;
+     }
+ 

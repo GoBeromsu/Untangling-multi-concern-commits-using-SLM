@@ -1,0 +1,22 @@
+# Type: cicd
+# Subtype: C3
+# English Summary: Use env to provide the environment value 'PYTHON_VERSION'
+# Chinese Summary: 使用env提供环境值'PYTHON_VERSION'
+# Entry Number: 7
+
+# === Git Diff Content ===
+
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index cb45f92..b66bcee 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -8,7 +8,8 @@ jobs:
+       - uses: actions/checkout@v2
+       - name: Set up Python
+         uses: actions/setup-python@v2
+-        with:
++        env:
++          PYTHON_VERSION: 3.8
+           python-version: ${{ env.PYTHON_VERSION }}
+       - name: Install dependencies
+         run: |

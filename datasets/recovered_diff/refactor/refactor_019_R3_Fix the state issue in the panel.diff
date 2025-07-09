@@ -1,0 +1,39 @@
+# Type: refactor
+# Subtype: R3
+# English Summary: Fix the state issue in the panel
+# Chinese Summary: 修复面板中的状态问题
+# Entry Number: 19
+
+# === Git Diff Content ===
+
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/NotificationPanelView.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/NotificationPanelView.java
+index 56e3032..f8bd793 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/NotificationPanelView.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/NotificationPanelView.java
+@@ -626,6 +626,7 @@ public class NotificationPanelView extends PanelView implements
+                         && shouldQuickSettingsIntercept(mInitialTouchX, mInitialTouchY, h)) {
+                     mQsTracking = true;
+                     onQsExpansionStarted();
++                    notifyExpandingFinished();
+                     mInitialHeightOnTouch = mQsExpansionHeight;
+                     mInitialTouchY = y;
+                     mInitialTouchX = x;
+@@ -825,9 +826,7 @@ public class NotificationPanelView extends PanelView implements
+             mInitialTouchX = event.getY();
+ 
+             // If we interrupt an expansion gesture here, make sure to update the state correctly.
+-            if (mIsExpanding) {
+-                onExpandingFinished();
+-            }
++            notifyExpandingFinished();
+         }
+     }
+ 
+@@ -970,7 +969,6 @@ public class NotificationPanelView extends PanelView implements
+     private void onQsExpansionStarted(int overscrollAmount) {
+         cancelQsAnimation();
+         cancelHeightAnimator();
+-        notifyExpandingFinished();
+ 
+         // Reset scroll position and apply that position to the expanded height.
+         float height = mQsExpansionHeight - mScrollView.getScrollY() - overscrollAmount;

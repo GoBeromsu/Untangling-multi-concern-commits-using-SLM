@@ -1,0 +1,21 @@
+# Type: refactor
+# Subtype: R5
+# English Summary: Remove punctuation
+# Chinese Summary: 删除标点符号
+# Entry Number: 10
+
+# === Git Diff Content ===
+
+diff --git a/core/src/main/java/com/orientechnologies/orient/core/config/OGlobalConfiguration.java b/core/src/main/java/com/orientechnologies/orient/core/config/OGlobalConfiguration.java
+index 53003ed..3e95cb6 100644
+--- a/core/src/main/java/com/orientechnologies/orient/core/config/OGlobalConfiguration.java
++++ b/core/src/main/java/com/orientechnologies/orient/core/config/OGlobalConfiguration.java
+@@ -176,7 +176,7 @@ public enum OGlobalConfiguration {
+ 
+ 	FILE_MMAP_MAX_MEMORY(
+ 			"file.mmap.maxMemory",
+-			"Max memory allocatable by memory mapping manager. Note that on 32bit operating systems, the limit is 2Gb but will vary between operating systems.",
++			"Max memory allocatable by memory mapping manager. Note that on 32bit operating systems, the limit is 2Gb but will vary between operating systems",
+ 			Long.class, 134217728, new OConfigurationChangeCallback() {
+ 				public void change(final Object iCurrentValue, final Object iNewValue) {
+ 					OMMapManager.setMaxMemory(OFileUtils.getSizeAsNumber(iNewValue));

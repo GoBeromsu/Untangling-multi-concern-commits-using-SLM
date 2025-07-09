@@ -1,0 +1,21 @@
+# Type: refactor
+# Subtype: R3
+# English Summary: Modified the return value to "other"
+# Chinese Summary: 修改返回值为 other
+# Entry Number: 2
+
+# === Git Diff Content ===
+
+diff --git a/ext/java/nokogiri/XmlNode.java b/ext/java/nokogiri/XmlNode.java
+index c0ddfb4..49dbbef 100644
+--- a/ext/java/nokogiri/XmlNode.java
++++ b/ext/java/nokogiri/XmlNode.java
+@@ -1275,7 +1275,7 @@ public class XmlNode extends RubyObject {
+         relink_namespace(context);
+         // post_add_child(context, this, other);
+ 
+-        return this;
++        return other;
+     }
+ 
+     protected void adoptAsChild(ThreadContext context, Node parent,

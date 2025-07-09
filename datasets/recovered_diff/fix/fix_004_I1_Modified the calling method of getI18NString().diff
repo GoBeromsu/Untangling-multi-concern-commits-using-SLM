@@ -1,0 +1,21 @@
+# Type: fix
+# Subtype: I1
+# English Summary: Modified the calling method of getI18NString()
+# Chinese Summary: 修改getI18NString()的调用方式
+# Entry Number: 4
+
+# === Git Diff Content ===
+
+diff --git a/src/net/java/sip/communicator/impl/gui/main/chatroomslist/joinforms/JoinChatRoomDialog.java b/src/net/java/sip/communicator/impl/gui/main/chatroomslist/joinforms/JoinChatRoomDialog.java
+index 4d6e17cf0..15eea4efa 100644
+--- a/src/net/java/sip/communicator/impl/gui/main/chatroomslist/joinforms/JoinChatRoomDialog.java
++++ b/src/net/java/sip/communicator/impl/gui/main/chatroomslist/joinforms/JoinChatRoomDialog.java
+@@ -216,7 +216,7 @@ public class JoinChatRoomDialog
+         if(list != null)
+         {
+             if(list.size() == 0)
+-                list.add(Messages.getI18NString("noAvailableRooms"));
++                list.add(Messages.getI18NString("noAvailableRooms").getText());
+ 
+             chatRoomsList.setListData(new Vector(list));
+             chatRoomsScrollPane.setPreferredSize(new Dimension(500, 120));

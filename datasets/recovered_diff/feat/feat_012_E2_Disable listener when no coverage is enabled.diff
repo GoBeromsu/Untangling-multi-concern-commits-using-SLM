@@ -1,0 +1,23 @@
+# Type: feat
+# Subtype: E2
+# English Summary: Disable listener when no coverage is enabled
+# Chinese Summary: 当没有覆盖启用时禁用监听器
+# Entry Number: 12
+
+# === Git Diff Content ===
+
+diff --git a/plugins/coverage/src/com/intellij/execution/coverage/CoverageJavaRunConfigurationExtension.java b/plugins/coverage/src/com/intellij/execution/coverage/CoverageJavaRunConfigurationExtension.java
+index 9a0d593..1310a9b 100644
+--- a/plugins/coverage/src/com/intellij/execution/coverage/CoverageJavaRunConfigurationExtension.java
++++ b/plugins/coverage/src/com/intellij/execution/coverage/CoverageJavaRunConfigurationExtension.java
+@@ -197,8 +197,9 @@ public class CoverageJavaRunConfigurationExtension extends RunConfigurationExten
+   }
+ 
+   @Override
+-  public boolean isListenerDisabled(RunConfigurationBase configuration, Object listener) {
++  public boolean isListenerDisabled(RunConfigurationBase configuration, Object listener, RunnerSettings runnerSettings) {
+     if (listener instanceof CoverageListener) {
++      if (!(runnerSettings.getData() instanceof CoverageRunnerData)) return true;
+       final CoverageEnabledConfiguration coverageEnabledConfiguration = CoverageEnabledConfiguration.getOrCreate(configuration);
+       return !(coverageEnabledConfiguration.getCoverageRunner() instanceof IDEACoverageRunner);
+     }

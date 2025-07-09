@@ -1,0 +1,26 @@
+# Type: refactor
+# Subtype: R3
+# English Summary: Update reload
+# Chinese Summary: 更新重新加载
+# Entry Number: 5
+
+# === Git Diff Content ===
+
+diff --git a/android/playground/app/src/main/java/com/alibaba/weex/WXPageActivity.java b/android/playground/app/src/main/java/com/alibaba/weex/WXPageActivity.java
+index 3eca93f..a7b6f20 100755
+--- a/android/playground/app/src/main/java/com/alibaba/weex/WXPageActivity.java
++++ b/android/playground/app/src/main/java/com/alibaba/weex/WXPageActivity.java
+@@ -379,8 +379,11 @@ public class WXPageActivity extends WXBaseActivity implements IWXRenderListener,
+       finish();
+       return true;
+     } else if (id == R.id.action_refresh) {
+-      if (TextUtils.equals(mUri.getScheme(), "http") || TextUtils.equals(mUri.getScheme(), "https")) {
+-        loadWXfromService(mUri.toString());
++      String scheme=mUri.getScheme();
++      if (mUri.isHierarchical() && (TextUtils.equals(scheme,"http") || TextUtils.equals(scheme,"https"))) {
++        String weexTpl = mUri.getQueryParameter(Constants.WEEX_TPL_KEY);
++        String url = TextUtils.isEmpty(weexTpl) ? mUri.toString() : weexTpl;
++        loadWXfromService(url);
+         return true;
+       }
+     }

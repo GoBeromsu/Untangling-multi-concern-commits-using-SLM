@@ -1,0 +1,21 @@
+# Type: docs
+# Subtype: D2
+# English Summary: Fix Javadoc tags
+# Chinese Summary: 修复Javadoc标签
+# Entry Number: 14
+
+# === Git Diff Content ===
+
+diff --git a/core/src/main/java/fi/iki/elonen/NanoHTTPD.java b/core/src/main/java/fi/iki/elonen/NanoHTTPD.java
+index ce292a4..ccdddf8 100644
+--- a/core/src/main/java/fi/iki/elonen/NanoHTTPD.java
++++ b/core/src/main/java/fi/iki/elonen/NanoHTTPD.java
+@@ -821,7 +821,7 @@ public abstract class NanoHTTPD {
+ 
+         /**
+          * Adds the files in the request body to the files map.
+-         * @arg files - map to modify
++         * @param files map to modify
+          */
+         void parseBody(Map<String, String> files) throws IOException, ResponseException;
+     }

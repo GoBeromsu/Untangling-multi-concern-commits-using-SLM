@@ -1,0 +1,33 @@
+# Type: docs
+# Subtype: D2
+# English Summary: Delete commented-out code
+# Chinese Summary: 删除注释掉的代码
+# Entry Number: 13
+
+# === Git Diff Content ===
+
+diff --git a/test/com/facebook/buck/android/GenAidlTest.java b/test/com/facebook/buck/android/GenAidlTest.java
+index 1f6426e..532b2bd 100644
+--- a/test/com/facebook/buck/android/GenAidlTest.java
++++ b/test/com/facebook/buck/android/GenAidlTest.java
+@@ -54,20 +54,6 @@ public class GenAidlTest {
+ 
+   @Test
+   public void testSimpleGenAidlRule() throws IOException {
+-//    FileSystem vfs = Jimfs.newFileSystem(Configuration.unix());
+-//    Path root = vfs.getPath("/");
+-//    Files.createDirectories(root);
+-//    ProjectFilesystem stubFilesystem = new ProjectFilesystem(root) {
+-//      @Override
+-//      public Path resolve(Path path) {
+-//        return path;
+-//      }
+-//
+-//      @Override
+-//      public boolean exists(Path pathRelativeToProjectRoot) {
+-//        return true;
+-//      }
+-//    };
+     ProjectFilesystem stubFilesystem = FakeProjectFilesystem.createJavaOnlyFilesystem();
+     Files.createDirectories(stubFilesystem.getRootPath().resolve("java/com/example/base"));
+ 

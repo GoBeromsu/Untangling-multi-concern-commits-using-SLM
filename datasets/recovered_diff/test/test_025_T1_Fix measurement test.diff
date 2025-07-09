@@ -1,0 +1,23 @@
+# Type: test
+# Subtype: T1
+# English Summary: Fix measurement test
+# Chinese Summary: 修复度量测试
+# Entry Number: 25
+
+# === Git Diff Content ===
+
+diff --git a/tests/src/test/java/alluxio/worker/AlluxioWorkerRestApiTest.java b/tests/src/test/java/alluxio/worker/AlluxioWorkerRestApiTest.java
+index 50292cc..369feaf 100644
+--- a/tests/src/test/java/alluxio/worker/AlluxioWorkerRestApiTest.java
++++ b/tests/src/test/java/alluxio/worker/AlluxioWorkerRestApiTest.java
+@@ -94,7 +94,9 @@ public final class AlluxioWorkerRestApiTest extends RestApiTest {
+     Map<String, Long> metrics = (Map<String, Long>) new ObjectMapper().readValue(result,
+         new TypeReference<Map<String, Long>>() {});
+ 
+-    Assert.assertTrue(metrics.get("worker.BlocksAccessed") >= 0);
++    String blocksAccessedMetricName =
++        WorkerContext.getWorkerSource().getName() + "." + WorkerSource.BLOCKS_ACCESSED;
++    Assert.assertTrue(metrics.get(blocksAccessedMetricName) >= 0);
+   }
+ 
+   @Test

@@ -1,0 +1,21 @@
+# Type: fix
+# Subtype: I3
+# English Summary: Added check for non-empty parentScope
+# Chinese Summary: 添加parentScope不为空判断
+# Entry Number: 26
+
+# === Git Diff Content ===
+
+diff --git a/src/ScriptOrFnScope.java b/src/ScriptOrFnScope.java
+index bd78268..5edfdff 100644
+--- a/src/ScriptOrFnScope.java
++++ b/src/ScriptOrFnScope.java
+@@ -78,7 +78,7 @@ class ScriptOrFnScope {
+ 
+     void munge() {
+ 
+-        if (!markedForMunging) {
++        if (!markedForMunging && parentScope != null) {
+             return;
+         }
+ 

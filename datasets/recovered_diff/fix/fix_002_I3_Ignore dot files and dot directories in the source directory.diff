@@ -1,0 +1,33 @@
+# Type: fix
+# Subtype: I3
+# English Summary: Ignore dot files and dot directories in the source directory
+# Chinese Summary: 忽略源目录中的点文件和点文件夹
+# Entry Number: 2
+
+# === Git Diff Content ===
+
+diff --git a/app/src/processing/app/Base.java b/app/src/processing/app/Base.java
+index 84cfb7d..30e966e 100644
+--- a/app/src/processing/app/Base.java
++++ b/app/src/processing/app/Base.java
+@@ -1818,12 +1818,19 @@ public class Base {
+   }
+ 
+ 
++  /**
++   * Copy a folder from one place to another. This ignores all dot files and
++   * folders found in the source directory, to avoid copying silly .DS_Store
++   * files and potentially troublesome .svn folders.
++   */
+   static public void copyDir(File sourceDir,
+                              File targetDir) throws IOException {
+     targetDir.mkdirs();
+     String files[] = sourceDir.list();
+     for (int i = 0; i < files.length; i++) {
+-      if (files[i].equals(".") || files[i].equals("..")) continue;
++      // Ignore dot files (.DS_Store), dot folders (.svn) while copying
++      if (files[i].charAt(0) == '.') continue;
++      //if (files[i].equals(".") || files[i].equals("..")) continue;
+       File source = new File(sourceDir, files[i]);
+       File target = new File(targetDir, files[i]);
+       if (source.isDirectory()) {

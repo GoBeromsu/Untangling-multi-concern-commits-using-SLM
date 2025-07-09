@@ -1,0 +1,26 @@
+# Type: refactor
+# Subtype: R3
+# English Summary: Remove redundant null checks
+# Chinese Summary: 删除冗余的null检查
+# Entry Number: 9
+
+# === Git Diff Content ===
+
+diff --git a/config/src/main/java/com/typesafe/config/impl/ConfigImpl.java b/config/src/main/java/com/typesafe/config/impl/ConfigImpl.java
+index 77d0b18..3dc0a8f 100644
+--- a/config/src/main/java/com/typesafe/config/impl/ConfigImpl.java
++++ b/config/src/main/java/com/typesafe/config/impl/ConfigImpl.java
+@@ -40,12 +40,7 @@ public class ConfigImpl {
+                 || name.endsWith(".properties")) {
+             ConfigParseable p = source.nameToParseable(name);
+ 
+-            if (p != null) {
+-                obj = p.parse(p.options().setAllowMissing(
+-                        options.getAllowMissing()));
+-            } else {
+-                obj = SimpleConfigObject.emptyMissing(SimpleConfigOrigin.newSimple(name));
+-            }
++            obj = p.parse(p.options().setAllowMissing(options.getAllowMissing()));
+         } else {
+             ConfigParseable confHandle = source.nameToParseable(name + ".conf");
+             ConfigParseable jsonHandle = source.nameToParseable(name + ".json");

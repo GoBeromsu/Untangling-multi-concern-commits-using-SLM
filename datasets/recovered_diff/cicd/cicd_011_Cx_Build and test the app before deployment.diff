@@ -1,0 +1,36 @@
+# Type: cicd
+# Subtype: Cx
+# English Summary: Build and test the app before deployment
+# Chinese Summary: 在部署前进行app构建和测试
+# Entry Number: 11
+
+# === Git Diff Content ===
+
+diff --git a/.circleci/config.yml b/.circleci/config.yml
+index a1f0f4a..0ddb46d 100644
+--- a/.circleci/config.yml
++++ b/.circleci/config.yml
+@@ -20,6 +20,11 @@ jobs:
+           name: Install Dependencies
+           command: npm install
+       - run:
++          name: Build Application
++          command: npm run build
++      - run:
++          name: Test Application
++          command: npm test
+       - deploy:
+           name: Deploy to Production
+           command: |
+@@ -37,6 +42,8 @@ workflows:
+           - checkout
+           - install_dependencies
+           - deploy:
+-              requires:
+-                  - install_dependencies
++              - build_application
++              - test_application
+                   - checkout
++              requires:
++                  - build_application
++                  - test_application

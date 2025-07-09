@@ -1,0 +1,20 @@
+# Type: refactor
+# Subtype: R4
+# English Summary: Add serialVersionUID constant
+# Chinese Summary: 添加 serialVersionUID 常量
+# Entry Number: 30
+
+# === Git Diff Content ===
+
+diff --git a/core/server/src/main/java/alluxio/web/WebInterfaceAbstractMetricsServlet.java b/core/server/src/main/java/alluxio/web/WebInterfaceAbstractMetricsServlet.java
+index be8f424..c668d16 100644
+--- a/core/server/src/main/java/alluxio/web/WebInterfaceAbstractMetricsServlet.java
++++ b/core/server/src/main/java/alluxio/web/WebInterfaceAbstractMetricsServlet.java
+@@ -27,6 +27,7 @@ import javax.servlet.http.HttpServletRequest;
+  * Abstract class that provides a common method for parsing metrics data.
+  */
+ public abstract class WebInterfaceAbstractMetricsServlet extends HttpServlet {
++  private static final long serialVersionUID = -849266423481584779L;
+ 
+   protected ObjectMapper mObjectMapper;
+ 

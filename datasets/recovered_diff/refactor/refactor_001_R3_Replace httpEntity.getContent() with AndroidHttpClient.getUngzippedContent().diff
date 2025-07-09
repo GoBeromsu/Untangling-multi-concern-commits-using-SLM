@@ -1,0 +1,21 @@
+# Type: refactor
+# Subtype: R3
+# English Summary: Replace httpEntity.getContent() with AndroidHttpClient.getUngzippedContent()
+# Chinese Summary: 使用 AndroidHttpClient.getUngzippedContent()代替 httpEntity.getContent()
+# Entry Number: 1
+
+# === Git Diff Content ===
+
+diff --git a/src/de/danoeh/antennapod/service/download/HttpDownloader.java b/src/de/danoeh/antennapod/service/download/HttpDownloader.java
+index 05df9163..af72ab69 100644
+--- a/src/de/danoeh/antennapod/service/download/HttpDownloader.java
++++ b/src/de/danoeh/antennapod/service/download/HttpDownloader.java
+@@ -70,7 +70,7 @@ public class HttpDownloader extends Downloader {
+ 					File destination = new File(status.getFeedFile()
+ 							.getFile_url());
+ 					if (!destination.exists()) {
+-						connection = httpEntity.getContent();
++						connection = AndroidHttpClient.getUngzippedContent(httpEntity);
+ 						InputStream in = new BufferedInputStream(connection);
+ 						out = new BufferedOutputStream(new FileOutputStream(
+ 								destination));

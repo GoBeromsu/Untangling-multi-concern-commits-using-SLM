@@ -1,0 +1,20 @@
+# Type: fix
+# Subtype: I13
+# English Summary: Update UI to reflect new scope additions
+# Chinese Summary: 更新 UI 以反映新的范围添加
+# Entry Number: 16
+
+# === Git Diff Content ===
+
+diff --git a/platform/lang-impl/src/com/intellij/profile/codeInspection/ui/SingleInspectionProfilePanel.java b/platform/lang-impl/src/com/intellij/profile/codeInspection/ui/SingleInspectionProfilePanel.java
+index 929729c..fd15e44 100644
+--- a/platform/lang-impl/src/com/intellij/profile/codeInspection/ui/SingleInspectionProfilePanel.java
++++ b/platform/lang-impl/src/com/intellij/profile/codeInspection/ui/SingleInspectionProfilePanel.java
+@@ -823,6 +823,7 @@ public class SingleInspectionProfilePanel extends JPanel {
+ 
+             @Override
+             protected void onScopeAdded() {
++              myTreeTable.updateUI();
+               updateOptionsAndDescriptionPanel();
+             }
+ 

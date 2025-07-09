@@ -1,0 +1,25 @@
+# Type: feat
+# Subtype: Ex
+# English Summary: Add default share menu item
+# Chinese Summary: 添加默认分享菜单项
+# Entry Number: 4
+
+# === Git Diff Content ===
+
+diff --git a/app/src/main/java/me/zhanghai/android/douya/util/UrlUtils.java b/app/src/main/java/me/zhanghai/android/douya/util/UrlUtils.java
+index f339955..3a4fde9 100644
+--- a/app/src/main/java/me/zhanghai/android/douya/util/UrlUtils.java
++++ b/app/src/main/java/me/zhanghai/android/douya/util/UrlUtils.java
+@@ -42,11 +42,10 @@ public class UrlUtils {
+ 
+     private static CustomTabsIntent makeCustomTabsIntent(Context context) {
+         return new CustomTabsIntent.Builder()
++                .addDefaultShareMenuItem()
+                 .enableUrlBarHiding()
+                 .setToolbarColor(ViewUtils.getColorFromAttrRes(R.attr.colorPrimary, 0, context))
+                 .setShowTitle(true)
+-                // TODO: Add share
+-                //.addMenuItem()
+                 .build();
+     }
+ }

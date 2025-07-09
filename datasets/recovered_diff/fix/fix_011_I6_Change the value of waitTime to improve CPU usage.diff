@@ -1,0 +1,21 @@
+# Type: fix
+# Subtype: I6
+# English Summary: Change the value of waitTime to improve CPU usage
+# Chinese Summary: 更改waitTime的值以改善CPU使用率
+# Entry Number: 11
+
+# === Git Diff Content ===
+
+diff --git a/hazelcast/src/main/java/com/hazelcast/nio/InOutSelector.java b/hazelcast/src/main/java/com/hazelcast/nio/InOutSelector.java
+index e52f928354..17e9d07d33 100644
+--- a/hazelcast/src/main/java/com/hazelcast/nio/InOutSelector.java
++++ b/hazelcast/src/main/java/com/hazelcast/nio/InOutSelector.java
+@@ -54,7 +54,7 @@ public final class InOutSelector implements Runnable {
+     public InOutSelector(ConnectionManager connectionManager) {
+         this.connectionManager = connectionManager;
+         logger = connectionManager.ioService.getLogger(this.getClass().getName());
+-        this.waitTime = 1;
++        this.waitTime = 1000;  // TODO: This value has significant effect on idle CPU usage!
+         Selector selectorTemp = null;
+         try {
+             selectorTemp = Selector.open();

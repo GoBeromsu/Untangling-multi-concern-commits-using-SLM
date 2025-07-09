@@ -1,0 +1,20 @@
+# Type: refactor
+# Subtype: R10
+# English Summary: Delete "onStore(null)" statement
+# Chinese Summary: 删除 onStore(null)语句
+# Entry Number: 6
+
+# === Git Diff Content ===
+
+diff --git a/hazelcast/src/main/java/com/hazelcast/map/DefaultRecordStore.java b/hazelcast/src/main/java/com/hazelcast/map/DefaultRecordStore.java
+index 68a5a7c0c5..e105c3988a 100644
+--- a/hazelcast/src/main/java/com/hazelcast/map/DefaultRecordStore.java
++++ b/hazelcast/src/main/java/com/hazelcast/map/DefaultRecordStore.java
+@@ -566,7 +566,6 @@ public class DefaultRecordStore extends AbstractEvictableRecordStore implements
+         if (record == null) {
+             removeIndex(key);
+             mapDataStore.remove(key, now);
+-            onStore(null);
+         } else {
+             return removeRecord(key, record, now) != null;
+         }

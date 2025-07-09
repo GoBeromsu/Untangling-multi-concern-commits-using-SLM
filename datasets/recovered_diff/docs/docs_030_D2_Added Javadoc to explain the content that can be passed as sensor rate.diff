@@ -1,0 +1,44 @@
+# Type: docs
+# Subtype: D2
+# English Summary: Added Javadoc to explain the content that can be passed as sensor rate
+# Chinese Summary: 添加Javadoc以解释可以作为传感器速率传递的内容
+# Entry Number: 30
+
+# === Git Diff Content ===
+
+diff --git a/src/org/anddev/andengine/ui/activity/BaseGameActivity.java b/src/org/anddev/andengine/ui/activity/BaseGameActivity.java
+index 8fefbc6..8baea3e 100644
+--- a/src/org/anddev/andengine/ui/activity/BaseGameActivity.java
++++ b/src/org/anddev/andengine/ui/activity/BaseGameActivity.java
+@@ -12,6 +12,7 @@ import org.anddev.andengine.ui.IGameInterface;
+ 
+ import android.content.Context;
+ import android.content.pm.ActivityInfo;
++import android.hardware.SensorManager;
+ import android.os.Bundle;
+ import android.os.PowerManager;
+ import android.os.PowerManager.WakeLock;
+@@ -150,6 +151,11 @@ public abstract class BaseGameActivity extends BaseActivity implements IGameInte
+ 		return this.mEngine.enableAccelerometerSensor(this, pAccelerometerListener);
+ 	}
+ 	
++	/**
++	 * @param pAccelerometerListener
++	 * @param pRate one of: {@link SensorManager#SENSOR_DELAY_FASTEST}, {@link SensorManager#SENSOR_DELAY_GAME}, {@link SensorManager#SENSOR_DELAY_UI}, {@link SensorManager#SENSOR_DELAY_NORMAL}
++	 * @return <code>true</code> when the sensor was successfully enabled, <code>false</code> otherwise. 
++	 */
+ 	protected boolean enableAccelerometerSensor(final IAccelerometerListener pAccelerometerListener, final int pRate) {
+ 		return this.mEngine.enableAccelerometerSensor(this, pAccelerometerListener, pRate);
+ 	}
+@@ -158,6 +164,11 @@ public abstract class BaseGameActivity extends BaseActivity implements IGameInte
+ 		return this.mEngine.enableOrientationSensor(this, pOrientationListener);
+ 	}
+ 	
++	/**
++	 * @param pOrientationListener
++	 * @param pRate one of: {@link SensorManager#SENSOR_DELAY_FASTEST}, {@link SensorManager#SENSOR_DELAY_GAME}, {@link SensorManager#SENSOR_DELAY_UI}, {@link SensorManager#SENSOR_DELAY_NORMAL}
++	 * @return <code>true</code> when the sensor was successfully enabled, <code>false</code> otherwise. 
++	 */
+ 	protected boolean enableOrientationSensor(final IOrientationListener pOrientationListener, final int pRate) {
+ 		return this.mEngine.enableOrientationSensor(this, pOrientationListener, pRate);
+ 	}

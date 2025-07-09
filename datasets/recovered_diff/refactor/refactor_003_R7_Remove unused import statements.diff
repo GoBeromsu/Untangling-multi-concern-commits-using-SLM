@@ -1,0 +1,20 @@
+# Type: refactor
+# Subtype: R7
+# English Summary: Remove unused import statements
+# Chinese Summary: 删除未使用的导入语句
+# Entry Number: 3
+
+# === Git Diff Content ===
+
+diff --git a/src/edu/stanford/nlp/pipeline/MorphaAnnotator.java b/src/edu/stanford/nlp/pipeline/MorphaAnnotator.java
+index d6ae5c7..b91be4b 100644
+--- a/src/edu/stanford/nlp/pipeline/MorphaAnnotator.java
++++ b/src/edu/stanford/nlp/pipeline/MorphaAnnotator.java
+@@ -3,7 +3,6 @@ package edu.stanford.nlp.pipeline;
+ import edu.stanford.nlp.ling.CoreAnnotation;
+ import edu.stanford.nlp.ling.CoreAnnotations;
+ import edu.stanford.nlp.ling.CoreLabel;
+-import edu.stanford.nlp.ling.Word;
+ import edu.stanford.nlp.process.Morphology;
+ import edu.stanford.nlp.util.CoreMap;
+ 

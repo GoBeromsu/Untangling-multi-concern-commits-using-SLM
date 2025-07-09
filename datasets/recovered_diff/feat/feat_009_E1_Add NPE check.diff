@@ -1,0 +1,24 @@
+# Type: feat
+# Subtype: E1
+# English Summary: Add NPE check
+# Chinese Summary: 添加 NPE 检查
+# Entry Number: 9
+
+# === Git Diff Content ===
+
+diff --git a/h2o-core/src/main/java/hex/Model.java b/h2o-core/src/main/java/hex/Model.java
+index b65a43339..7b80479c1 100644
+--- a/h2o-core/src/main/java/hex/Model.java
++++ b/h2o-core/src/main/java/hex/Model.java
+@@ -430,8 +430,9 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters,
+   public double score(double [] data){ return ArrayUtils.maxIndex(score0(data, new float[_output.nclasses()]));  }
+ 
+   @Override protected Futures remove_impl( Futures fs ) {
+-    for( Key k : _output._model_metrics )
+-      k.remove(fs);
++    if (_output._model_metrics != null)
++      for( Key k : _output._model_metrics )
++        k.remove(fs);
+     return fs;
+   }
+ 
