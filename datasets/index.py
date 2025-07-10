@@ -8,15 +8,15 @@ from typing import Dict, List, Any, Optional, Set
 
 CONVENTIONAL_COMMIT_TYPES = [
     "feat",
-    "fix",
-    "refactor",
-    "test",
-    "docs",
-    "build",
-    "cicd",
 ]
-SAMPLES_PER_TYPE = 30
+SAMPLES_PER_TYPE = 15
 OUTPUT_COLUMNS = ["annotated_type", "masked_commit_message", "git_diff", "sha"]
+
+# Path constants
+CCS_SOURCE_PATH = Path("ccs/CCS Dataset Training Data.csv")
+SHA_BACKUP_PATH = Path("ccs/sha_backup.csv")
+SAMPLED_CSV_PATH = Path("ccs/sampled_commits.csv")
+DIFF_OUTPUT_DIR = Path("ccs/extracted_diffs_by_type")
 
 
 def load_sha_backup(file_path: Path) -> Set[str]:
@@ -116,19 +116,7 @@ def sample_commits_by_type(
     sampled_data = []
 
     for commit_type, commits in commits_by_type.items():
-        if len(commits) == 0:
-            logging.warning(f"No commits found for type: {commit_type}")
-            continue
-
-        # Sample with replacement if not enough commits
-        if len(commits) < samples_per_type:
-            logging.warning(
-                f"Only {len(commits)} commits available for {commit_type}, "
-                f"sampling with replacement"
-            )
-            sampled_commits = random.choices(commits, k=samples_per_type)
-        else:
-            sampled_commits = random.sample(commits, samples_per_type)
+        sampled_commits = random.sample(commits, samples_per_type)
 
         # Extract only required columns
         for commit in sampled_commits:
@@ -140,17 +128,52 @@ def sample_commits_by_type(
     return sampled_data
 
 
+def extract_diffs(sampled_data: List[Dict[str, str]], output_dir: Path) -> None:
+    """Extract git diff files organized by type into separate directories."""
+    type_counts = {}
+
+    for record in sampled_data:
+        commit_type = record["annotated_type"]
+
+        # Create type directory if needed
+        type_dir = output_dir / commit_type
+        type_dir.mkdir(parents=True, exist_ok=True)
+
+        # Count entries for this type
+        if commit_type not in type_counts:
+            type_counts[commit_type] = 0
+        type_counts[commit_type] += 1
+
+        # Generate filename
+        filename = f"{commit_type}_{type_counts[commit_type]}_{record['sha']}.diff"
+        filepath = type_dir / filename
+
+        # Create file content with metadata
+        content_lines = [
+            f"# Type: {commit_type}",
+            f"# Commit Message: {record['masked_commit_message']}",
+            f"# SHA: {record['sha']}",
+            "",
+            "# === Git Diff Content ===",
+            "",
+            record["git_diff"],
+        ]
+
+        with filepath.open("w", encoding="utf-8") as f:
+            f.write("\n".join(content_lines))
+
+    logging.info(f"Extracted {len(sampled_data)} diff files to {output_dir}")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     logging.info("Starting CCS dataset processing for concern extraction.")
 
     # Load SHA backup to exclude
-    sha_backup_path = Path("ccs/sha_backup.csv")
-    excluded_shas = load_sha_backup(sha_backup_path)
+    excluded_shas = load_sha_backup(SHA_BACKUP_PATH)
 
     # Load CCS dataset
-    source_path = Path("ccs/CCS Dataset Training Data.csv")
-    ccs_dataset = load_ccs_dataset(source_path)
+    ccs_dataset = load_ccs_dataset(CCS_SOURCE_PATH)
 
     # Filter out commits with SHAs in backup
     original_count = len(ccs_dataset)
@@ -172,9 +195,19 @@ def main() -> None:
 
     logging.info(f"Generated {len(sampled_data)} samples total")
 
-    # Save to CSV in ccs folder
-    output_path = Path("ccs/sampled_commits.csv")
-    save_to_csv(sampled_data, output_path, OUTPUT_COLUMNS)
+    # Save to CSV
+    save_to_csv(sampled_data, SAMPLED_CSV_PATH, OUTPUT_COLUMNS)
+
+    # Extract diff files by type
+    extract_diffs(sampled_data, DIFF_OUTPUT_DIR)
+
+    # Append new SHAs to backup
+    new_shas = [{"sha": record["sha"]} for record in sampled_data if record.get("sha")]
+    if new_shas:
+        with SHA_BACKUP_PATH.open("a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["sha"])
+            writer.writerows(new_shas)
+        logging.info(f"Appended {len(new_shas)} new SHAs to backup")
 
     # Print summary
     type_counts = {}
