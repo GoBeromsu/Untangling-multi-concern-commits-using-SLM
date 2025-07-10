@@ -3,6 +3,7 @@
 # English Summary: Add validation for intentionElement
 # Chinese Summary: 添加对intentionElement相关校验
 # Entry Number: 30
+# Beomsu : fix, validation to prevent errors
 
 # === Git Diff Content ===
 

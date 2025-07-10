@@ -4,6 +4,7 @@
 # Chinese Summary: 添加条件判断，避免 Range 头部信息错误
 # Entry Number: 1
 
+# Beomsu : fix, not new funtionality but to prevent bugs
 # === Git Diff Content ===
 
 diff --git a/src/main/java/com/ning/http/client/resumable/ResumableAsyncHandler.java b/src/main/java/com/ning/http/client/resumable/ResumableAsyncHandler.java

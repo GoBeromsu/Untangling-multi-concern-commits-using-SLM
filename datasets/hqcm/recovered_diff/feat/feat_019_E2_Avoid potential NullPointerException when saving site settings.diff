@@ -3,6 +3,7 @@
 # English Summary: Avoid potential NullPointerException when saving site settings
 # Chinese Summary: 保存站点设置时避免潜在的NullPointerException
 # Entry Number: 19
+# Beomsu : fix, NPE prevention is bug fixing
 
 # === Git Diff Content ===
 

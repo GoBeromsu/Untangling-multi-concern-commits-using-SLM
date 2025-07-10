@@ -3,6 +3,7 @@
 # English Summary: If there is no available worker when requesting a worker, throw an exception
 # Chinese Summary: 如果请求工人时没有可用的工人，则抛出异常
 # Entry Number: 24
+# Beomsu : fix, error handling improvement
 
 # === Git Diff Content ===
 

@@ -3,6 +3,7 @@
 # English Summary: Add NPE check
 # Chinese Summary: 添加 NPE 检查
 # Entry Number: 9
+# Beomsu : fix, NullPointerException prevention is bug fixing
 
 # === Git Diff Content ===
 

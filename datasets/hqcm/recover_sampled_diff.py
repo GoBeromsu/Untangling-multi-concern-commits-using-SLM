@@ -121,20 +121,6 @@ def save_changes_by_type(
     return type_counts
 
 
-def display_summary(type_counts: Dict[str, int], total_processed: int):
-    """Display summary of processed files."""
-    print("\n" + "=" * 60)
-    print("PROCESSING SUMMARY")
-    print("=" * 60)
-    print(f"Total entries processed: {total_processed}")
-    print("\nBreakdown by type:")
-
-    for change_type, count in sorted(type_counts.items()):
-        print(f"  {change_type:12}: {count:3d} files")
-
-    print("=" * 60)
-
-
 def main():
     """Main function to extract all changes by type."""
     print("Git Changes Extractor - Processing all files...")
@@ -187,7 +173,16 @@ def main():
         total_processed += len(entries)
 
     # Display summary
-    display_summary(type_counts, total_processed)
+    print("\n" + "=" * 60)
+    print("PROCESSING SUMMARY")
+    print("=" * 60)
+    print(f"Total entries processed: {len(all_entries)}")
+    print("\nBreakdown by type:")
+
+    for change_type, count in sorted(type_counts.items()):
+        print(f"  {change_type:12}: {count:3d} files")
+
+    print("=" * 60)
     print(f"\nAll files saved to: {base_output_dir}")
     print("Process completed! 🎉")
 

@@ -3,6 +3,7 @@
 # English Summary: If orderSetting is not empty, set order value to orderSetting
 # Chinese Summary: 如果orderSetting不为空，则设置order值为orderSetting
 # Entry Number: 21
+# Beomsu : fix, null checking to prevent errors
 
 # === Git Diff Content ===
 

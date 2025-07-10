@@ -3,6 +3,7 @@
 # English Summary: When displaying all classes in the automatic pop-up window, do not do it at the instanceof location (very slow)
 # Chinese Summary: 在自动弹出窗口中显示所有类时，不要在instanceof位置这样做（非常慢）
 # Entry Number: 13
+# Beomsu : fix or refactor, performance optimization to fix slow behavior
 
 # === Git Diff Content ===
 

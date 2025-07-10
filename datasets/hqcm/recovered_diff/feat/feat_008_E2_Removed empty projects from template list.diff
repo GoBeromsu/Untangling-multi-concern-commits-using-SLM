@@ -3,6 +3,7 @@
 # English Summary: Removed empty projects from template list
 # Chinese Summary: 从模板列表中删除了空项目
 # Entry Number: 8
+# Beomsu : fix, cleaning up unwanted items, improving existing behavior
 
 # === Git Diff Content ===
 

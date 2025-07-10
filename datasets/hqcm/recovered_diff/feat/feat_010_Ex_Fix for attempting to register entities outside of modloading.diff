@@ -3,6 +3,7 @@
 # English Summary: Fix for attempting to register entities outside of modloading
 # Chinese Summary: 修复尝试在modloading之外注册实体的mod
 # Entry Number: 10
+# Beomsu : fix, summary starts with "Fix for"
 
 # === Git Diff Content ===
 
