@@ -73,7 +73,12 @@ def calculate_token_ranges() -> List[Tuple[int, int, str]]:
         (2001, 3000, "2K-3K"),
         (3001, 4000, "3K-4K"),
         (4001, 5000, "4K-5K"),
-        (5001, float("inf"), ">5K"),
+        (5001, 6000, "5K-6K"),
+        (6001, 7000, "6K-7K"),
+        (7001, 8000, "7K-8K"),
+        (8001, 9000, "8K-9K"),
+        (9001, 10000, "9K-10K"),
+        (10001, float("inf"), ">10K"),
     ]
 
 
@@ -187,25 +192,67 @@ def generate_summary_report(
             "Analysis of git diff sizes using **token count** (via tiktoken) by commit type and type combinations.\n\n"
         )
 
-        # Individual types summary
-        f.write("## Individual Types Summary (Ranked by Median Token Count)\n\n")
+        # Add detailed distribution table
+        f.write("## Detailed Token Distribution by Individual Types\n\n")
         sorted_types = sorted(
             individual_stats.keys(), key=lambda x: individual_stats[x]["median"]
         )
 
+        # Create distribution table header
         f.write(
-            "| Rank | Type | Count | Median | Mean | 95th Percentile | ≤2K Tokens |\n"
+            "| Type | Total | ≤1K | 1K-2K | 2K-3K | 3K-4K | 4K-5K | 5K-6K | 6K-7K | 7K-8K | 8K-9K | 9K-10K | >10K | Median |\n"
         )
         f.write(
-            "|------|------|-------|--------|------|----------------|-------------|\n"
+            "|------|-------|-----|-------|-------|-------|-------|-------|-------|-------|-------|--------|------|--------|\n"
+        )
+
+        for commit_type in sorted_types:
+            s = individual_stats[commit_type]
+            dist = s["distribution"]
+
+            # Format distribution percentages
+            row = f"| **{commit_type}** | {s['total_count']} |"
+            for range_label in [
+                "≤1K",
+                "1K-2K",
+                "2K-3K",
+                "3K-4K",
+                "4K-5K",
+                "5K-6K",
+                "6K-7K",
+                "7K-8K",
+                "8K-9K",
+                "9K-10K",
+                ">10K",
+            ]:
+                percentage = dist.get(range_label, {"percentage": 0})["percentage"]
+                row += f" {percentage:.1f}% |"
+            row += f" {s['median']:,.0f} |\n"
+            f.write(row)
+
+        # Individual types summary
+        f.write("\n## Individual Types Summary (Ranked by Median Token Count)\n\n")
+
+        f.write(
+            "| Rank | Type | Count | Median | Mean | 95th Percentile | ≤3K Tokens | ≤5K Tokens |\n"
+        )
+        f.write(
+            "|------|------|-------|--------|------|----------------|------------|------------|\n"
         )
 
         for rank, commit_type in enumerate(sorted_types, 1):
             s = individual_stats[commit_type]
-            small_count = sum(s["distribution"][r]["count"] for r in ["≤1K", "1K-2K"])
-            small_pct = (small_count / s["total_count"]) * 100
+            small_count_3k = sum(
+                s["distribution"][r]["count"] for r in ["≤1K", "1K-2K", "2K-3K"]
+            )
+            small_pct_3k = (small_count_3k / s["total_count"]) * 100
+            small_count_5k = sum(
+                s["distribution"][r]["count"]
+                for r in ["≤1K", "1K-2K", "2K-3K", "3K-4K", "4K-5K"]
+            )
+            small_pct_5k = (small_count_5k / s["total_count"]) * 100
             f.write(
-                f"| {rank} | **{commit_type}** | {s['total_count']} | {s['median']:,.0f} | {s['mean']:,.0f} | {s['q95']:,.0f} | {small_pct:.1f}% |\n"
+                f"| {rank} | **{commit_type}** | {s['total_count']} | {s['median']:,.0f} | {s['mean']:,.0f} | {s['q95']:,.0f} | {small_pct_3k:.1f}% | {small_pct_5k:.1f}% |\n"
             )
 
         # Type combinations summary
@@ -216,97 +263,26 @@ def generate_summary_report(
             )
 
             f.write(
-                "| Rank | Combination | Size | Count | Median | Mean | 95th Percentile | ≤2K Tokens |\n"
+                "| Rank | Combination | Size | Count | Median | Mean | 95th Percentile | ≤3K Tokens | ≤5K Tokens |\n"
             )
             f.write(
-                "|------|-------------|------|-------|--------|------|----------------|-------------|\n"
+                "|------|-------------|------|-------|--------|------|----------------|------------|------------|\n"
             )
 
             for rank, combination in enumerate(sorted_combinations, 1):
                 s = combination_stats[combination]
-                small_count = sum(
-                    s["distribution"][r]["count"] for r in ["≤1K", "1K-2K"]
-                )
-                small_pct = (small_count / s["total_count"]) * 100
-                f.write(
-                    f"| {rank} | **{combination}** | {s['combination_size']} | {s['total_count']} | {s['median']:,.0f} | {s['mean']:,.0f} | {s['q95']:,.0f} | {small_pct:.1f}% |\n"
-                )
-
-        # Recommendations
-        f.write("\n## Recommendations for LLM Input\n\n")
-
-        # Individual types recommendations
-        excellent_types = [t for t in sorted_types if individual_stats[t]["q95"] < 2000]
-        good_types = [
-            t for t in sorted_types if 2000 <= individual_stats[t]["q95"] < 4000
-        ]
-
-        if excellent_types:
-            f.write(
-                "### 🌟 **Excellent Individual Types** (95th percentile < 2K tokens)\n"
-            )
-            for commit_type in excellent_types:
-                s = individual_stats[commit_type]
-                small_count = sum(
-                    s["distribution"][r]["count"] for r in ["≤1K", "1K-2K"]
-                )
-                small_pct = (small_count / s["total_count"]) * 100
-                f.write(
-                    f"- **{commit_type}**: {small_pct:.1f}% ≤2K tokens (median: {s['median']:,.0f})\n"
-                )
-
-        if good_types:
-            f.write(
-                "\n### ✅ **Good Individual Types** (95th percentile 2K-4K tokens)\n"
-            )
-            for commit_type in good_types:
-                s = individual_stats[commit_type]
-                small_count = sum(
+                small_count_3k = sum(
                     s["distribution"][r]["count"] for r in ["≤1K", "1K-2K", "2K-3K"]
                 )
-                small_pct = (small_count / s["total_count"]) * 100
-                f.write(
-                    f"- **{commit_type}**: {small_pct:.1f}% ≤3K tokens (median: {s['median']:,.0f})\n"
+                small_pct_3k = (small_count_3k / s["total_count"]) * 100
+                small_count_5k = sum(
+                    s["distribution"][r]["count"]
+                    for r in ["≤1K", "1K-2K", "2K-3K", "3K-4K", "4K-5K"]
                 )
-
-        # Combination recommendations
-        if combination_stats:
-            excellent_combinations = [
-                c for c in sorted_combinations if combination_stats[c]["q95"] < 2000
-            ]
-            good_combinations = [
-                c
-                for c in sorted_combinations
-                if 2000 <= combination_stats[c]["q95"] < 4000
-            ]
-
-            if excellent_combinations:
+                small_pct_5k = (small_count_5k / s["total_count"]) * 100
                 f.write(
-                    "\n### 🌟 **Excellent Type Combinations** (95th percentile < 2K tokens)\n"
+                    f"| {rank} | **{combination}** | {s['combination_size']} | {s['total_count']} | {s['median']:,.0f} | {s['mean']:,.0f} | {s['q95']:,.0f} | {small_pct_3k:.1f}% | {small_pct_5k:.1f}% |\n"
                 )
-                for combination in excellent_combinations:
-                    s = combination_stats[combination]
-                    small_count = sum(
-                        s["distribution"][r]["count"] for r in ["≤1K", "1K-2K"]
-                    )
-                    small_pct = (small_count / s["total_count"]) * 100
-                    f.write(
-                        f"- **{combination}**: {small_pct:.1f}% ≤2K tokens (median: {s['median']:,.0f})\n"
-                    )
-
-            if good_combinations:
-                f.write(
-                    "\n### ✅ **Good Type Combinations** (95th percentile 2K-4K tokens)\n"
-                )
-                for combination in good_combinations:
-                    s = combination_stats[combination]
-                    small_count = sum(
-                        s["distribution"][r]["count"] for r in ["≤1K", "1K-2K", "2K-3K"]
-                    )
-                    small_pct = (small_count / s["total_count"]) * 100
-                    f.write(
-                        f"- **{combination}**: {small_pct:.1f}% ≤3K tokens (median: {s['median']:,.0f})\n"
-                    )
 
 
 def print_analysis_summary(individual_stats: Dict, combination_stats: Dict) -> None:
@@ -321,9 +297,15 @@ def print_analysis_summary(individual_stats: Dict, combination_stats: Dict) -> N
     )
     for commit_type in sorted_types:
         s = individual_stats[commit_type]
-        small_count = sum(s["distribution"][r]["count"] for r in ["≤1K", "1K-2K"])
+        small_count_3k = sum(
+            s["distribution"][r]["count"] for r in ["≤1K", "1K-2K", "2K-3K"]
+        )
+        small_count_5k = sum(
+            s["distribution"][r]["count"]
+            for r in ["≤1K", "1K-2K", "2K-3K", "3K-4K", "4K-5K"]
+        )
         print(
-            f"  {commit_type:12}: median {s['median']:>5,.0f} tokens, {small_count:>3}/{s['total_count']} (≤2K tokens)"
+            f"  {commit_type:12}: median {s['median']:>5,.0f} tokens, {small_count_3k:>3}/{s['total_count']} (≤3K), {small_count_5k:>3}/{s['total_count']} (≤5K)"
         )
 
     if combination_stats:
@@ -333,10 +315,16 @@ def print_analysis_summary(individual_stats: Dict, combination_stats: Dict) -> N
         )
         for combination in sorted_combinations:
             s = combination_stats[combination]
-            small_count = sum(s["distribution"][r]["count"] for r in ["≤1K", "1K-2K"])
+            small_count_3k = sum(
+                s["distribution"][r]["count"] for r in ["≤1K", "1K-2K", "2K-3K"]
+            )
+            small_count_5k = sum(
+                s["distribution"][r]["count"]
+                for r in ["≤1K", "1K-2K", "2K-3K", "3K-4K", "4K-5K"]
+            )
             size_info = f"(size {s['combination_size']})"
             print(
-                f"  {combination:20} {size_info:9}: median {s['median']:>5,.0f} tokens, {small_count:>3}/{s['total_count']} (≤2K tokens)"
+                f"  {combination:20} {size_info:9}: median {s['median']:>5,.0f} tokens, {small_count_3k:>3}/{s['total_count']} (≤3K), {small_count_5k:>3}/{s['total_count']} (≤5K)"
             )
 
     print("=" * 80)
@@ -360,7 +348,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output",
-        default="token_distribution_analysis.md",
+        default="tangled_css_token_distribution_analysis.md",
         help="Output markdown file name",
     )
 
