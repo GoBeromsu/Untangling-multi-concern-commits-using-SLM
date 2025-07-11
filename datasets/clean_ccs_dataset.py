@@ -21,7 +21,7 @@ ENCODING_MODEL: str = "cl100k_base"  # GPT-4 encoding
 RANDOM_SEED: int = 42
 
 # File paths
-WRONG_COMMITS_FILE: str = "exclude_commits.csv"
+WRONG_COMMITS_FILE: str = "excluded_commits.csv"
 SAMPLED_COMMITS_FILE: str = "sampled_css_dataset.csv"
 SHA_BACKUP_FILE: str = "processed_shas.csv"
 

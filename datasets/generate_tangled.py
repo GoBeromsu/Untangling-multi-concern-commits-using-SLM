@@ -13,7 +13,7 @@ CASES_PER_CONCERN_COUNT = 350
 CONCERN_COUNTS = [1, 2, 3]
 TOTAL_CASES = CASES_PER_CONCERN_COUNT * len(CONCERN_COUNTS)  # 334 * 3 = 1002
 SEED = 42
-OUTPUT_PATH = Path("ccs/css_tangled_dataset.csv")
+OUTPUT_PATH = Path("ccs/tangled_css_dataset.csv")
 
 # Token limit for diff size (16384 - 4096 = 12288)
 MAX_DIFF_TOKENS = 12288
