@@ -2,6 +2,7 @@ import csv
 import logging
 import random
 import pandas as pd
+import tiktoken
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Set
 
@@ -10,6 +11,8 @@ CONVENTIONAL_COMMIT_TYPES = [
     "feat",
 ]
 SAMPLES_PER_TYPE = 15
+TARGET_TOKEN_LIMIT = 12288  # 16384 - 4096
+ENCODING_MODEL = "cl100k_base"  # GPT-4 encoding
 OUTPUT_COLUMNS = ["annotated_type", "masked_commit_message", "git_diff", "sha"]
 
 # Path constants
@@ -36,20 +39,42 @@ def load_sha_backup(file_path: Path) -> Set[str]:
 
 
 def load_ccs_dataset(file_path: Path) -> List[Dict[str, Any]]:
-    """Load CCS dataset CSV file using pandas for better handling of large fields."""
+    """Load CCS dataset CSV file and filter out commits exceeding token limit."""
     if not file_path.exists():
         raise FileNotFoundError(f"Dataset file not found: {file_path}")
 
     try:
         df = pd.read_csv(file_path, encoding="utf-8")
-
         df["annotated_type"] = (
             df["annotated_type"].str.lower().str.strip().replace("ci", "cicd")
         )
         data = df.to_dict("records")
 
-        logging.info(f"Loaded {len(data)} records from CCS dataset")
-        return data
+        # Filter by token limit
+        encoding = tiktoken.get_encoding(ENCODING_MODEL)
+        filtered_data = []
+        token_filtered_count = 0
+
+        for item in data:
+            combined_text = " ".join(
+                [str(item.get(col, "")) for col in OUTPUT_COLUMNS if item.get(col)]
+            )
+            token_count = len(encoding.encode(combined_text))
+
+            if token_count <= TARGET_TOKEN_LIMIT:
+                filtered_data.append(item)
+            else:
+                token_filtered_count += 1
+
+        if token_filtered_count > 0:
+            logging.info(
+                f"Filtered out {token_filtered_count} commits exceeding {TARGET_TOKEN_LIMIT} tokens"
+            )
+
+        logging.info(
+            f"Loaded {len(filtered_data)} records from CCS dataset (after token filtering)"
+        )
+        return filtered_data
     except Exception as e:
         logging.error(f"Error loading dataset: {e}")
         raise
