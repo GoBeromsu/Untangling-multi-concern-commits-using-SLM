@@ -8,9 +8,9 @@ from typing import Dict, List, Any, Optional, Set
 
 
 CONVENTIONAL_COMMIT_TYPES = [
-    "feat",
+    "build"
 ]
-SAMPLES_PER_TYPE = 15
+SAMPLES_PER_TYPE = 1
 TARGET_TOKEN_LIMIT = 12288  # 16384 - 4096
 ENCODING_MODEL = "cl100k_base"  # GPT-4 encoding
 OUTPUT_COLUMNS = ["annotated_type", "masked_commit_message", "git_diff", "sha"]
