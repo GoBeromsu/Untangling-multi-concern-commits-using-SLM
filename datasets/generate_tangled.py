@@ -9,7 +9,7 @@ import tiktoken
 
 # Configuration constants
 DATASET_PATH = Path("ccs/sampled_css_dataset.csv")
-CASES_PER_CONCERN_COUNT = 210
+CASES_PER_CONCERN_COUNT = 350
 CONCERN_COUNTS = [1, 2, 3]
 TOTAL_CASES = CASES_PER_CONCERN_COUNT * len(CONCERN_COUNTS)  # 334 * 3 = 1002
 SEED = 42
@@ -198,34 +198,35 @@ def save_to_csv(data: List[Dict[str, Any]], output_path: Path) -> None:
 
 def print_detailed_summary(cases: List[Dict[str, Any]]) -> None:
     """Print detailed summary of generated cases."""
-    # Convert cases list to DataFrame for easier analysis using pandas
     df = pd.DataFrame(cases)
 
     print(f"\nGenerated {len(cases)} total tangled cases:")
     print(f"Target: {TOTAL_CASES} cases ({CASES_PER_CONCERN_COUNT} per concern count)")
 
-    # Concern count distribution using pandas value_counts and sort_index
+    # Concern count distribution
     concern_counts = df["concern_count"].value_counts().sort_index()
     print(f"\nConcern count distribution:")
     for concern_count, count in concern_counts.items():
         percentage = (count / len(cases)) * 100
         print(f"  {concern_count} concerns: {count} cases ({percentage:.1f}%)")
 
-    # Type distribution analysis using NumPy for better performance
-    # NumPy array creation - faster than list operations for large datasets
-    all_types = []
-    for case_types_str in df["types"]:
-        case_types = json.loads(case_types_str)
-        all_types.extend(case_types)
+    # Type combination distribution by concern count
+    print(f"\nType combination distribution:")
 
-    unique_types, type_counts = np.unique(all_types, return_counts=True)
+    for concern_count in sorted(CONCERN_COUNTS):
+        concern_cases = df[df["concern_count"] == concern_count]
+        print(f"\n  {concern_count} concern combinations:")
 
-    print(f"\nType distribution (total atomic changes):")
-    sorted_indices = np.argsort(unique_types)
-    for idx in sorted_indices:
-        change_type = unique_types[idx]
-        count = type_counts[idx]
-        print(f"  {change_type}: {count} atomic changes")
+        concern_combinations = []
+        for case_types_str in concern_cases["types"]:
+            case_types = json.loads(case_types_str)
+            normalized_combination = "+".join(sorted(case_types))
+            concern_combinations.append(normalized_combination)
+
+        combination_counts = pd.Series(concern_combinations).value_counts()
+        for combination, count in combination_counts.items():
+            percentage = (count / len(concern_cases)) * 100
+            print(f"    {combination}: {count} cases ({percentage:.1f}%)")
 
 
 def main() -> None:
