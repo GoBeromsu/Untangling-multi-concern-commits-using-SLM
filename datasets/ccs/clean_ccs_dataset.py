@@ -15,15 +15,15 @@ import os
 
 
 # Processing configuration
-TARGET_COUNT_PER_TYPE: int = 30
+TARGET_COUNT_PER_TYPE: int = 50
 TARGET_TOKEN_LIMIT: int = 12288  # 16384 - 4096
 ENCODING_MODEL: str = "cl100k_base"  # GPT-4 encoding
 RANDOM_SEED: int = 42
 
 # File paths
-WRONG_COMMITS_FILE: str = "wrong_commites.csv"
+WRONG_COMMITS_FILE: str = "exclude_commits.csv"
 SAMPLED_COMMITS_FILE: str = "sampled_css_dataset.csv"
-SHA_BACKUP_FILE: str = "sha_backup.csv"
+SHA_BACKUP_FILE: str = "processed_shas.csv"
 
 
 def load_wrong_commit_shas(wrong_commits_file_path: str) -> Set[str]:

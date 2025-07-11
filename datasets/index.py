@@ -8,18 +8,24 @@ from typing import Dict, List, Any, Optional, Set
 
 
 CONVENTIONAL_COMMIT_TYPES = [
-    "build"
+    "feat",
+    "fix",
+    "refactor",
+    "test",
+    "docs",
+    "build",
+    "cicd",
 ]
-SAMPLES_PER_TYPE = 1
+SAMPLES_PER_TYPE = 23
 TARGET_TOKEN_LIMIT = 12288  # 16384 - 4096
 ENCODING_MODEL = "cl100k_base"  # GPT-4 encoding
 OUTPUT_COLUMNS = ["annotated_type", "masked_commit_message", "git_diff", "sha"]
 
 # Path constants
 CCS_SOURCE_PATH = Path("ccs/CCS Dataset Training Data.csv")
-SHA_BACKUP_PATH = Path("ccs/sha_backup.csv")
+SHA_BACKUP_PATH = Path("ccs/processed_shas.csv")
 SAMPLED_CSV_PATH = Path("ccs/sampled_css_dataset.csv")
-DIFF_OUTPUT_DIR = Path("ccs/extracted_diffs_by_type")
+DIFF_OUTPUT_DIR = Path("ccs/types")
 
 
 def load_sha_backup(file_path: Path) -> Set[str]:
