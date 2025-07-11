@@ -41,8 +41,11 @@ def load_ccs_dataset(file_path: Path) -> List[Dict[str, Any]]:
         raise FileNotFoundError(f"Dataset file not found: {file_path}")
 
     try:
-        # Use pandas to read CSV which handles large fields better
         df = pd.read_csv(file_path, encoding="utf-8")
+
+        df["annotated_type"] = (
+            df["annotated_type"].str.lower().str.strip().replace("ci", "cicd")
+        )
         data = df.to_dict("records")
 
         logging.info(f"Loaded {len(data)} records from CCS dataset")
@@ -55,49 +58,39 @@ def load_ccs_dataset(file_path: Path) -> List[Dict[str, Any]]:
 def save_to_csv(
     data: List[Dict[str, str]], output_path: Path, columns: List[str]
 ) -> None:
-    """Save processed data to CSV file with specified columns."""
+    """Append processed data to CSV file with specified columns using pandas."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with output_path.open("w", newline="", encoding="utf-8") as f:
-        if data:
-            writer = csv.DictWriter(f, fieldnames=columns)
-            writer.writeheader()
-            writer.writerows(data)
+    if data:
+        df = pd.DataFrame(data, columns=columns)
+
+        # Append if file exists, otherwise create new
+        df.to_csv(
+            output_path,
+            mode="a" if output_path.exists() else "w",
+            header=not output_path.exists(),
+            index=False,
+            encoding="utf-8",
+        )
 
     logging.info(f"Saved {len(data)} records to {output_path}")
-
-
-def normalize_commit_type(commit_type: str) -> Optional[str]:
-    """Normalize commit type according to mapping rules."""
-    commit_type = commit_type.lower().strip()
-
-    # Convert ci to cicd
-    if commit_type == "ci":
-        return "cicd"
-
-    # Return type if it's in our valid types
-    if commit_type in CONVENTIONAL_COMMIT_TYPES:
-        return commit_type
-
-    return None
 
 
 def group_commits_by_type(
     dataset: List[Dict[str, Any]], valid_types: List[str]
 ) -> Dict[str, List[Dict[str, Any]]]:
-    """Groups commits by their normalized concern type."""
+    """Groups commits by their concern type."""
     commits_by_type = {commit_type: [] for commit_type in valid_types}
 
     excluded_count = 0
     for item in dataset:
-        commit_type = normalize_commit_type(item.get("annotated_type", ""))
+        commit_type = item.get("annotated_type", "").lower().strip()
 
-        if commit_type is None:
+        if commit_type not in valid_types:
             excluded_count += 1
             continue
 
-        if commit_type in commits_by_type:
-            commits_by_type[commit_type].append(item)
+        commits_by_type[commit_type].append(item)
 
     logging.info(f"Excluded {excluded_count} records (style or invalid types)")
 
@@ -107,23 +100,20 @@ def group_commits_by_type(
     return commits_by_type
 
 
-def sample_commits_by_type(
-    commits_by_type: Dict[str, List[Dict[str, Any]]],
-    samples_per_type: int,
+def sample_commits_for_type(
+    commits: List[Dict[str, Any]],
+    count: int,
     output_columns: List[str],
 ) -> List[Dict[str, str]]:
-    """Sample specified number of commits per type and extract required columns."""
+    """Sample specified number of commits for a single type and extract required columns."""
+    sampled_commits = random.sample(commits, count)
     sampled_data = []
 
-    for commit_type, commits in commits_by_type.items():
-        sampled_commits = random.sample(commits, samples_per_type)
-
-        # Extract only required columns
-        for commit in sampled_commits:
-            sampled_record = {}
-            for column in output_columns:
-                sampled_record[column] = commit.get(column, "")
-            sampled_data.append(sampled_record)
+    for commit in sampled_commits:
+        sampled_record = {}
+        for column in output_columns:
+            sampled_record[column] = commit.get(column, "")
+        sampled_data.append(sampled_record)
 
     return sampled_data
 
@@ -188,21 +178,26 @@ def main() -> None:
     # Group commits by normalized type
     commits_by_type = group_commits_by_type(ccs_dataset, CONVENTIONAL_COMMIT_TYPES)
 
-    # Sample commits and extract required columns
-    sampled_data = sample_commits_by_type(
-        commits_by_type, SAMPLES_PER_TYPE, OUTPUT_COLUMNS
-    )
+    # Sample commits for each type
+    all_sampled_data = []
+    for commits in commits_by_type.values():
+        sampled_data = sample_commits_for_type(
+            commits, SAMPLES_PER_TYPE, OUTPUT_COLUMNS
+        )
+        all_sampled_data.extend(sampled_data)
 
-    logging.info(f"Generated {len(sampled_data)} samples total")
+    logging.info(f"Generated {len(all_sampled_data)} samples total")
 
     # Save to CSV
-    save_to_csv(sampled_data, SAMPLED_CSV_PATH, OUTPUT_COLUMNS)
+    save_to_csv(all_sampled_data, SAMPLED_CSV_PATH, OUTPUT_COLUMNS)
 
     # Extract diff files by type
-    extract_diffs(sampled_data, DIFF_OUTPUT_DIR)
+    extract_diffs(all_sampled_data, DIFF_OUTPUT_DIR)
 
     # Append new SHAs to backup
-    new_shas = [{"sha": record["sha"]} for record in sampled_data if record.get("sha")]
+    new_shas = [
+        {"sha": record["sha"]} for record in all_sampled_data if record.get("sha")
+    ]
     if new_shas:
         with SHA_BACKUP_PATH.open("a", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=["sha"])
@@ -211,7 +206,7 @@ def main() -> None:
 
     # Print summary
     type_counts = {}
-    for record in sampled_data:
+    for record in all_sampled_data:
         commit_type = record.get("annotated_type", "")
         type_counts[commit_type] = type_counts.get(commit_type, 0) + 1
 
