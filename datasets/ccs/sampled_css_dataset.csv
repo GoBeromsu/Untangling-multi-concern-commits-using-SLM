@@ -32636,3 +32636,959 @@ index 01fd411..3570cae 100644
  
  #[tokio::test]
 ",1db13ec43727aca872a0f3836e4023ed85db665e
+feat,add ability to get all encoded values,"diff --git a/delorean_mem_qe/src/column.rs b/delorean_mem_qe/src/column.rs
+index bc89cb2..b3df18e 100644
+--- a/delorean_mem_qe/src/column.rs
++++ b/delorean_mem_qe/src/column.rs
+@@ -537,6 +537,22 @@ impl Column {
+         }
+     }
+ 
++    /// Materialise all of the encoded values.
++    pub fn all_encoded_values(&self) -> Vector {
++        match self {
++            Column::String(c) => {
++                let now = std::time::Instant::now();
++                let v = c.all_encoded_values();
++                log::debug!(""time getting all encoded values {:?}"", now.elapsed());
++
++                log::debug!(""dictionary {:?}"", c.data.dictionary());
++                Vector::Integer(v)
++            }
++            Column::Float(c) => Vector::Float(c.all_encoded_values()),
++            Column::Integer(c) => Vector::Integer(c.all_encoded_values()),
++        }
++    }
++
+     /// Given an encoded value for a row, materialise and return the decoded
+     /// version.
+     ///
+@@ -986,6 +1002,10 @@ impl String {
+         self.data.encoded_values(row_ids)
+     }
+ 
++    pub fn all_encoded_values(&self) -> Vec<i64> {
++        self.data.all_encoded_values()
++    }
++
+     /// Return the decoded value for an encoded ID.
+     ///
+     /// Panics if there is no decoded value for the provided id
+@@ -1037,6 +1057,10 @@ impl Float {
+         self.data.encoded_values(row_ids)
+     }
+ 
++    pub fn all_encoded_values(&self) -> Vec<f64> {
++        self.data.all_encoded_values()
++    }
++
+     pub fn scan_from(&self, row_id: usize) -> &[f64] {
+         self.data.scan_from(row_id)
+     }
+@@ -1106,6 +1130,10 @@ impl Integer {
+         self.data.encoded_values(row_ids)
+     }
+ 
++    pub fn all_encoded_values(&self) -> Vec<i64> {
++        self.data.all_encoded_values()
++    }
++
+     pub fn scan_from(&self, row_id: usize) -> &[i64] {
+         self.data.scan_from(row_id)
+     }
+diff --git a/delorean_mem_qe/src/encoding.rs b/delorean_mem_qe/src/encoding.rs
+index d6a865a..4b057cf 100644
+--- a/delorean_mem_qe/src/encoding.rs
++++ b/delorean_mem_qe/src/encoding.rs
+@@ -68,6 +68,12 @@ where
+         self.values(row_ids)
+     }
+ 
++    /// Return all encoded values. For this encoding this is just the decoded
++    /// values
++    pub fn all_encoded_values(&self) -> Vec<T> {
++        self.values.clone()
++    }
++
+     // TODO(edd): fix this when added NULL support
+     pub fn scan_from_until_some(&self, _row_id: usize) -> Option<T> {
+         unreachable!(""to remove"");
+@@ -485,6 +491,26 @@ impl DictionaryRLE {
+         out
+     }
+ 
++    // values materialises a vector of references to all logical values in the
++    // encoding.
++    pub fn all_values(&mut self) -> Vec<Option<&String>> {
++        let mut out: Vec<Option<&String>> = Vec::with_capacity(self.total as usize);
++
++        // build reverse mapping.
++        let mut idx_value = BTreeMap::new();
++        for (k, v) in &self.entry_index {
++            idx_value.insert(v, k);
++        }
++        assert_eq!(idx_value.len(), self.entry_index.len());
++
++        for (idx, rl) in &self.run_lengths {
++            // TODO(edd): fix unwrap - we know that the value exists in map...
++            let v = idx_value.get(&idx).unwrap().as_ref();
++            out.extend(iter::repeat(v).take(*rl as usize));
++        }
++        out
++    }
++
+     /// Return the decoded value for an encoded ID.
+     ///
+     /// Panics if there is no decoded value for the provided id
+@@ -528,22 +554,13 @@ impl DictionaryRLE {
+         out
+     }
+ 
+-    // values materialises a vector of references to all logical values in the
+-    // encoding.
+-    pub fn all_values(&mut self) -> Vec<Option<&String>> {
+-        let mut out: Vec<Option<&String>> = Vec::with_capacity(self.total as usize);
+-
+-        // build reverse mapping.
+-        let mut idx_value = BTreeMap::new();
+-        for (k, v) in &self.entry_index {
+-            idx_value.insert(v, k);
+-        }
+-        assert_eq!(idx_value.len(), self.entry_index.len());
++    // all_encoded_values materialises a vector of all encoded values for the
++    // column.
++    pub fn all_encoded_values(&self) -> Vec<i64> {
++        let mut out: Vec<i64> = Vec::with_capacity(self.total as usize);
+ 
+         for (idx, rl) in &self.run_lengths {
+-            // TODO(edd): fix unwrap - we know that the value exists in map...
+-            let v = idx_value.get(&idx).unwrap().as_ref();
+-            out.extend(iter::repeat(v).take(*rl as usize));
++            out.extend(iter::repeat(*idx as i64).take(*rl as usize));
+         }
+         out
+     }
+diff --git a/delorean_mem_qe/src/segment.rs b/delorean_mem_qe/src/segment.rs
+index c058df0..f8c5005 100644
+--- a/delorean_mem_qe/src/segment.rs
++++ b/delorean_mem_qe/src/segment.rs
+@@ -228,7 +228,7 @@ impl Segment {
+         group_columns: &[String],
+         aggregates: &[(String, AggregateType)],
+         window: i64,
+-    ) -> BTreeMap<Vec<String>, Vec<(String, Option<column::Aggregate>)>> {
++    ) -> BTreeMap<Vec<i64>, Vec<(&String, &AggregateType, Option<column::Aggregate>)>> {
+         // Build a hash table - essentially, scan columns for matching row ids,
+         // emitting the encoded value for each column and track those value
+         // combinations in a hashmap with running aggregates.
+@@ -242,6 +242,10 @@ impl Segment {
+             assert_ne!(group_columns[group_columns.len() - 1], ""time"");
+         }
+ 
++        // TODO(edd): Perf - if there is no predicate and we want entire segment
++        // then it will be a lot faster to not build filtered_row_ids and just
++        // get all encoded values for each grouping column...
++
+         // filter on predicates and time
+         let filtered_row_ids: croaring::Bitmap;
+         if let Some(row_ids) = self.filter_by_predicates_eq(time_range, predicates) {
+@@ -263,7 +267,12 @@ impl Segment {
+         let mut group_column_encoded_values = Vec::with_capacity(group_columns.len());
+         for group_column in group_columns {
+             if let Some(column) = self.column(&group_column) {
+-                let encoded_values = column.encoded_values(&filtered_row_ids_vec);
++                let encoded_values = if filtered_row_ids_vec.len() == self.meta.rows {
++                    column.all_encoded_values()
++                } else {
++                    column.encoded_values(&filtered_row_ids_vec)
++                };
++
+                 assert_eq!(
+                     filtered_row_ids.cardinality() as usize,
+                     encoded_values.len()
+@@ -325,10 +334,10 @@ impl Segment {
+             .collect::<Vec<_>>();
+ 
+         // hashMap is about 20% faster than BTreeMap in this case
+-        let mut hash_table: HashMap<
++        let mut hash_table: BTreeMap<
+             Vec<i64>,
+             Vec<(&String, &AggregateType, Option<column::Aggregate>)>,
+-        > = HashMap::new();
++        > = BTreeMap::new();
+ 
+         let mut aggregate_row: Vec<(&str, Option<column::Scalar>)> =
+             std::iter::repeat_with(|| ("""", None))
+@@ -406,8 +415,10 @@ impl Segment {
+             }
+             processed_rows += 1;
+         }
++        // println!(""groups: {:?}"", hash_table.len());
+         log::debug!(""({:?} rows processed) {:?}"", processed_rows, hash_table);
+         BTreeMap::new()
++        // hash_table
+     }
+ 
+     pub fn aggregate_by_group_using_sort(
+@@ -451,7 +462,11 @@ impl Segment {
+         let mut group_column_encoded_values = Vec::with_capacity(group_columns.len());
+         for group_column in group_columns {
+             if let Some(column) = self.column(&group_column) {
+-                let encoded_values = column.encoded_values(&filtered_row_ids_vec);
++                let encoded_values = if filtered_row_ids_vec.len() == self.meta.rows {
++                    column.all_encoded_values()
++                } else {
++                    column.encoded_values(&filtered_row_ids_vec)
++                };
+                 assert_eq!(
+                     filtered_row_ids.cardinality() as usize,
+                     encoded_values.len()
+@@ -557,6 +572,10 @@ impl Segment {
+             assert_ne!(group_columns[group_columns.len() - 1], ""time"");
+         }
+ 
++        // TODO(edd): Perf - if there is no predicate and we want entire segment
++        // then it will be a lot faster to not build filtered_row_ids and just
++        // get all encoded values for each grouping column...
++
+         // filter on predicates and time
+         let filtered_row_ids: croaring::Bitmap;
+         if let Some(row_ids) = self.filter_by_predicates_eq(time_range, predicates) {
+@@ -577,7 +596,11 @@ impl Segment {
+         let mut group_column_encoded_values = Vec::with_capacity(group_columns.len());
+         for group_column in group_columns {
+             if let Some(column) = self.column(&group_column) {
+-                let encoded_values = column.encoded_values(&filtered_row_ids_vec);
++                let encoded_values = if filtered_row_ids_vec.len() == self.meta.rows {
++                    column.all_encoded_values()
++                } else {
++                    column.encoded_values(&filtered_row_ids_vec)
++                };
+                 assert_eq!(
+                     filtered_row_ids.cardinality() as usize,
+                     encoded_values.len()
+@@ -709,6 +732,7 @@ impl Segment {
+             aggregates: group_key_aggregates,
+         });
+ 
++        // println!(""groups: {:?}"", results.len());
+         log::debug!(""({:?} rows processed) {:?}"", processed_rows, results);
+         // results
+         vec![]
+",cad5e45208346528ad02cd04dcac863f90faa037
+feat,brew tests/multiple darwin builds/gh enterprise,"diff --git a/pipeline/brew/brew.go b/pipeline/brew/brew.go
+index ec27182..15ed189 100644
+--- a/pipeline/brew/brew.go
++++ b/pipeline/brew/brew.go
+@@ -1,5 +1,3 @@
+-// Package brew implements the Pipe, providing formula generation and
+-// uploading it to a configured repo.
+ package brew
+ 
+ import (
+@@ -10,13 +8,12 @@ import (
+ 	""strings""
+ 	""text/template""
+ 
+-	""github.com/goreleaser/goreleaser/internal/artifact""
+-
+ 	""github.com/apex/log""
+ 
+ 	""github.com/goreleaser/goreleaser/checksum""
+ 	""github.com/goreleaser/goreleaser/config""
+ 	""github.com/goreleaser/goreleaser/context""
++	""github.com/goreleaser/goreleaser/internal/artifact""
+ 	""github.com/goreleaser/goreleaser/internal/client""
+ 	""github.com/goreleaser/goreleaser/pipeline""
+ )
+@@ -106,14 +103,14 @@ func doRun(ctx *context.Context, client client.Client) error {
+ 		artifact.And(
+ 			artifact.ByGoos(""darwin""),
+ 			artifact.ByGoarch(""amd64""),
+-			artifact.ByGoarch(""""),
++			artifact.ByGoarm(""""),
+ 			artifact.ByType(artifact.UploadableArchive),
+ 		),
+ 	).List()
+ 	if len(archives) == 0 {
+ 		return ErrNoDarwin64Build
+ 	}
+-	if len(archives) > 0 {
++	if len(archives) > 1 {
+ 		return ErrTooManyDarwin64Builds
+ 	}
+ 	var path = filepath.Join(ctx.Config.Brew.Folder, ctx.Config.ProjectName+"".rb"")
+@@ -145,8 +142,7 @@ func doBuildFormula(data templateData) (out bytes.Buffer, err error) {
+ }
+ 
+ func dataFor(ctx *context.Context, client client.Client, artifact artifact.Artifact) (result templateData, err error) {
+-	var file = artifact.Path
+-	sum, err := checksum.SHA256(file)
++	sum, err := checksum.SHA256(artifact.Path)
+ 	if err != nil {
+ 		return
+ 	}
+@@ -163,7 +159,7 @@ func dataFor(ctx *context.Context, client client.Client, artifact artifact.Artif
+ 		Tag:          ctx.Git.CurrentTag,
+ 		Version:      ctx.Version,
+ 		Caveats:      ctx.Config.Brew.Caveats,
+-		File:         file,
++		File:         artifact.Name,
+ 		SHA256:       sum,
+ 		Dependencies: ctx.Config.Brew.Dependencies,
+ 		Conflicts:    ctx.Config.Brew.Conflicts,
+diff --git a/pipeline/brew/brew_test.go b/pipeline/brew/brew_test.go
+index 7e513bf..9066935 100644
+--- a/pipeline/brew/brew_test.go
++++ b/pipeline/brew/brew_test.go
+@@ -9,6 +9,7 @@ import (
+ 
+ 	""github.com/goreleaser/goreleaser/config""
+ 	""github.com/goreleaser/goreleaser/context""
++	""github.com/goreleaser/goreleaser/internal/artifact""
+ 	""github.com/goreleaser/goreleaser/internal/testlib""
+ 	""github.com/stretchr/testify/assert""
+ )
+@@ -93,7 +94,8 @@ func TestRunPipe(t *testing.T) {
+ 		Git: context.GitInfo{
+ 			CurrentTag: ""v1.0.1"",
+ 		},
+-		Version: ""1.0.1"",
++		Version:   ""1.0.1"",
++		Artifacts: artifact.New(),
+ 		Config: config.Project{
+ 			Dist:        folder,
+ 			ProjectName: ""run-pipe"",
+@@ -124,31 +126,53 @@ func TestRunPipe(t *testing.T) {
+ 		Publish: true,
+ 	}
+ 	var path = filepath.Join(folder, ""bin.tar.gz"")
+-	ctx.AddBinary(""darwinamd64"", ""bin"", ""bin"", path)
++	ctx.Artifacts.Add(artifact.Artifact{
++		Name:   ""bin.tar.gz"",
++		Path:   path,
++		Goos:   ""darwin"",
++		Goarch: ""amd64"",
++		Type:   artifact.UploadableArchive,
++	})
+ 	client := &DummyClient{}
+ 	assert.Error(t, doRun(ctx, client))
+ 	assert.False(t, client.CreatedFile)
+ 
+ 	_, err = os.Create(path)
+ 	assert.NoError(t, err)
+-	assert.NoError(t, doRun(ctx, client))
+-	assert.True(t, client.CreatedFile)
+ 
+-	bts, err := ioutil.ReadFile(""testdata/run_pipe.rb"")
+-	assert.NoError(t, err)
+-	// ioutil.WriteFile(""testdata/run_pipe.rb"", []byte(client.Content), 0644)
++	t.Run(""default git url"", func(tt *testing.T) {
++		assert.NoError(tt, doRun(ctx, client))
++		assert.True(tt, client.CreatedFile)
++
++		bts, err := ioutil.ReadFile(""testdata/run_pipe.rb"")
++		assert.NoError(tt, err)
++		// TODO: make writing this file toggleable somehow?
++		// ioutil.WriteFile(""testdata/run_pipe.rb"", []byte(client.Content), 0644)
++		assert.Equal(tt, string(bts), client.Content)
++	})
+ 
+-	assert.Equal(t, string(bts), client.Content)
++	t.Run(""github enterprise url"", func(tt *testing.T) {
++		ctx.Config.GitHubURLs.Download = ""http://github.example.org""
++		assert.NoError(tt, doRun(ctx, client))
++		assert.True(tt, client.CreatedFile)
++
++		bts, err := ioutil.ReadFile(""testdata/run_pipe_enterprise.rb"")
++		assert.NoError(tt, err)
++		// TODO: make writing this file toggleable somehow?
++		// ioutil.WriteFile(""testdata/run_pipe_enterprise.rb"", []byte(client.Content), 0644)
++		assert.Equal(tt, string(bts), client.Content)
++	})
+ }
+ 
++// TODO: this test is irrelevant and can probavly be removed
+ func TestRunPipeFormatOverride(t *testing.T) {
+ 	folder, err := ioutil.TempDir("""", ""goreleasertest"")
+ 	assert.NoError(t, err)
+ 	var path = filepath.Join(folder, ""bin.zip"")
+ 	_, err = os.Create(path)
+ 	assert.NoError(t, err)
+-	var ctx = &context.Context{
+-		Config: config.Project{
++	var ctx = context.New(
++		config.Project{
+ 			Dist: folder,
+ 			Archive: config.Archive{
+ 				Format: ""tar.gz"",
+@@ -166,9 +190,15 @@ func TestRunPipeFormatOverride(t *testing.T) {
+ 				},
+ 			},
+ 		},
+-		Publish: true,
+-	}
+-	ctx.AddBinary(""darwinamd64"", ""bin"", ""bin"", path)
++	)
++	ctx.Publish = true
++	ctx.Artifacts.Add(artifact.Artifact{
++		Name:   ""bin.zip"",
++		Path:   path,
++		Goos:   ""darwin"",
++		Goarch: ""amd64"",
++		Type:   artifact.UploadableArchive,
++	})
+ 	client := &DummyClient{}
+ 	assert.NoError(t, doRun(ctx, client))
+ 	assert.True(t, client.CreatedFile)
+@@ -195,6 +225,40 @@ func TestRunPipeNoDarwin64Build(t *testing.T) {
+ 	assert.False(t, client.CreatedFile)
+ }
+ 
++func TestRunPipeMultipleDarwin64Build(t *testing.T) {
++	var ctx = context.New(
++		config.Project{
++			Archive: config.Archive{
++				Format: ""tar.gz"",
++			},
++			Brew: config.Homebrew{
++				GitHub: config.Repo{
++					Owner: ""test"",
++					Name:  ""test"",
++				},
++			},
++		},
++	)
++	ctx.Publish = true
++	ctx.Artifacts.Add(artifact.Artifact{
++		Name:   ""bin1"",
++		Path:   ""doesnt mather"",
++		Goos:   ""darwin"",
++		Goarch: ""amd64"",
++		Type:   artifact.UploadableArchive,
++	})
++	ctx.Artifacts.Add(artifact.Artifact{
++		Name:   ""bin2"",
++		Path:   ""doesnt mather"",
++		Goos:   ""darwin"",
++		Goarch: ""amd64"",
++		Type:   artifact.UploadableArchive,
++	})
++	client := &DummyClient{}
++	assert.Equal(t, ErrTooManyDarwin64Builds, doRun(ctx, client))
++	assert.False(t, client.CreatedFile)
++}
++
+ func TestRunPipeBrewNotSetup(t *testing.T) {
+ 	var ctx = &context.Context{
+ 		Config:  config.Project{},
+@@ -206,9 +270,8 @@ func TestRunPipeBrewNotSetup(t *testing.T) {
+ }
+ 
+ func TestRunPipeBinaryRelease(t *testing.T) {
+-	var ctx = &context.Context{
+-		Publish: true,
+-		Config: config.Project{
++	var ctx = context.New(
++		config.Project{
+ 			Archive: config.Archive{
+ 				Format: ""binary"",
+ 			},
+@@ -219,8 +282,15 @@ func TestRunPipeBinaryRelease(t *testing.T) {
+ 				},
+ 			},
+ 		},
+-	}
+-	ctx.AddBinary(""darwinamd64"", ""foo"", ""bar"", ""baz"")
++	)
++	ctx.Publish = true
++	ctx.Artifacts.Add(artifact.Artifact{
++		Name:   ""bin"",
++		Path:   ""doesnt mather"",
++		Goos:   ""darwin"",
++		Goarch: ""amd64"",
++		Type:   artifact.Binary,
++	})
+ 	client := &DummyClient{}
+ 	testlib.AssertSkipped(t, doRun(ctx, client))
+ 	assert.False(t, client.CreatedFile)
+diff --git a/pipeline/brew/doc.go b/pipeline/brew/doc.go
+new file mode 100644
+index 0000000..2cddc12
+--- /dev/null
++++ b/pipeline/brew/doc.go
+@@ -0,0 +1,3 @@
++// Package brew implements the Pipe, providing formula generation and
++// uploading it to a configured repo.
++package brew
+diff --git a/pipeline/brew/testdata/run_pipe_enterprise.rb b/pipeline/brew/testdata/run_pipe_enterprise.rb
+new file mode 100644
+index 0000000..4b24ce0
+--- /dev/null
++++ b/pipeline/brew/testdata/run_pipe_enterprise.rb
+@@ -0,0 +1,33 @@
++class RunPipe < Formula
++  desc ""A run pipe test formula""
++  homepage ""https://github.com/goreleaser""
++  url ""http://github.example.org/test/test/releases/download/v1.0.1/bin.tar.gz""
++  version ""1.0.1""
++  sha256 ""e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855""
++  
++  depends_on ""zsh""
++  depends_on ""bash""
++  
++  conflicts_with ""gtk+""
++  conflicts_with ""qt""
++
++  def install
++    bin.install ""foo""
++  end
++
++  def caveats
++    ""don't do this""
++  end
++
++  plist_options :startup => false
++
++  def plist; <<-EOS.undent
++    <xml>whatever</xml>
++    EOS
++  end
++
++  test do
++    system ""true""
++    system ""#{bin}/foo -h""
++  end
++end
+",f433bcb59c36571e22d4e86c612e0a6a52f73c09
+feat,Added tooltip for Data sources table buttons only on small screen,"diff --git a/packages/nc-gui/components/dashboard/settings/DataSources.vue b/packages/nc-gui/components/dashboard/settings/DataSources.vue
+index 78caa98..0ed5df9 100644
+--- a/packages/nc-gui/components/dashboard/settings/DataSources.vue
++++ b/packages/nc-gui/components/dashboard/settings/DataSources.vue
+@@ -351,59 +351,78 @@ const isEditBaseModalOpen = computed({
+ 
+                 <div class=""ds-table-col ds-table-actions"">
+                   <div class=""flex items-center gap-2"">
+-                    <NcButton
+-                      v-if=""!sources[0].is_meta && !sources[0].is_local""
+-                      class=""nc-action-btn cursor-pointer outline-0""
+-                      type=""text""
+-                      size=""small""
+-                      @click=""baseAction(sources[0].id, DataSourcesSubTab.Metadata)""
+-                    >
+-                      <div class=""flex items-center gap-2 text-gray-600"">
+-                        <GeneralIcon icon=""sync"" class=""group-hover:text-accent"" />
+-                        <div class=""nc-action-btn-label"">
+-                          {{ $t('tooltip.metaSync') }}
++                    <NcTooltip v-if=""!sources[0].is_meta && !sources[0].is_local"" overlay-class-name=""!xl:hidden"">
++                      <template #title>
++                        {{ $t('tooltip.metaSync') }}
++                      </template>
++                      <NcButton
++                        class=""nc-action-btn cursor-pointer outline-0""
++                        type=""text""
++                        size=""small""
++                        @click=""baseAction(sources[0].id, DataSourcesSubTab.Metadata)""
++                      >
++                        <div class=""flex items-center gap-2 text-gray-600"">
++                          <GeneralIcon icon=""sync"" class=""group-hover:text-accent"" />
++                          <div class=""nc-action-btn-label"">
++                            {{ $t('tooltip.metaSync') }}
++                          </div>
+                         </div>
+-                      </div>
+-                    </NcButton>
+-                    <NcButton
+-                      size=""small""
+-                      class=""nc-action-btn cursor-pointer outline-0""
+-                      type=""text""
+-                      @click=""baseAction(sources[0].id, DataSourcesSubTab.ERD)""
+-                    >
+-                      <div class=""flex items-center gap-2 text-gray-600"">
+-                        <GeneralIcon icon=""erd"" class=""group-hover:text-accent"" />
+-                        <div class=""nc-action-btn-label"">
+-                          {{ $t('title.relations') }}
++                      </NcButton>
++                    </NcTooltip>
++                    <NcTooltip overlay-class-name=""!xl:hidden"">
++                      <template #title>
++                        {{ $t('title.relations') }}
++                      </template>
++                      <NcButton
++                        size=""small""
++                        class=""nc-action-btn cursor-pointer outline-0""
++                        type=""text""
++                        @click=""baseAction(sources[0].id, DataSourcesSubTab.ERD)""
++                      >
++                        <div class=""flex items-center gap-2 text-gray-600"">
++                          <GeneralIcon icon=""erd"" class=""group-hover:text-accent"" />
++                          <div class=""nc-action-btn-label"">
++                            {{ $t('title.relations') }}
++                          </div>
+                         </div>
+-                      </div>
+-                    </NcButton>
+-                    <NcButton
+-                      size=""small""
+-                      class=""nc-action-btn cursor-pointer outline-0""
+-                      type=""text""
+-                      @click=""baseAction(sources[0].id, DataSourcesSubTab.UIAcl)""
+-                    >
+-                      <div class=""flex items-center gap-2 text-gray-600"">
+-                        <GeneralIcon icon=""acl"" class=""group-hover:text-accent"" />
+-                        <div class=""nc-action-btn-label"">
+-                          {{ $t('labels.uiAcl') }}
++                      </NcButton>
++                    </NcTooltip>
++                    <NcTooltip overlay-class-name=""!xl:hidden"">
++                      <template #title>
++                        {{ $t('labels.uiAcl') }}
++                      </template>
++                      <NcButton
++                        size=""small""
++                        class=""nc-action-btn cursor-pointer outline-0""
++                        type=""text""
++                        @click=""baseAction(sources[0].id, DataSourcesSubTab.UIAcl)""
++                      >
++                        <div class=""flex items-center gap-2 text-gray-600"">
++                          <GeneralIcon icon=""acl"" class=""group-hover:text-accent"" />
++                          <div class=""nc-action-btn-label"">
++                            {{ $t('labels.uiAcl') }}
++                          </div>
+                         </div>
+-                      </div>
+-                    </NcButton>
+-                    <NcButton
+-                      size=""small""
+-                      class=""nc-action-btn cursor-pointer outline-0""
+-                      type=""text""
+-                      @click=""baseAction(sources[0].id, DataSourcesSubTab.Audit)""
+-                    >
+-                      <div class=""flex items-center gap-2 text-gray-600"">
+-                        <GeneralIcon icon=""book"" class=""group-hover:text-accent"" />
+-                        <div class=""nc-action-btn-label"">
+-                          {{ $t('title.audit') }}
++                      </NcButton>
++                    </NcTooltip>
++                    <NcTooltip overlay-class-name=""!xl:hidden"">
++                      <template #title>
++                        {{ $t('title.audit') }}
++                      </template>
++                      <NcButton
++                        size=""small""
++                        class=""nc-action-btn cursor-pointer outline-0""
++                        type=""text""
++                        @click=""baseAction(sources[0].id, DataSourcesSubTab.Audit)""
++                      >
++                        <div class=""flex items-center gap-2 text-gray-600"">
++                          <GeneralIcon icon=""book"" class=""group-hover:text-accent"" />
++                          <div class=""nc-action-btn-label"">
++                            {{ $t('title.audit') }}
++                          </div>
+                         </div>
+-                      </div>
+-                    </NcButton>
++                      </NcButton>
++                    </NcTooltip>
+                   </div>
+                 </div>
+                 <div class=""ds-table-col ds-table-crud"">
+@@ -450,67 +469,92 @@ const isEditBaseModalOpen = computed({
+ 
+                 <div class=""ds-table-col ds-table-actions"">
+                   <div class=""flex items-center gap-2"">
+-                    <NcButton
+-                      size=""small""
+-                      class=""nc-action-btn cursor-pointer outline-0""
+-                      type=""text""
+-                      @click=""baseAction(source.id, DataSourcesSubTab.ERD)""
+-                    >
+-                      <div class=""flex items-center gap-2 text-gray-600"">
+-                        <GeneralIcon icon=""erd"" class=""group-hover:text-accent"" />
+-                        <div class=""nc-action-btn-label"">
+-                          {{ $t('title.relations') }}
++                    <NcTooltip overlay-class-name=""!xl:hidden"">
++                      <template #title>
++                        {{ $t('title.relations') }}
++                      </template>
++                      <NcButton
++                        size=""small""
++                        class=""nc-action-btn cursor-pointer outline-0""
++                        type=""text""
++                        @click=""baseAction(source.id, DataSourcesSubTab.ERD)""
++                      >
++                        <div class=""flex items-center gap-2 text-gray-600"">
++                          <GeneralIcon icon=""erd"" class=""group-hover:text-accent"" />
++                          <div class=""nc-action-btn-label"">
++                            {{ $t('title.relations') }}
++                          </div>
+                         </div>
+-                      </div>
+-                    </NcButton>
++                      </NcButton>
++                    </NcTooltip>
++                    <NcTooltip overlay-class-name=""!xl:hidden"">
++                      <template #title>
++                        {{ $t('labels.uiAcl') }}
++                      </template>
++                      <NcButton
++                        size=""small""
++                        type=""text""
++                        class=""nc-action-btn cursor-pointer outline-0""
++                        @click=""baseAction(source.id, DataSourcesSubTab.UIAcl)""
++                      >
++                        <div class=""flex items-center gap-2 text-gray-600"">
++                          <GeneralIcon icon=""acl"" class=""group-hover:text-accent"" />
++                          <div class=""nc-action-btn-label"">
++                            {{ $t('labels.uiAcl') }}
++                          </div>
++                        </div>
++                      </NcButton>
++                    </NcTooltip>
++                    <NcTooltip overlay-class-name=""!xl:hidden"">
++                      <template #title>
++                        {{ $t('tooltip.metaSync') }}
++                      </template>
++                      <NcButton
++                        v-if=""!source.is_meta && !source.is_local""
++                        size=""small""
++                        type=""text""
++                        class=""nc-action-btn cursor-pointer outline-0""
++                        @click=""baseAction(source.id, DataSourcesSubTab.Metadata)""
++                      >
++                        <div class=""flex items-center gap-2 text-gray-600"">
++                          <GeneralIcon icon=""sync"" class=""group-hover:text-accent"" />
++                          <div class=""nc-action-btn-label"">
++                            {{ $t('tooltip.metaSync') }}
++                          </div>
++                        </div>
++                      </NcButton>
++                    </NcTooltip>
++                  </div>
++                </div>
++                <div class=""ds-table-col ds-table-crud justify-end gap-x-1"">
++                  <NcTooltip>
++                    <template #title>
++                      {{ $t('general.edit') }}
++                    </template>
+                     <NcButton
++                      v-if=""!source.is_meta && !source.is_local""
+                       size=""small""
++                      class=""nc-action-btn cursor-pointer outline-0 !w-8 !px-1 !rounded-lg mt-0.5""
+                       type=""text""
+-                      class=""nc-action-btn cursor-pointer outline-0""
+-                      @click=""baseAction(source.id, DataSourcesSubTab.UIAcl)""
++                      @click=""baseAction(source.id, DataSourcesSubTab.Edit)""
+                     >
+-                      <div class=""flex items-center gap-2 text-gray-600"">
+-                        <GeneralIcon icon=""acl"" class=""group-hover:text-accent"" />
+-                        <div class=""nc-action-btn-label"">
+-                          {{ $t('labels.uiAcl') }}
+-                        </div>
+-                      </div>
++                      <GeneralIcon icon=""edit"" class=""text-gray-600 -mt-0.5"" />
+                     </NcButton>
++                  </NcTooltip>
++                  <NcTooltip>
++                    <template #title>
++                      {{ $t('general.delete') }}
++                    </template>
+                     <NcButton
+                       v-if=""!source.is_meta && !source.is_local""
+                       size=""small""
++                      class=""nc-action-btn cursor-pointer outline-0 !w-8 !px-1 !rounded-lg mt-0.5""
+                       type=""text""
+-                      class=""nc-action-btn cursor-pointer outline-0""
+-                      @click=""baseAction(source.id, DataSourcesSubTab.Metadata)""
++                      @click=""openDeleteBase(source)""
+                     >
+-                      <div class=""flex items-center gap-2 text-gray-600"">
+-                        <GeneralIcon icon=""sync"" class=""group-hover:text-accent"" />
+-                        <div class=""nc-action-btn-label"">
+-                          {{ $t('tooltip.metaSync') }}
+-                        </div>
+-                      </div>
++                      <GeneralIcon icon=""delete"" class=""text-red-500 -mt-0.5"" />
+                     </NcButton>
+-                  </div>
+-                </div>
+-                <div class=""ds-table-col ds-table-crud justify-end gap-x-1"">
+-                  <NcButton
+-                    v-if=""!source.is_meta && !source.is_local""
+-                    size=""small""
+-                    class=""nc-action-btn cursor-pointer outline-0 !w-8 !px-1 !rounded-lg mt-0.5""
+-                    type=""text""
+-                    @click=""baseAction(source.id, DataSourcesSubTab.Edit)""
+-                  >
+-                    <GeneralIcon icon=""edit"" class=""text-gray-600 -mt-0.5"" />
+-                  </NcButton>
+-                  <NcButton
+-                    v-if=""!source.is_meta && !source.is_local""
+-                    size=""small""
+-                    class=""nc-action-btn cursor-pointer outline-0 !w-8 !px-1 !rounded-lg mt-0.5""
+-                    type=""text""
+-                    @click=""openDeleteBase(source)""
+-                  >
+-                    <GeneralIcon icon=""delete"" class=""text-red-500 -mt-0.5"" />
+-                  </NcButton>
++                  </NcTooltip>
+                 </div>
+               </div>
+             </template>
+diff --git a/packages/nc-gui/components/nc/Tooltip.vue b/packages/nc-gui/components/nc/Tooltip.vue
+index 0810b8b..97b159e 100644
+--- a/packages/nc-gui/components/nc/Tooltip.vue
++++ b/packages/nc-gui/components/nc/Tooltip.vue
+@@ -12,6 +12,7 @@ interface Props {
+   disabled?: boolean
+   placement?: TooltipPlacement | undefined
+   hideOnClick?: boolean
++  overlayClassName?: string
+ }
+ 
+ const props = defineProps<Props>()
+@@ -36,6 +37,8 @@ const attrs = useAttrs()
+ 
+ const isKeyPressed = ref(false)
+ 
++const overlayClassName = computed(() => props.overlayClassName)
++
+ onKeyStroke(
+   (e) => e.key === modifierKey.value,
+   (e) => {
+@@ -100,7 +103,7 @@ const onClick = () => {
+ <template>
+   <a-tooltip
+     v-model:visible=""showTooltip""
+-    :overlay-class-name=""`nc-tooltip ${showTooltip ? 'visible' : 'hidden'}`""
++    :overlay-class-name=""`nc-tooltip ${showTooltip ? 'visible' : 'hidden'} ${overlayClassName}`""
+     :overlay-style=""tooltipStyle""
+     arrow-point-at-center
+     :trigger=""[]""
+",a75538817c20fc4132718fd7b586bf835a5795e3
+feat,add postgres-driver typings,"diff --git a/packages/cubejs-postgres-driver/driver/index.d.ts b/packages/cubejs-postgres-driver/driver/index.d.ts
+new file mode 100644
+index 0000000..47dcada
+--- /dev/null
++++ b/packages/cubejs-postgres-driver/driver/index.d.ts
+@@ -0,0 +1,8 @@
++import { PoolConfig } from ""pg"";
++
++declare module ""@cubejs-backend/postgres-driver"" {
++  class PostgresDriver {
++    constructor(options?: PoolConfig);
++  }
++  export = PostgresDriver;
++}
+diff --git a/packages/cubejs-postgres-driver/package.json b/packages/cubejs-postgres-driver/package.json
+index 9db5a20..1e9a236 100644
+--- a/packages/cubejs-postgres-driver/package.json
++++ b/packages/cubejs-postgres-driver/package.json
+@@ -12,6 +12,7 @@
+     ""node"": "">=8.11.1""
+   },
+   ""main"": ""driver/PostgresDriver.js"",
++  ""typings"": ""driver/index.d.ts"",
+   ""scripts"": {
+     ""lint"": ""eslint **/*.js""
+   },
+",364d9bf18b2ce73c04d5ec3a70aefa3e6b83cc12
+feat,"enable user to re-order attachment in modal view
+
+re #383
+
+Signed-off-by: Pranav C <pranavxc@gmail.com>","diff --git a/packages/nc-gui/components/project/spreadsheet/components/editableCell/editableAttachmentCell.vue b/packages/nc-gui/components/project/spreadsheet/components/editableCell/editableAttachmentCell.vue
+index 7e9d06c..cbc5775 100644
+--- a/packages/nc-gui/components/project/spreadsheet/components/editableCell/editableAttachmentCell.vue
++++ b/packages/nc-gui/components/project/spreadsheet/components/editableCell/editableAttachmentCell.vue
+@@ -18,13 +18,16 @@
+     </div>
+ 
+     <div class=""d-flex align-center img-container"">
+-      <div v-for=""(item,i) in localState"" :key=""i"" class=""thumbnail align-center justify-center d-flex"">
++      <div
++        v-for=""(item,i) in localState""
++        :key=""item.url""
++        class=""thumbnail align-center justify-center d-flex""
++      >
+         <v-tooltip bottom>
+           <template #activator=""{on}"">
+             <!--            <img alt=""#"" v-if=""isImage(item.title)"" :src=""item.url"" v-on=""on"" @click=""selectImage(item.url,i)"">-->
+             <v-img
+               v-if=""isImage(item.title)""
+-              :key=""item.url""
+               lazy-src=""https://via.placeholder.com/60.png?text=Loading...""
+               alt=""#""
+               max-height=""33px""
+@@ -89,7 +92,11 @@
+ 
+           <div class=""d-flex flex-wrap h-100"">
+             <v-container fluid style=""max-height:calc(90vh - 80px);overflow-y: auto"">
+-              <v-row>
++              <draggable
++                v-model=""localState""
++                class=""row""
++                @update=""onOrderUpdate""
++              >
+                 <v-col v-for=""(item,i) in localState"" :key=""i"" cols=""4"">
+                   <v-card
+                     class=""modal-thumbnail-card align-center justify-center d-flex""
+@@ -125,7 +132,7 @@
+                     {{ item.title }}
+                   </p>
+                 </v-col>
+-              </v-row>
++              </draggable>
+             </v-container>
+           </div>
+         </v-card-text>
+@@ -216,9 +223,12 @@
+ 
+ <script>
+ import FileSaver from 'file-saver'
++import draggable from 'vuedraggable'
+ import { isImage } from '@/components/project/spreadsheet/helpers/imageExt'
++
+ export default {
+   name: 'EditableAttachmentCell',
++  components: { draggable },
+   props: ['dbAlias', 'value', 'active', 'isLocked', 'meta', 'column'],
+   data: () => ({
+     carousel: null,
+@@ -301,6 +311,10 @@ export default {
+       this.$emit('input', JSON.stringify(this.localState))
+       this.$emit('update')
+     },
++    onOrderUpdate() {
++      this.$emit('input', JSON.stringify(this.localState))
++      this.$emit('update')
++    },
+     removeItem(i) {
+       this.localState.splice(i, 1)
+       this.$emit('input', JSON.stringify(this.localState))
+@@ -394,18 +408,19 @@ export default {
+   top: 5px;
+   right: 5px
+ }
+-.modal-thumbnail-card{
++
++.modal-thumbnail-card {
+ 
+   .download-icon {
+     position: absolute;
+     bottom: 5px;
+     right: 5px;
+-    opacity:0;
+-    transition:.4s opacity;
++    opacity: 0;
++    transition: .4s opacity;
+   }
+ 
+-  &:hover .download-icon{
+-    opacity:1
++  &:hover .download-icon {
++    opacity: 1
+   }
+ }
+ 
+",fd8e563cc19ca4684885d4692acee6bebcca4ada

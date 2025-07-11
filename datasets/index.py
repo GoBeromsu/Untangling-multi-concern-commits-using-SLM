@@ -7,16 +7,8 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Set
 
 
-CONVENTIONAL_COMMIT_TYPES = [
-    "feat",
-    "fix",
-    "refactor",
-    "test",
-    "docs",
-    "build",
-    "cicd",
-]
-SAMPLES_PER_TYPE = 23
+CONVENTIONAL_COMMIT_TYPES = ["feat"]
+SAMPLES_PER_TYPE = 3
 TARGET_TOKEN_LIMIT = 12288  # 16384 - 4096
 ENCODING_MODEL = "cl100k_base"  # GPT-4 encoding
 OUTPUT_COLUMNS = ["annotated_type", "masked_commit_message", "git_diff", "sha"]
@@ -198,9 +190,12 @@ def main() -> None:
 
     # Filter out commits with SHAs in backup
     original_count = len(ccs_dataset)
-    ccs_dataset = [
-        item for item in ccs_dataset if str(item.get("sha", "")) not in excluded_shas
-    ]
+    filtered_dataset = []
+    for item in ccs_dataset:
+        sha = str(item.get("sha", ""))
+        if sha not in excluded_shas:
+            filtered_dataset.append(item)
+    ccs_dataset = filtered_dataset
     filtered_count = len(ccs_dataset)
     logging.info(
         f"Filtered out {original_count - filtered_count} commits from SHA backup"
