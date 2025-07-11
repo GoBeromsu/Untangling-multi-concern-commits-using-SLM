@@ -31262,308 +31262,1377 @@ index 4c59caa..6e45503 100644
 +    A?, A?, A?, A?, A?, A?, A?, A?, A?, A?,
 +]>
 ",2954a0955ce9af6acb345ed1e8328e145ad30475
-refactor,add config param to email/sms connector test API,"diff --git a/packages/connector-aliyun-dm/src/index.ts b/packages/connector-aliyun-dm/src/index.ts
-index 87a7a22..62fc944 100644
---- a/packages/connector-aliyun-dm/src/index.ts
-+++ b/packages/connector-aliyun-dm/src/index.ts
-@@ -32,10 +32,12 @@ export default class AliyunDmConnector implements EmailConnector {
+feat,add title to badge icon,"diff --git a/kibbeh/src/modules/room/chat/RoomChatList.tsx b/kibbeh/src/modules/room/chat/RoomChatList.tsx
+index a7418e6..805a9a4 100644
+--- a/kibbeh/src/modules/room/chat/RoomChatList.tsx
++++ b/kibbeh/src/modules/room/chat/RoomChatList.tsx
+@@ -16,6 +16,11 @@ interface ChatListProps {
+   users: RoomUser[];
+ }
+ 
++interface BadgeIconData {
++  emoji: string,
++  title: string
++}
++
+ export const RoomChatList: React.FC<ChatListProps> = ({ room, users }) => {
+   const { setData } = useContext(UserPreviewModalContext);
+   const { messages, toggleFrozen } = useRoomChatStore();
+@@ -48,11 +53,14 @@ export const RoomChatList: React.FC<ChatListProps> = ({ room, users }) => {
+   const getBadgeIcon = (m: Message) => {
+     const user = users.find((u) => u.id === m.userId);
+     const isSpeaker = room.creatorId === user?.id || user?.roomPermissions?.isSpeaker;
+-    let emoji = null;
++    let badgeIconData: BadgeIconData | null = null;
+     if (isSpeaker) {
+-      emoji = ""📣"";
++      badgeIconData = {
++        emoji: ""📣"",
++        title: ""Speaker""
++      };
      }
+-    return emoji && <Twemoji text={emoji} style={{ marginRight: ""1ch"" }}/>;
++    return badgeIconData && <Twemoji text={badgeIconData.emoji} title={badgeIconData.title} style={{ marginRight: ""1ch"" }}/>;
    };
- 
--  public sendMessage: EmailSendMessageFunction = async (address, type, data) => {
--    const config = await this.getConfig(this.metadata.id);
--    await this.validateConfig(config);
--    const { accessKeyId, accessKeySecret, accountName, fromAlias, templates } = config;
-+  // eslint-disable-next-line complexity
-+  public sendMessage: EmailSendMessageFunction = async (address, type, data, config) => {
-+    const emailConfig =
-+      (config as AliyunDmConfig | undefined) ?? (await this.getConfig(this.metadata.id));
-+    await this.validateConfig(emailConfig);
-+    const { accessKeyId, accessKeySecret, accountName, fromAlias, templates } = emailConfig;
-     const template = templates.find((template) => template.usageType === type);
- 
-     assert(
-diff --git a/packages/connector-aliyun-sms/src/index.ts b/packages/connector-aliyun-sms/src/index.ts
-index f0bdd32..9cfbae8 100644
---- a/packages/connector-aliyun-sms/src/index.ts
-+++ b/packages/connector-aliyun-sms/src/index.ts
-@@ -26,10 +26,11 @@ export default class AliyunSmsConnector implements SmsConnector {
-     }
-   };
- 
--  public sendMessage: SmsSendMessageFunction = async (phone, type, { code }) => {
--    const config = await this.getConfig(this.metadata.id);
--    await this.validateConfig(config);
--    const { accessKeyId, accessKeySecret, signName, templates } = config;
-+  public sendMessage: SmsSendMessageFunction = async (phone, type, { code }, config) => {
-+    const smsConfig =
-+      (config as AliyunSmsConfig | undefined) ?? (await this.getConfig(this.metadata.id));
-+    await this.validateConfig(smsConfig);
-+    const { accessKeyId, accessKeySecret, signName, templates } = smsConfig;
-     const template = templates.find(({ usageType }) => usageType === type);
- 
-     assert(
-diff --git a/packages/connector-types/src/index.ts b/packages/connector-types/src/index.ts
-index 8d7b3c1..538220d 100644
---- a/packages/connector-types/src/index.ts
-+++ b/packages/connector-types/src/index.ts
-@@ -64,13 +64,15 @@ export type SmsMessageTypes = EmailMessageTypes;
- export type EmailSendMessageFunction<T = unknown> = (
-   address: string,
-   type: keyof EmailMessageTypes,
--  payload: EmailMessageTypes[typeof type]
-+  payload: EmailMessageTypes[typeof type],
-+  config?: Record<string, unknown>
- ) => Promise<T>;
- 
- export type SmsSendMessageFunction<T = unknown> = (
-   phone: string,
-   type: keyof SmsMessageTypes,
--  payload: SmsMessageTypes[typeof type]
-+  payload: SmsMessageTypes[typeof type],
-+  config?: Record<string, unknown>
- ) => Promise<T>;
- 
- export interface BaseConnector {
-diff --git a/packages/console/src/pages/ConnectorDetails/components/SenderTester/index.tsx b/packages/console/src/pages/ConnectorDetails/components/SenderTester/index.tsx
-index 1a997dd..dd29ae7 100644
---- a/packages/console/src/pages/ConnectorDetails/components/SenderTester/index.tsx
-+++ b/packages/console/src/pages/ConnectorDetails/components/SenderTester/index.tsx
-@@ -1,7 +1,6 @@
- import { ConnectorType } from '@logto/schemas';
- import { phoneRegEx, emailRegEx } from '@logto/shared';
- import classNames from 'classnames';
--import ky from 'ky';
- import React, { useEffect, useRef, useState } from 'react';
- import { useForm } from 'react-hook-form';
- import { useTranslation } from 'react-i18next';
-@@ -10,18 +9,21 @@ import Button from '@/components/Button';
- import FormField from '@/components/FormField';
- import TextInput from '@/components/TextInput';
- import Tooltip from '@/components/Tooltip';
-+import useApi from '@/hooks/use-api';
- 
- import * as styles from './index.module.scss';
- 
- type Props = {
-   connectorType: Exclude<ConnectorType, ConnectorType.Social>;
-+  config?: string;
-+  className?: string;
- };
- 
- type FormData = {
-   sendTo: string;
- };
- 
--const SenderTester = ({ connectorType }: Props) => {
-+const SenderTester = ({ connectorType, config, className }: Props) => {
-   const buttonPosReference = useRef(null);
-   const [showTooltip, setShowTooltip] = useState(false);
-   const [isSubmitting, seIsSubmitting] = useState(false);
-@@ -33,6 +35,7 @@ const SenderTester = ({ connectorType }: Props) => {
-     },
-   } = useForm<FormData>();
-   const { t } = useTranslation(undefined, { keyPrefix: 'admin_console' });
-+  const api = useApi();
-   const isSms = connectorType === ConnectorType.SMS;
- 
-   useEffect(() => {
-@@ -52,12 +55,13 @@ const SenderTester = ({ connectorType }: Props) => {
- 
-   const onSubmit = handleSubmit(async (formData) => {
-     const { sendTo } = formData;
-+    const configJson = config ? (JSON.parse(config) as JSON) : undefined;
-     seIsSubmitting(true);
- 
--    const data = isSms ? { phone: sendTo } : { email: sendTo };
-+    const data = { config: configJson, ...(isSms ? { phone: sendTo } : { email: sendTo }) };
- 
-     try {
--      await ky
-+      await api
-         .post(`/api/connectors/test/${connectorType.toLowerCase()}`, {
-           json: data,
-         })
-@@ -70,7 +74,7 @@ const SenderTester = ({ connectorType }: Props) => {
-   });
  
    return (
--    <form onSubmit={onSubmit}>
-+    <form className={className}>
-       <div className={styles.fields}>
-         <FormField
-           isRequired
-@@ -95,10 +99,10 @@ const SenderTester = ({ connectorType }: Props) => {
-         </FormField>
-         <div ref={buttonPosReference} className={styles.send}>
-           <Button
--            htmlType=""submit""
-             isLoading={isSubmitting}
-             title=""admin_console.connector_details.send""
-             type=""outline""
-+            onClick={onSubmit}
-           />
-         </div>
-         {showTooltip && (
-diff --git a/packages/console/src/pages/ConnectorDetails/index.module.scss b/packages/console/src/pages/ConnectorDetails/index.module.scss
-index 1c7575e..8cadc18 100644
---- a/packages/console/src/pages/ConnectorDetails/index.module.scss
-+++ b/packages/console/src/pages/ConnectorDetails/index.module.scss
-@@ -93,3 +93,7 @@
- .resetIcon {
-   color: var(--color-icon);
+",6e5098655e6d9bb13f6423abe780cdf6b50ff13a
+feat,"Add ability to specify release name
+
+Signed-off-by: Matt Stratton <matt.stratton@gmail.com>","diff --git a/config/config.go b/config/config.go
+index ee2922d..f37c4c1 100644
+--- a/config/config.go
++++ b/config/config.go
+@@ -116,9 +116,10 @@ type Archive struct {
+ 
+ // Release config used for the GitHub release
+ type Release struct {
+-	GitHub     Repo `yaml:"",omitempty""`
+-	Draft      bool `yaml:"",omitempty""`
+-	Prerelease bool `yaml:"",omitempty""`
++	GitHub       Repo   `yaml:"",omitempty""`
++	Draft        bool   `yaml:"",omitempty""`
++	Prerelease   bool   `yaml:"",omitempty""`
++	NameTemplate string `yaml:"",omitempty`
+ 
+ 	// Capture all undefined fields and should be empty after loading
+ 	XXX map[string]interface{} `yaml:"",inline""`
+diff --git a/internal/name/name.go b/internal/name/name.go
+index ca5dbec..e53a0a2 100644
+--- a/internal/name/name.go
++++ b/internal/name/name.go
+@@ -67,6 +67,18 @@ func ForChecksums(ctx *context.Context) (string, error) {
+ 	)
+ }
+ 
++// ForTitle returns the release title based upon its template
++func ForTitle(ctx *context.Context) (string, error) {
++	return apply{
++		nameData{
++			ProjectName: ctx.Config.ProjectName,
++			Tag: ctx.Git.CurrentTag,
++			Version: ctx.Version,
++		}
++		ctx.Config.Release.NameTemplate,
++	}
++}
++
+ func apply(data nameData, templateStr string) (string, error) {
+ 	var out bytes.Buffer
+ 	t, err := template.New(data.ProjectName).Parse(templateStr)
+diff --git a/pipeline/defaults/defaults.go b/pipeline/defaults/defaults.go
+index e94ee24..9dbfce8 100644
+--- a/pipeline/defaults/defaults.go
++++ b/pipeline/defaults/defaults.go
+@@ -14,6 +14,9 @@ import (
+ // NameTemplate default name_template for the archive.
+ const NameTemplate = ""{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}""
+ 
++// ReleaseNameTemplate is the default name for the release.
++const ReleaseNameTemplate = ""{{ .Version }}""
++
+ // SnapshotNameTemplate represents the default format for snapshot release names.
+ const SnapshotNameTemplate = ""SNAPSHOT-{{ .Commit }}""
+ 
+@@ -31,6 +34,9 @@ func (Pipe) Description() string {
+ // Run the pipe
+ func (Pipe) Run(ctx *context.Context) error {
+ 	ctx.Config.Dist = ""dist""
++	if ctx.Config.Release.NameTemplate == """" {
++		ctx.Config.Release.NameTemplate = ReleaseNameTemplate
++	}
+ 	if ctx.Config.Snapshot.NameTemplate == """" {
+ 		ctx.Config.Snapshot.NameTemplate = SnapshotNameTemplate
+ 	}
+",f823cf28652987d43c8324b4f5b203240032383a
+feat,Support ISNULL,"diff --git a/rust/cubesql/src/compile/engine/udf.rs b/rust/cubesql/src/compile/engine/udf.rs
+index f3991c0..549167a 100644
+--- a/rust/cubesql/src/compile/engine/udf.rs
++++ b/rust/cubesql/src/compile/engine/udf.rs
+@@ -3,13 +3,16 @@ use std::sync::Arc;
+ 
+ use datafusion::{
+     arrow::{
+-        array::{ArrayRef, GenericStringArray, Int32Builder, StringBuilder, UInt32Builder},
++        array::{
++            ArrayRef, BooleanBuilder, GenericStringArray, Int32Builder, StringBuilder,
++            UInt32Builder,
++        },
+         datatypes::DataType,
+     },
+     error::DataFusionError,
+     logical_plan::create_udf,
+     physical_plan::{
+-        functions::{make_scalar_function, Volatility},
++        functions::{make_scalar_function, ReturnTypeFunction, Signature, Volatility},
+         udf::ScalarUDF,
+     },
+ };
+@@ -167,3 +170,24 @@ pub fn create_instr_udf() -> ScalarUDF {
+         fun,
+     )
  }
 +
-+.readme {
-+  margin-top: _.unit(-6);
-+}
-diff --git a/packages/console/src/pages/ConnectorDetails/index.tsx b/packages/console/src/pages/ConnectorDetails/index.tsx
-index aa8a7df..b4dad0b 100644
---- a/packages/console/src/pages/ConnectorDetails/index.tsx
-+++ b/packages/console/src/pages/ConnectorDetails/index.tsx
-@@ -210,7 +210,9 @@ const ConnectorDetails = () => {
-                 }}
-               />
-             </FormField>
--            {data.type !== ConnectorType.Social && <SenderTester connectorType={data.type} />}
-+            {data.type !== ConnectorType.Social && (
-+              <SenderTester connectorType={data.type} config={config} />
-+            )}
-             {saveError && <div>{saveError}</div>}
-           </div>
-           <div className={detailsStyles.footer}>
-diff --git a/packages/core/src/routes/connector.test.ts b/packages/core/src/routes/connector.test.ts
-index c75e5cb..c96e343 100644
---- a/packages/core/src/routes/connector.test.ts
-+++ b/packages/core/src/routes/connector.test.ts
-@@ -123,11 +123,16 @@ describe('connector route', () => {
-       const sendMessageSpy = jest.spyOn(mockedEmailConnector, 'sendMessage');
-       const response = await connectorRequest
-         .post('/connectors/test/email')
--        .send({ email: 'test@email.com' });
-+        .send({ email: 'test@email.com', config: { test: 123 } });
-       expect(sendMessageSpy).toHaveBeenCalledTimes(1);
--      expect(sendMessageSpy).toHaveBeenCalledWith('test@email.com', 'Test', {
--        code: 'email-test',
--      });
-+      expect(sendMessageSpy).toHaveBeenCalledWith(
-+        'test@email.com',
-+        'Test',
-+        {
-+          code: 'email-test',
-+        },
-+        { test: 123 }
-+      );
-       expect(response).toHaveProperty('statusCode', 204);
-     });
- 
-@@ -166,11 +171,16 @@ describe('connector route', () => {
-       const sendMessageSpy = jest.spyOn(mockedSmsConnectorInstance, 'sendMessage');
-       const response = await connectorRequest
-         .post('/connectors/test/sms')
--        .send({ phone: '12345678901' });
-+        .send({ phone: '12345678901', config: { test: 123 } });
-       expect(sendMessageSpy).toHaveBeenCalledTimes(1);
--      expect(sendMessageSpy).toHaveBeenCalledWith('12345678901', 'Test', {
--        code: '123456',
--      });
-+      expect(sendMessageSpy).toHaveBeenCalledWith(
-+        '12345678901',
-+        'Test',
-+        {
-+          code: '123456',
-+        },
-+        { test: 123 }
-+      );
-       expect(response).toHaveProperty('statusCode', 204);
-     });
- 
-diff --git a/packages/core/src/routes/connector.ts b/packages/core/src/routes/connector.ts
-index ebaf15a..46ac140 100644
---- a/packages/core/src/routes/connector.ts
-+++ b/packages/core/src/routes/connector.ts
-@@ -1,4 +1,4 @@
--import { ConnectorDTO, Connectors, ConnectorType } from '@logto/schemas';
-+import { arbitraryObjectGuard, ConnectorDTO, Connectors, ConnectorType } from '@logto/schemas';
- import { emailRegEx, phoneRegEx } from '@logto/shared';
- import { object, string } from 'zod';
- 
-@@ -153,15 +153,16 @@ export default function connectorRoutes<T extends AuthedRouter>(router: T) {
-     koaGuard({
-       body: object({
-         email: string().regex(emailRegEx),
-+        config: arbitraryObjectGuard.optional(),
-       }),
-     }),
-     async (ctx, next) => {
--      const { email } = ctx.guard.body;
-+      const { email, config } = ctx.guard.body;
- 
-       const connectorInstances = await getConnectorInstances();
-       const connector = connectorInstances.find(
-         (connector): connector is EmailConnectorInstance =>
--          connector.connector.enabled && connector.metadata.type === ConnectorType.Email
-+          connector.metadata.type === ConnectorType.Email
-       );
- 
-       assertThat(
-@@ -169,9 +170,18 @@ export default function connectorRoutes<T extends AuthedRouter>(router: T) {
-         new RequestError({ code: 'connector.not_found', type: ConnectorType.Email })
-       );
- 
--      await connector.sendMessage(email, 'Test', {
--        code: 'email-test',
--      });
-+      if (config) {
-+        await connector.validateConfig(config);
-+      }
++pub fn create_isnull_udf() -> ScalarUDF {
++    let fun = make_scalar_function(move |args: &[ArrayRef]| {
++        assert!(args.len() == 1);
 +
-+      await connector.sendMessage(
-+        email,
-+        'Test',
-+        {
-+          code: 'email-test',
-+        },
-+        config
-+      );
++        let mut builder = BooleanBuilder::new(1);
++        builder.append_value(args[0].is_null(0))?;
++
++        Ok(Arc::new(builder.finish()) as ArrayRef)
++    });
++
++    let return_type: ReturnTypeFunction =
++        Arc::new(move |_| Ok(Arc::new(DataType::Boolean).clone()));
++
++    ScalarUDF::new(
++        ""isnull"",
++        &Signature::any(1, Volatility::Immutable),
++        &return_type,
++        &fun,
++    )
++}
+diff --git a/rust/cubesql/src/compile/mod.rs b/rust/cubesql/src/compile/mod.rs
+index 891283b..9004ffe 100644
+--- a/rust/cubesql/src/compile/mod.rs
++++ b/rust/cubesql/src/compile/mod.rs
+@@ -36,7 +36,7 @@ use self::context::*;
+ use self::engine::context::SystemVar;
+ use self::engine::udf::{
+     create_connection_id_udf, create_current_user_udf, create_db_udf, create_instr_udf,
+-    create_user_udf, create_version_udf,
++    create_isnull_udf, create_user_udf, create_version_udf,
+ };
+ use self::parser::parse_sql_to_statement;
  
-       ctx.status = 204;
+@@ -1415,6 +1415,7 @@ impl QueryPlanner {
+         ctx.register_udf(create_user_udf(props));
+         ctx.register_udf(create_current_user_udf(props));
+         ctx.register_udf(create_instr_udf());
++        ctx.register_udf(create_isnull_udf());
  
-@@ -184,15 +194,16 @@ export default function connectorRoutes<T extends AuthedRouter>(router: T) {
-     koaGuard({
-       body: object({
-         phone: string().regex(phoneRegEx),
-+        config: arbitraryObjectGuard.optional(),
-       }),
-     }),
-     async (ctx, next) => {
--      const { phone } = ctx.guard.body;
-+      const { phone, config } = ctx.guard.body;
+         {
+             let schema_provider = MemorySchemaProvider::new();
+",f0a4b62f4bd2a1ba2caf37c764b117b352a2f2b3
+feat,allow users to share their playground session,"diff --git a/playground/docker-compose.yml b/playground/docker-compose.yml
+new file mode 100644
+index 0000000..b8ac6aa
+--- /dev/null
++++ b/playground/docker-compose.yml
+@@ -0,0 +1,18 @@
++version: '3.3'
++
++services:
++  db:
++    container_name: panda-mysql
++    image: mariadb:10.7.1-focal
++    restart: always
++    ports:
++      - 3310:3306
++    environment:
++      MARIADB_ROOT_PASSWORD: root
++      MARIADB_DATABASE: panda
++    volumes:
++      - panda-mysql:/var/lib/mysql
++
++volumes:
++  panda-mysql:
++    driver: local
+diff --git a/playground/package.json b/playground/package.json
+index eab6f62..0feccbb 100644
+--- a/playground/package.json
++++ b/playground/package.json
+@@ -9,6 +9,9 @@
+     ""start"": ""next start"",
+     ""lint"": ""next lint"",
+     ""dev"": ""next dev"",
++    ""db:start"": ""docker-compose up -d"",
++    ""db:stop"": ""docker-compose down"",
++    ""db:push"": ""prisma db push --skip-generate"",
+     ""db:generate"": ""prisma generate"",
+     ""db:reset"": ""prisma migrate reset"",
+     ""db:studio"": ""prisma studio""
+diff --git a/playground/prisma/dev.db b/playground/prisma/dev.db
+deleted file mode 100644
+index aa8281f..0000000
+Binary files a/playground/prisma/dev.db and /dev/null differ
+diff --git a/playground/prisma/migrations/20230204163131_init/migration.sql b/playground/prisma/migrations/20230204163131_init/migration.sql
+deleted file mode 100644
+index b3c34f7..0000000
+--- a/playground/prisma/migrations/20230204163131_init/migration.sql
++++ /dev/null
+@@ -1,8 +0,0 @@
+--- CreateTable
+-CREATE TABLE ""Session"" (
+-    ""id"" TEXT NOT NULL PRIMARY KEY,
+-    ""code"" TEXT NOT NULL,
+-    ""config"" TEXT NOT NULL,
+-    ""view"" TEXT NOT NULL DEFAULT 'code',
+-    ""createdAt"" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+-);
+diff --git a/playground/prisma/migrations/20230208183556_/migration.sql b/playground/prisma/migrations/20230208183556_/migration.sql
+deleted file mode 100644
+index 619fd84..0000000
+--- a/playground/prisma/migrations/20230208183556_/migration.sql
++++ /dev/null
+@@ -1,20 +0,0 @@
+-/*
+-  Warnings:
+-
+-  - You are about to drop the column `config` on the `Session` table. All the data in the column will be lost.
+-
+-*/
+--- RedefineTables
+-PRAGMA foreign_keys=OFF;
+-CREATE TABLE ""new_Session"" (
+-    ""id"" TEXT NOT NULL PRIMARY KEY,
+-    ""code"" TEXT NOT NULL,
+-    ""theme"" TEXT NOT NULL DEFAULT '',
+-    ""view"" TEXT NOT NULL DEFAULT 'code',
+-    ""createdAt"" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+-);
+-INSERT INTO ""new_Session"" (""code"", ""createdAt"", ""id"", ""view"") SELECT ""code"", ""createdAt"", ""id"", ""view"" FROM ""Session"";
+-DROP TABLE ""Session"";
+-ALTER TABLE ""new_Session"" RENAME TO ""Session"";
+-PRAGMA foreign_key_check;
+-PRAGMA foreign_keys=ON;
+diff --git a/playground/prisma/migrations/20230529181831_init/migration.sql b/playground/prisma/migrations/20230529181831_init/migration.sql
+new file mode 100644
+index 0000000..ffe5546
+--- /dev/null
++++ b/playground/prisma/migrations/20230529181831_init/migration.sql
+@@ -0,0 +1,9 @@
++-- CreateTable
++CREATE TABLE `Session` (
++    `id` VARCHAR(191) NOT NULL,
++    `code` TEXT NOT NULL,
++    `theme` TEXT NOT NULL,
++    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
++
++    PRIMARY KEY (`id`)
++) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+diff --git a/playground/prisma/migrations/migration_lock.toml b/playground/prisma/migrations/migration_lock.toml
+index e5e5c47..e5a788a 100644
+--- a/playground/prisma/migrations/migration_lock.toml
++++ b/playground/prisma/migrations/migration_lock.toml
+@@ -1,3 +1,3 @@
+ # Please do not edit this file manually
+ # It should be added in your version-control system (i.e. Git)
+-provider = ""sqlite""
+\ No newline at end of file
++provider = ""mysql""
+\ No newline at end of file
+diff --git a/playground/prisma/schema.prisma b/playground/prisma/schema.prisma
+index e84678a..9e1281e 100644
+--- a/playground/prisma/schema.prisma
++++ b/playground/prisma/schema.prisma
+@@ -2,16 +2,14 @@ generator client {
+   provider = ""prisma-client-js""
+ }
  
-       const connectorInstances = await getConnectorInstances();
-       const connector = connectorInstances.find(
-         (connector): connector is SmsConnectorInstance =>
--          connector.connector.enabled && connector.metadata.type === ConnectorType.SMS
-+          connector.metadata.type === ConnectorType.SMS
-       );
+-// Using SQLite for local development
+ datasource db {
+-  provider = ""sqlite""
+-  url      = ""file:dev.db""
++  provider = ""mysql""
++  url      = env(""DATABASE_URL"")
+ }
  
-       assertThat(
-@@ -200,9 +211,14 @@ export default function connectorRoutes<T extends AuthedRouter>(router: T) {
-         new RequestError({ code: 'connector.not_found', type: ConnectorType.SMS })
-       );
+ model Session {
+-  id        String   @id
+-  code      String
+-  theme     String   @default("""")
+-  view      String   @default(""code"")
++  id        String   @id @default(cuid())
++  code      String   @db.Text
++  theme     String   @db.Text
+   createdAt DateTime @default(now())
+ }
+diff --git a/playground/src/app/[id]/page.tsx b/playground/src/app/[id]/page.tsx
+index 40c21f0..a88d2b9 100644
+--- a/playground/src/app/[id]/page.tsx
++++ b/playground/src/app/[id]/page.tsx
+@@ -6,9 +6,9 @@ const Page = async (props: any) => {
+     params: { id },
+   } = props
  
--      await connector.sendMessage(phone, 'Test', {
--        code: '123456',
--      });
-+      await connector.sendMessage(
-+        phone,
-+        'Test',
-+        {
-+          code: '123456',
-+        },
-+        config
-+      );
+-  const initialState = await prisma?.session.findFirst({
++  const initialState = await prisma.session.findFirst({
+     where: { id },
+-    select: { code: true, theme: true, view: true },
++    select: { code: true, theme: true },
+   })
  
-       ctx.status = 204;
+   return <Playground intialState={initialState} />
+diff --git a/playground/src/components/Editor.tsx b/playground/src/components/Editor.tsx
+index 8263dba..e82469a 100644
+--- a/playground/src/components/Editor.tsx
++++ b/playground/src/components/Editor.tsx
+@@ -123,10 +123,7 @@ export const Editor = (props: EditorProps) => {
  
-",f53aceff6f53efd34b5fbb5959ab2b7af7f94715
+   return (
+     <Flex flex=""1"" direction=""column"" align=""flex-start"">
+-      <Tabs
+-        defaultValue={value.view}
+-        className={css({ flex: '1', width: 'full', display: 'flex', flexDirection: 'column' })}
+-      >
++      <Tabs defaultValue=""code"" className={css({ flex: '1', width: 'full', display: 'flex', flexDirection: 'column' })}>
+         <TabList
+           className={css({
+             px: '6',
+diff --git a/playground/src/components/usePlayground.ts b/playground/src/components/usePlayground.ts
+index 74b6069..a959fca 100644
+--- a/playground/src/components/usePlayground.ts
++++ b/playground/src/components/usePlayground.ts
+@@ -4,7 +4,6 @@ import { Layout } from './LayoutControl'
+ export type State = {
+   code: string
+   theme: string
+-  view: string
+ }
+ 
+ export type UsePlayGroundProps = {
+@@ -51,7 +50,7 @@ export const App = () => {
+       body: JSON.stringify(state),
+     })
+       .then((response) => response.json())
+-      .then((data) => {
++      .then(({ data }) => {
+         history.pushState({ id: data.id }, '', data.id)
+         setIsPristine(true)
+       })
+diff --git a/playground/src/pages/api/share.ts b/playground/src/pages/api/share.ts
+index 23f8b9e..e6f3f26 100644
+--- a/playground/src/pages/api/share.ts
++++ b/playground/src/pages/api/share.ts
+@@ -7,17 +7,16 @@ import { prisma } from '../../client/prisma'
+ const schema = z.object({
+   code: z.string(),
+   theme: z.string(),
+-  view: z.enum(['code', 'config']).optional(),
+ })
+ 
+ const handler = async (req: NextApiRequest, res: NextApiResponse) =>
+   match(req)
+     .with({ method: 'POST' }, async () => {
+       try {
+-        const { code, theme } = schema.parse(req.body)
++        const data = schema.parse(req.body)
+         const id = nanoid(10)
+-        await prisma.session.create({ data: { id, code, theme } })
+-        return res.status(200).json({ id })
++        const session = await prisma.session.create({ data: { id, ...data }, select: { id: true } })
++        return res.status(200).json({ success: true, data: session })
+       } catch (e) {
+         console.log(e)
+         return res.status(500).json({ success: false })
+",9c2c7ea1d4935d30e014ca807a4f9cb1665b1e41
+refactor,remove unused,"diff --git a/src/content/redux/modules/dictionaries.ts b/src/content/redux/modules/dictionaries.ts
+index 88f7215..570d397 100644
+--- a/src/content/redux/modules/dictionaries.ts
++++ b/src/content/redux/modules/dictionaries.ts
+@@ -3,7 +3,6 @@ import { DictID, appConfigFactory, AppConfig } from '@/app-config'
+ import isEqual from 'lodash/isEqual'
+ import { saveWord } from '@/_helpers/record-manager'
+ import { getDefaultSelectionInfo, SelectionInfo, isSameSelection } from '@/_helpers/selection'
+-import { createActiveConfigStream } from '@/_helpers/config-manager'
+ import { isContainChinese, isContainEnglish, testerPunct, isContainMinor, testerChinese, testJapanese, testKorean } from '@/_helpers/lang-check'
+ import { MsgType, MsgFetchDictResult } from '@/typings/message'
+ import { StoreState, DispatcherThunk, Dispatcher } from './index'
+diff --git a/src/content/redux/modules/widget.ts b/src/content/redux/modules/widget.ts
+index 53ad550..68e0a3d 100644
+--- a/src/content/redux/modules/widget.ts
++++ b/src/content/redux/modules/widget.ts
+@@ -1,9 +1,9 @@
+ import * as recordManager from '@/_helpers/record-manager'
+ import { StoreState, DispatcherThunk, Dispatcher } from './index'
+-import appConfigFactory, { TCDirection, AppConfig, DictID } from '@/app-config'
++import appConfigFactory, { TCDirection, DictID } from '@/app-config'
+ import { message, storage } from '@/_helpers/browser-api'
+-import { createActiveConfigStream, createConfigIDListStream } from '@/_helpers/config-manager'
+-import { MsgSelection, MsgType, MsgTempDisabledState, MsgEditWord, MsgOpenUrl, MsgFetchDictResult } from '@/typings/message'
++import { createConfigIDListStream } from '@/_helpers/config-manager'
++import { MsgType, MsgTempDisabledState, MsgEditWord, MsgOpenUrl, MsgFetchDictResult } from '@/typings/message'
+ import { searchText, restoreDicts } from '@/content/redux/modules/dictionaries'
+ import { SelectionInfo, getDefaultSelectionInfo } from '@/_helpers/selection'
+ import { Mutable } from '@/typings/helpers'
+",a50b51999015e210918d9c8e95fd4cac347353be
+refactor,switch to throwing errors,"diff --git a/src/background/sync-manager/services/shanbay/index.ts b/src/background/sync-manager/services/shanbay/index.ts
+index 651fd1b..de17a45 100644
+--- a/src/background/sync-manager/services/shanbay/index.ts
++++ b/src/background/sync-manager/services/shanbay/index.ts
+@@ -24,7 +24,7 @@ export class Service extends SyncService<SyncConfig> {
+ 
+   async init() {
+     if (!(await this.isLogin())) {
+-      return Promise.reject('login')
++      throw new Error('login')
+     }
+ 
+     await setSyncConfig<SyncConfig>(Service.id, this.config)
+@@ -85,11 +85,11 @@ export class Service extends SyncService<SyncConfig> {
+         encodeURIComponent(text)
+       var resSearch = await fetch(url).then(r => r.json())
+     } catch (e) {
+-      return Promise.reject('network')
++      throw new Error('network')
+     }
+ 
+     if (!resSearch || !resSearch.data) {
+-      return Promise.reject('word')
++      throw new Error('word')
+     }
+ 
+     try {
+@@ -104,11 +104,14 @@ export class Service extends SyncService<SyncConfig> {
+         }
+       ).then(r => r.json())
+     } catch (e) {
+-      return Promise.reject('network')
++      if (process.env.DEBUG) {
++        console.error(e)
++      }
++      throw new Error('network')
+     }
+ 
+     if (!resLearning || resLearning.status_code !== 0) {
+-      return Promise.reject('word')
++      throw new Error('word')
+     }
+   }
+ 
+",c527037074641064d267f46c1350bb2afc48320e
+refactor,switch to callback ref,"diff --git a/src/notebook/components/transforms/html.js b/src/notebook/components/transforms/html.js
+index 83fc1fb..021cc65 100644
+--- a/src/notebook/components/transforms/html.js
++++ b/src/notebook/components/transforms/html.js
+@@ -8,16 +8,16 @@ type Props = {
+ 
+ export default class HTMLDisplay extends React.Component {
+   props: Props;
++  el: HTMLElement;
+ 
+   componentDidMount(): void {
+-    if (this.refs.here) {
+-      if (document.createRange && Range && Range.prototype.createContextualFragment) {
+-        const range = document.createRange();
+-        const fragment = range.createContextualFragment(this.props.data);
+-        ReactDOM.findDOMNode(this.refs.here).appendChild(fragment);
+-      } else {
+-        ReactDOM.findDOMNode(this.refs.here).innerHTML = this.props.data;
+-      }
++    // Create a range to ensure that scripts are invoked from within the HTML
++    if (document.createRange && Range && Range.prototype.createContextualFragment) {
++      const range = document.createRange();
++      const fragment = range.createContextualFragment(this.props.data);
++      this.el.appendChild(fragment);
++    } else {
++      this.el.innerHTML = this.props.data;
+     }
+   }
+ 
+@@ -27,7 +27,7 @@ export default class HTMLDisplay extends React.Component {
+ 
+   render(): ?React.Element<any> {
+     return (
+-      <div ref=""here"" />
++      <div ref={(el) => { this.el = el; }} />
+     );
+   }
+ }
+",ee4bf61fb8836e249fb4ef3507dc938e70696b3f
+refactor,remove unnecessary lines from verify-wal test,"diff --git a/storage/wal/verifier_test.go b/storage/wal/verifier_test.go
+index 61e1536..a44755f 100644
+--- a/storage/wal/verifier_test.go
++++ b/storage/wal/verifier_test.go
+@@ -138,22 +138,13 @@ func writeCorruptEntries(file *os.File, t *testing.T, n int) {
+ 		}
+ 	}
+ 
+-
+ 	// Write some random bytes to the file to simulate corruption.
+ 	if _, err := file.Write(corruption); err != nil {
+ 		fatal(t, ""corrupt WAL segment"", err)
+ 	}
+-	corrupt := []byte{1, 255, 0, 3, 45, 26, 110}
+-
+-	wrote, err := file.Write(corrupt)
+-	if err != nil {
+-		t.Fatal(err)
+-	} else if wrote != len(corrupt) {
+-		t.Fatal(""Error writing corrupt data to file"")
+-	}
+ 
+ 	if err := file.Close(); err != nil {
+-		t.Fatalf(""Error: filed to close file: %v\n"", err)
++		t.Fatalf(""Error: failed to close file: %v\n"", err)
+ 	}
+ }
+ 
+",fba4326c72fc22d81aba6976a9fef1e4b6154fd9
+refactor,remove duplicated code,"diff --git a/packages/core/src/components/action-sheet/action-sheet.tsx b/packages/core/src/components/action-sheet/action-sheet.tsx
+index 7166508..dad7daf 100644
+--- a/packages/core/src/components/action-sheet/action-sheet.tsx
++++ b/packages/core/src/components/action-sheet/action-sheet.tsx
+@@ -1,9 +1,9 @@
+ import { Component, CssClassMap, Element, Event, EventEmitter, Listen, Method, Prop } from '@stencil/core';
+-import { Animation, AnimationBuilder, AnimationController, Config, DomController, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
++import { Animation, AnimationBuilder, Config, DomController, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
+ 
+-import { domControllerAsync, isDef, playAnimationAsync } from '../../utils/helpers';
++import { domControllerAsync } from '../../utils/helpers';
+ import { createThemedClasses, getClassMap } from '../../utils/theme';
+-import { OverlayInterface, BACKDROP } from '../../utils/overlays';
++import { OverlayInterface, BACKDROP, overlayAnimation } from '../../utils/overlays';
+ 
+ import iosEnterAnimation from './animations/ios.enter';
+ import iosLeaveAnimation from './animations/ios.leave';
+@@ -23,15 +23,15 @@ import mdLeaveAnimation from './animations/md.leave';
+ })
+ export class ActionSheet implements OverlayInterface {
+ 
++  private presented = false;
++
+   mode: string;
+   color: string;
+-
+-  private presented = false;
+-  private animation: Animation | null = null;
++  animation: Animation;
+ 
+   @Element() private el: HTMLElement;
+ 
+-  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: AnimationController;
++  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: HTMLIonAnimationControllerElement;
+   @Prop({ context: 'config' }) config: Config;
+   @Prop({ context: 'dom' }) dom: DomController;
+   @Prop() overlayId: number;
+@@ -178,25 +178,8 @@ export class ActionSheet implements OverlayInterface {
+     });
+   }
+ 
+-  private playAnimation(animationBuilder: AnimationBuilder) {
+-    if (this.animation) {
+-      this.animation.destroy();
+-      this.animation = null;
+-    }
+-
+-    return this.animationCtrl.create(animationBuilder, this.el).then(animation => {
+-      this.animation = animation;
+-      // Check if prop animate is false or if the config for animate is defined/false
+-      if (!this.willAnimate || (isDef(this.config.get('willAnimate')) && this.config.get('willAnimate') === false)) {
+-        // if the duration is 0, it won't actually animate I don't think
+-        // TODO - validate this
+-        this.animation = animation.duration(0);
+-      }
+-      return playAnimationAsync(animation);
+-    }).then((animation) => {
+-      animation.destroy();
+-      this.animation = null;
+-    });
++  private playAnimation(animationBuilder: AnimationBuilder): Promise<void> {
++    return overlayAnimation(this, animationBuilder, this.willAnimate, this.el, undefined);
+   }
+ 
+   protected buttonClick(button: ActionSheetButton) {
+diff --git a/packages/core/src/components/alert/alert.tsx b/packages/core/src/components/alert/alert.tsx
+index 800b77b..bdf4fc5 100644
+--- a/packages/core/src/components/alert/alert.tsx
++++ b/packages/core/src/components/alert/alert.tsx
+@@ -1,8 +1,8 @@
+ import { Component, CssClassMap, Element, Event, EventEmitter, Listen, Method, Prop } from '@stencil/core';
+-import { Animation, AnimationBuilder, AnimationController, Config, DomController, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
+-import { domControllerAsync, playAnimationAsync, autoFocus } from '../../utils/helpers';
++import { Animation, AnimationBuilder, Config, DomController, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
++import { domControllerAsync, autoFocus } from '../../utils/helpers';
+ import { createThemedClasses, getClassMap } from '../../utils/theme';
+-import { OverlayInterface, BACKDROP } from '../../utils/overlays';
++import { OverlayInterface, BACKDROP, overlayAnimation } from '../../utils/overlays';
+ 
+ import iosEnterAnimation from './animations/ios.enter';
+ import iosLeaveAnimation from './animations/ios.leave';
+@@ -21,18 +21,19 @@ import mdLeaveAnimation from './animations/md.leave';
+   }
+ })
+ export class Alert implements OverlayInterface {
+-  mode: string;
+-  color: string;
+ 
+   private presented = false;
+-  private animation: Animation | null = null;
+   private activeId: string;
+   private inputType: string | null = null;
+   private hdrId: string;
+ 
++  animation: Animation;
++  mode: string;
++  color: string;
++
+   @Element() private el: HTMLElement;
+ 
+-  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: AnimationController;
++  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: HTMLIonAnimationControllerElement;
+   @Prop({ context: 'config' }) config: Config;
+   @Prop({ context: 'dom' }) dom: DomController;
+   @Prop() overlayId: number;
+@@ -264,25 +265,10 @@ export class Alert implements OverlayInterface {
+     return values;
+   }
+ 
+-  private playAnimation(animationBuilder: AnimationBuilder) {
+-    if (this.animation) {
+-      this.animation.destroy();
+-      this.animation = null;
+-    }
+-
+-    return this.animationCtrl.create(animationBuilder, this.el).then(animation => {
+-      this.animation = animation;
+-      if (!this.willAnimate) {
+-        animation.duration(0);
+-      }
+-      return playAnimationAsync(animation);
+-    }).then(animation => {
+-      animation.destroy();
+-      this.animation = null;
+-    });
++  private playAnimation(animationBuilder: AnimationBuilder): Promise<void> {
++    return overlayAnimation(this, animationBuilder, this.willAnimate, this.el, undefined);
+   }
+ 
+-
+   private renderCheckbox(inputs: AlertInput[]) {
+     if (inputs.length === 0) return null;
+ 
+diff --git a/packages/core/src/components/loading/loading.tsx b/packages/core/src/components/loading/loading.tsx
+index f45eaf1..cc4f511 100644
+--- a/packages/core/src/components/loading/loading.tsx
++++ b/packages/core/src/components/loading/loading.tsx
+@@ -1,13 +1,13 @@
+ import { Component, Element, Event, EventEmitter, Listen, Method, Prop } from '@stencil/core';
+-import { Animation, AnimationBuilder, AnimationController, Config, DomController, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
+-import { domControllerAsync, playAnimationAsync } from '../../utils/helpers';
++import { Animation, AnimationBuilder, Config, DomController, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
++import { domControllerAsync } from '../../utils/helpers';
+ import { createThemedClasses, getClassMap } from '../../utils/theme';
+ 
+ import iosEnterAnimation from './animations/ios.enter';
+ import iosLeaveAnimation from './animations/ios.leave';
+ import mdEnterAnimation from './animations/md.enter';
+ import mdLeaveAnimation from './animations/md.leave';
+-import { OverlayInterface, BACKDROP } from '../../utils/overlays';
++import { OverlayInterface, BACKDROP, overlayAnimation } from '../../utils/overlays';
+ 
+ @Component({
+   tag: 'ion-loading',
+@@ -21,16 +21,17 @@ import { OverlayInterface, BACKDROP } from '../../utils/overlays';
+ })
+ 
+ export class Loading implements OverlayInterface {
+-  color: string;
+-  mode: string;
+ 
+   private presented = false;
+-  private animation: Animation;
+   private durationTimeout: any;
+ 
++  animation: Animation;
++  color: string;
++  mode: string;
++
+   @Element() private el: HTMLElement;
+ 
+-  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: AnimationController;
++  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: HTMLIonAnimationControllerElement;
+   @Prop({ context: 'config' }) config: Config;
+   @Prop({ context: 'dom' }) dom: DomController;
+   @Prop() overlayId: number;
+@@ -199,24 +200,8 @@ export class Loading implements OverlayInterface {
+     });
+   }
+ 
+-  private playAnimation(animationBuilder: AnimationBuilder) {
+-    if (this.animation) {
+-      this.animation.destroy();
+-      this.animation = null;
+-    }
+-
+-    return this.animationCtrl.create(animationBuilder, this.el).then(animation => {
+-      this.animation = animation;
+-      if (!this.willAnimate) {
+-        // if the duration is 0, it won't actually animate I don't think
+-        // TODO - validate this
+-        animation.duration(0);
+-      }
+-      return playAnimationAsync(animation);
+-    }).then(animation => {
+-      animation.destroy();
+-      this.animation = null;
+-    });
++  private playAnimation(animationBuilder: AnimationBuilder): Promise<void> {
++    return overlayAnimation(this, animationBuilder, this.willAnimate, this.el, undefined);
+   }
+ 
+   hostData() {
+diff --git a/packages/core/src/components/modal/modal.tsx b/packages/core/src/components/modal/modal.tsx
+index af50d63..2b7510c 100644
+--- a/packages/core/src/components/modal/modal.tsx
++++ b/packages/core/src/components/modal/modal.tsx
+@@ -1,10 +1,10 @@
+ import { Component, Element, Event, EventEmitter, Listen, Method, Prop } from '@stencil/core';
+-import { Animation, AnimationBuilder, AnimationController, Config, DomController, FrameworkDelegate, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
++import { Animation, AnimationBuilder, Config, DomController, FrameworkDelegate, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
+ 
+ import { DomFrameworkDelegate } from '../../utils/dom-framework-delegate';
+-import { domControllerAsync, playAnimationAsync } from '../../utils/helpers';
++import { domControllerAsync } from '../../utils/helpers';
+ import { createThemedClasses } from '../../utils/theme';
+-import { OverlayInterface, BACKDROP } from '../../utils/overlays';
++import { OverlayInterface, BACKDROP, overlayAnimation } from '../../utils/overlays';
+ 
+ import iosEnterAnimation from './animations/ios.enter';
+ import iosLeaveAnimation from './animations/ios.leave';
+@@ -25,14 +25,16 @@ import mdLeaveAnimation from './animations/md.leave';
+ export class Modal implements OverlayInterface {
+ 
+   private presented = false;
+-  private animation: Animation;
+   private usersComponentElement: HTMLElement;
+ 
++  animation: Animation;
++
+   @Element() private el: HTMLElement;
+ 
+-  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: AnimationController;
++  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: HTMLIonAnimationControllerElement;
+   @Prop({ context: 'config' }) config: Config;
+   @Prop({ context: 'dom' }) dom: DomController;
++
+   @Prop() overlayId: number;
+   @Prop({ mutable: true }) delegate: FrameworkDelegate;
+ 
+@@ -208,22 +210,8 @@ export class Modal implements OverlayInterface {
+     });
+   }
+ 
+-  private playAnimation(animationBuilder: AnimationBuilder) {
+-    if (this.animation) {
+-      this.animation.destroy();
+-      this.animation = null;
+-    }
+-
+-    return this.animationCtrl.create(animationBuilder, this.el).then(animation => {
+-      this.animation = animation;
+-      if (!this.willAnimate) {
+-        animation.duration(0);
+-      }
+-      return playAnimationAsync(animation);
+-    }).then((animation) => {
+-      animation.destroy();
+-      this.animation = null;
+-    });
++  private playAnimation(animationBuilder: AnimationBuilder): Promise<void> {
++    return overlayAnimation(this, animationBuilder, this.willAnimate, this.el, undefined);
+   }
+ 
+   @Method()
+diff --git a/packages/core/src/components/picker/picker.tsx b/packages/core/src/components/picker/picker.tsx
+index 13faa3e..d70381e 100644
+--- a/packages/core/src/components/picker/picker.tsx
++++ b/packages/core/src/components/picker/picker.tsx
+@@ -1,9 +1,9 @@
+ import { Component, CssClassMap, Element, Event, EventEmitter, Listen, Method, Prop, State } from '@stencil/core';
+-import { Animation, AnimationBuilder, AnimationController, Config, DomController, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
++import { Animation, AnimationBuilder, Config, DomController, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
+ 
+-import { domControllerAsync, playAnimationAsync } from '../../utils/helpers';
++import { domControllerAsync } from '../../utils/helpers';
+ import { getClassMap } from '../../utils/theme';
+-import { OverlayInterface } from '../../utils/overlays';
++import { OverlayInterface, overlayAnimation } from '../../utils/overlays';
+ 
+ import iosEnterAnimation from './animations/ios.enter';
+ import iosLeaveAnimation from './animations/ios.leave';
+@@ -21,16 +21,17 @@ import iosLeaveAnimation from './animations/ios.leave';
+ export class Picker implements OverlayInterface {
+ 
+   private presented = false;
+-  private animation: Animation;
+   private durationTimeout: any;
+   private mode: string;
+ 
++  animation: Animation;
++
+   @Element() private el: HTMLElement;
+ 
+   @State() private showSpinner: boolean = null;
+   @State() private spinner: string;
+ 
+-  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: AnimationController;
++  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: HTMLIonAnimationControllerElement;
+   @Prop({ context: 'config' }) config: Config;
+   @Prop({ context: 'dom' }) dom: DomController;
+   @Prop() overlayId: number;
+@@ -231,22 +232,8 @@ export class Picker implements OverlayInterface {
+     return this.columns;
+   }
+ 
+-  private playAnimation(animationBuilder: AnimationBuilder) {
+-    if (this.animation) {
+-      this.animation.destroy();
+-      this.animation = null;
+-    }
+-
+-    return this.animationCtrl.create(animationBuilder, this.el).then(animation => {
+-      this.animation = animation;
+-      if (!this.willAnimate) {
+-        animation.duration(0);
+-      }
+-      return playAnimationAsync(animation);
+-    }).then(animation => {
+-      animation.destroy();
+-      this.animation = null;
+-    })
++  private playAnimation(animationBuilder: AnimationBuilder): Promise<void> {
++    return overlayAnimation(this, animationBuilder, this.willAnimate, this.el, undefined);
+   }
+ 
+   private buttonClick(button: PickerButton) {
+diff --git a/packages/core/src/components/popover/popover.tsx b/packages/core/src/components/popover/popover.tsx
+index 65031ff..6a47bf6 100644
+--- a/packages/core/src/components/popover/popover.tsx
++++ b/packages/core/src/components/popover/popover.tsx
+@@ -1,10 +1,10 @@
+ import { Component, Element, Event, EventEmitter, Listen, Method, Prop } from '@stencil/core';
+-import { Animation, AnimationBuilder, AnimationController, Config, DomController, FrameworkDelegate, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
++import { Animation, AnimationBuilder, Config, DomController, FrameworkDelegate, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
+ 
+ import { DomFrameworkDelegate } from '../../utils/dom-framework-delegate';
+-import { domControllerAsync, playAnimationAsync } from '../../utils/helpers';
++import { domControllerAsync } from '../../utils/helpers';
+ import { createThemedClasses } from '../../utils/theme';
+-import { OverlayInterface, BACKDROP } from '../../utils/overlays';
++import { OverlayInterface, BACKDROP, overlayAnimation } from '../../utils/overlays';
+ 
+ import iosEnterAnimation from './animations/ios.enter';
+ import iosLeaveAnimation from './animations/ios.leave';
+@@ -24,12 +24,13 @@ import mdLeaveAnimation from './animations/md.leave';
+ export class Popover implements OverlayInterface {
+ 
+   private presented = false;
+-  private animation: Animation;
+   private usersComponentElement: HTMLElement;
+ 
++  animation: Animation;
++
+   @Element() private el: HTMLElement;
+ 
+-  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: AnimationController;
++  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: HTMLIonAnimationControllerElement;
+   @Prop({ context: 'config' }) config: Config;
+   @Prop({ context: 'dom' }) dom: DomController;
+   @Prop({ mutable: true }) delegate: FrameworkDelegate;
+@@ -224,22 +225,8 @@ export class Popover implements OverlayInterface {
+     });
+   }
+ 
+-  private playAnimation(animationBuilder: AnimationBuilder) {
+-    if (this.animation) {
+-      this.animation.destroy();
+-      this.animation = null;
+-    }
+-
+-    return this.animationCtrl.create(animationBuilder, this.el, this.ev).then((animation) => {
+-      this.animation = animation;
+-      if (!this.willAnimate) {
+-        animation.duration(0);
+-      }
+-      return playAnimationAsync(animation);
+-    }).then(animation => {
+-      animation.destroy();
+-      this.animation = null;
+-    })
++  private playAnimation(animationBuilder: AnimationBuilder): Promise<void> {
++    return overlayAnimation(this, animationBuilder, this.willAnimate, this.el, this.ev);
+   }
+ 
+   hostData() {
+diff --git a/packages/core/src/components/toast/toast.tsx b/packages/core/src/components/toast/toast.tsx
+index 1afa318..372070a 100644
+--- a/packages/core/src/components/toast/toast.tsx
++++ b/packages/core/src/components/toast/toast.tsx
+@@ -1,9 +1,9 @@
+ import { Component, Element, Event, EventEmitter, Listen, Method, Prop } from '@stencil/core';
+-import { Animation, AnimationBuilder, AnimationController, Config, CssClassMap, DomController, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
++import { Animation, AnimationBuilder, Config, CssClassMap, DomController, OverlayDismissEvent, OverlayDismissEventDetail } from '../../index';
+ 
+-import { domControllerAsync, playAnimationAsync } from '../../utils/helpers';
++import { domControllerAsync } from '../../utils/helpers';
+ import { createThemedClasses, getClassMap } from '../../utils/theme';
+-import { OverlayInterface } from '../../utils/overlays';
++import { OverlayInterface, overlayAnimation } from '../../utils/overlays';
+ 
+ import iosEnterAnimation from './animations/ios.enter';
+ import iosLeaveAnimation from './animations/ios.leave';
+@@ -24,14 +24,14 @@ import mdLeaveAnimation from './animations/md.leave';
+ export class Toast implements OverlayInterface {
+ 
+   private presented = false;
+-  private animation: Animation | null;
+ 
+   @Element() private el: HTMLElement;
+ 
+   mode: string;
+   color: string;
++  animation: Animation | null;
+ 
+-  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: AnimationController;
++  @Prop({ connect: 'ion-animation-controller' }) animationCtrl: HTMLIonAnimationControllerElement;
+   @Prop({ context: 'config' }) config: Config;
+   @Prop({ context: 'dom' }) dom: DomController;
+   @Prop() overlayId: number;
+@@ -123,6 +123,22 @@ export class Toast implements OverlayInterface {
+    */
+   @Event() ionToastDidUnload: EventEmitter<ToastEventDetail>;
+ 
++  componentDidLoad() {
++    this.ionToastDidLoad.emit();
++  }
++
++  componentDidUnload() {
++    this.ionToastDidUnload.emit();
++  }
++
++  @Listen('ionDismiss')
++  protected onDismiss(ev: UIEvent) {
++    ev.stopPropagation();
++    ev.preventDefault();
++
++    this.dismiss();
++  }
++
+   /**
+    * Present the toast overlay after it has been created.
+    */
+@@ -169,38 +185,8 @@ export class Toast implements OverlayInterface {
+     });
+   }
+ 
+-  playAnimation(animationBuilder: AnimationBuilder) {
+-    if (this.animation) {
+-      this.animation.destroy();
+-      this.animation = null;
+-    }
+-
+-    return this.animationCtrl.create(animationBuilder, this.el, this.position).then(animation => {
+-      this.animation = animation;
+-      if (!this.willAnimate) {
+-        animation.duration(0);
+-      }
+-      return playAnimationAsync(animation);
+-    }).then((animation) => {
+-      animation.destroy();
+-      this.animation = null;
+-    });
+-  }
+-
+-  componentDidLoad() {
+-    this.ionToastDidLoad.emit();
+-  }
+-
+-  componentDidUnload() {
+-    this.ionToastDidUnload.emit();
+-  }
+-
+-  @Listen('ionDismiss')
+-  protected onDismiss(ev: UIEvent) {
+-    ev.stopPropagation();
+-    ev.preventDefault();
+-
+-    this.dismiss();
++  private playAnimation(animationBuilder: AnimationBuilder): Promise<void> {
++    return overlayAnimation(this, animationBuilder, this.willAnimate, this.el, this.position);
+   }
+ 
+   private wrapperClass(): CssClassMap {
+diff --git a/packages/core/src/utils/overlays.ts b/packages/core/src/utils/overlays.ts
+index 8926544..634df43 100644
+--- a/packages/core/src/utils/overlays.ts
++++ b/packages/core/src/utils/overlays.ts
+@@ -1,3 +1,5 @@
++import { AnimationBuilder, Animation } from "".."";
++import { playAnimationAsync } from ""./helpers"";
+ 
+ let lastId = 1;
+ 
+@@ -56,8 +58,33 @@ export function removeLastOverlay(overlays: OverlayMap) {
+   return toRemove ? toRemove.dismiss() : Promise.resolve();
+ }
+ 
++export function overlayAnimation(
++  overlay: OverlayInterface,
++  animationBuilder: AnimationBuilder,
++  animate: boolean,
++  baseEl: HTMLElement,
++  opts: any
++): Promise<void> {
++  if (overlay.animation) {
++    overlay.animation.destroy();
++    overlay.animation = null;
++  }
++  return overlay.animationCtrl.create(animationBuilder, baseEl, opts).then(animation => {
++    overlay.animation = animation;
++    if (!animate) {
++      animation.duration(0);
++    }
++    return playAnimationAsync(animation);
++  }).then((animation) => {
++    animation.destroy();
++    overlay.animation = null;
++  });
++}
++
+ export interface OverlayInterface {
+   overlayId: number;
++  animation: Animation;
++  animationCtrl: HTMLIonAnimationControllerElement;
+ 
+   present(): Promise<void>;
+   dismiss(data?: any, role?: string): Promise<void>;
+",9e3f295bbfd4098ffda1ae6656699f60b86c1f92
+refactor,remove unnecessary `parse_json` call in `ops.StructField` impl,"diff --git a/ibis/backends/snowflake/registry.py b/ibis/backends/snowflake/registry.py
+index cbddf8d..d5a0859 100644
+--- a/ibis/backends/snowflake/registry.py
++++ b/ibis/backends/snowflake/registry.py
+@@ -231,7 +231,7 @@ operation_registry.update(
+         ops.DateFromYMD: fixed_arity(sa.func.date_from_parts, 3),
+         ops.StringToTimestamp: fixed_arity(sa.func.to_timestamp_tz, 2),
+         ops.RegexExtract: fixed_arity(sa.func.regexp_substr, 3),
+-        ops.RegexSearch: fixed_arity(lambda left, right: left.op('REGEXP')(right), 2),
++        ops.RegexSearch: fixed_arity(sa.sql.operators.custom_op(""REGEXP""), 2),
+         ops.RegexReplace: fixed_arity(sa.func.regexp_replace, 3),
+         ops.ExtractMillisecond: fixed_arity(
+             lambda arg: sa.cast(
+@@ -244,8 +244,7 @@ operation_registry.update(
+             t.translate(op.arg), _TIMESTAMP_UNITS_TO_SCALE[op.unit]
+         ),
+         ops.StructField: lambda t, op: sa.cast(
+-            sa.func.parse_json(sa.func.get(t.translate(op.arg), op.field)),
+-            t.get_sqla_type(op.output_dtype),
++            sa.func.get(t.translate(op.arg), op.field), t.get_sqla_type(op.output_dtype)
+         ),
+         ops.NthValue: _nth_value,
+     }
+",9e80231539aa307e607e2b82b35df9e09ede8385
+refactor,convert `run_tag_values_test_case` to a function,"diff --git a/query_tests/src/influxrpc/tag_values.rs b/query_tests/src/influxrpc/tag_values.rs
+index 01fd411..3570cae 100644
+--- a/query_tests/src/influxrpc/tag_values.rs
++++ b/query_tests/src/influxrpc/tag_values.rs
+@@ -1,5 +1,5 @@
+ use datafusion::logical_plan::{col, lit};
+-use predicate::predicate::PredicateBuilder;
++use predicate::predicate::{Predicate, PredicateBuilder};
+ use query::{
+     exec::stringset::{IntoStringSet, StringSetRef},
+     frontend::influxrpc::InfluxRpcPlanner,
+@@ -9,39 +9,42 @@ use crate::scenarios::*;
+ 
+ /// runs tag_value(predicate) and compares it to the expected
+ /// output
+-macro_rules! run_tag_values_test_case {
+-    ($DB_SETUP:expr, $TAG_NAME:expr, $PREDICATE:expr, $EXPECTED_VALUES:expr) => {
+-        test_helpers::maybe_start_logging();
+-        let predicate = $PREDICATE;
+-        let tag_name = $TAG_NAME;
+-        let expected_values = $EXPECTED_VALUES;
+-        for scenario in $DB_SETUP.make().await {
+-            let DbScenario {
+-                scenario_name, db, ..
+-            } = scenario;
+-            println!(""Running scenario '{}'"", scenario_name);
+-            println!(""Predicate: '{:#?}'"", predicate);
+-            let planner = InfluxRpcPlanner::new();
+-            let ctx = db.executor().new_context(query::exec::ExecutorType::Query);
+-
+-            let plan = planner
+-                .tag_values(db.as_ref(), &tag_name, predicate.clone())
+-                .expect(""built plan successfully"");
+-            let names = ctx
+-                .to_string_set(plan)
+-                .await
+-                .expect(""converted plan to strings successfully"");
+-
+-            assert_eq!(
+-                names,
+-                to_stringset(&expected_values),
+-                ""Error in  scenario '{}'\n\nexpected:\n{:?}\nactual:\n{:?}"",
+-                scenario_name,
+-                expected_values,
+-                names
+-            );
+-        }
+-    };
++async fn run_tag_values_test_case<D>(
++    db_setup: D,
++    tag_name: &str,
++    predicate: Predicate,
++    expected_tag_values: Vec<&str>,
++) where
++    D: DbSetup,
++{
++    test_helpers::maybe_start_logging();
++
++    for scenario in db_setup.make().await {
++        let DbScenario {
++            scenario_name, db, ..
++        } = scenario;
++        println!(""Running scenario '{}'"", scenario_name);
++        println!(""Predicate: '{:#?}'"", predicate);
++        let planner = InfluxRpcPlanner::new();
++        let ctx = db.executor().new_context(query::exec::ExecutorType::Query);
++
++        let plan = planner
++            .tag_values(db.as_ref(), tag_name, predicate.clone())
++            .expect(""built plan successfully"");
++        let names = ctx
++            .to_string_set(plan)
++            .await
++            .expect(""converted plan to strings successfully"");
++
++        assert_eq!(
++            names,
++            to_stringset(&expected_tag_values),
++            ""Error in  scenario '{}'\n\nexpected:\n{:?}\nactual:\n{:?}"",
++            scenario_name,
++            expected_tag_values,
++            names
++        );
++    }
+ }
+ 
+ #[tokio::test]
+@@ -50,12 +53,13 @@ async fn list_tag_values_no_tag() {
+     // If the tag is not present, expect no values back (not error)
+     let tag_name = ""tag_not_in_chunks"";
+     let expected_tag_keys = vec![];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -63,12 +67,13 @@ async fn list_tag_values_no_predicate_state_col() {
+     let predicate = PredicateBuilder::default().build();
+     let tag_name = ""state"";
+     let expected_tag_keys = vec![""CA"", ""MA"", ""NY""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -76,12 +81,13 @@ async fn list_tag_values_no_predicate_city_col() {
+     let tag_name = ""city"";
+     let predicate = PredicateBuilder::default().build();
+     let expected_tag_keys = vec![""Boston"", ""LA"", ""NYC""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -89,12 +95,13 @@ async fn list_tag_values_timestamp_pred_state_col() {
+     let tag_name = ""state"";
+     let predicate = PredicateBuilder::default().timestamp_range(50, 201).build();
+     let expected_tag_keys = vec![""CA"", ""MA""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -104,12 +111,13 @@ async fn list_tag_values_state_pred_state_col() {
+         .add_expr(col(""state"").eq(lit(""MA""))) // state=MA
+         .build();
+     let expected_tag_keys = vec![""Boston""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -120,12 +128,13 @@ async fn list_tag_values_timestamp_and_state_pred_state_col() {
+         .add_expr(col(""state"").eq(lit(""MA""))) // state=MA
+         .build();
+     let expected_tag_keys = vec![""MA""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -133,12 +142,13 @@ async fn list_tag_values_table_pred_state_col() {
+     let tag_name = ""state"";
+     let predicate = PredicateBuilder::default().table(""h2o"").build();
+     let expected_tag_keys = vec![""CA"", ""MA""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -146,12 +156,13 @@ async fn list_tag_values_table_pred_city_col() {
+     let tag_name = ""city"";
+     let predicate = PredicateBuilder::default().table(""o2"").build();
+     let expected_tag_keys = vec![""Boston"", ""NYC""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -162,12 +173,13 @@ async fn list_tag_values_table_and_timestamp_and_table_pred_state_col() {
+         .timestamp_range(50, 201)
+         .build();
+     let expected_tag_keys = vec![""MA""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -178,12 +190,13 @@ async fn list_tag_values_table_and_state_pred_state_col() {
+         .add_expr(col(""state"").eq(lit(""NY""))) // state=NY
+         .build();
+     let expected_tag_keys = vec![""NY""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -195,12 +208,13 @@ async fn list_tag_values_table_and_timestamp_and_state_pred_state_col() {
+         .add_expr(col(""state"").eq(lit(""NY""))) // state=NY
+         .build();
+     let expected_tag_keys = vec![""NY""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -213,12 +227,13 @@ async fn list_tag_values_table_and_timestamp_and_state_pred_state_col_no_rows() 
+         .build();
+     let expected_tag_keys = vec![];
+ 
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+",1db13ec43727aca872a0f3836e4023ed85db665e
