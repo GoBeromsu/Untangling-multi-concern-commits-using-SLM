@@ -71,6 +71,38 @@ def load_concern_test_dataset(
         return [], {}
 
 
+def load_concern_test_dataset_csv(
+    file_path: str,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Load concern classification test dataset from CSV file."""
+    try:
+        df = pd.read_csv(file_path)
+        cases = []
+        
+        for _, row in df.iterrows():
+            # Parse types column as JSON list
+            types_str = row["types"]
+            concern_types = json.loads(types_str) if types_str else []
+            
+            # Build atomic changes structure compatible with existing logic
+            atomic_changes = [{"label": concern_type} for concern_type in concern_types]
+            
+            # Create case dict with expected structure
+            case = {
+                "tangleChange": row["diff"],
+                "atomicChanges": atomic_changes
+            }
+            cases.append(case)
+        
+        # No metadata available for CSV format
+        metadata = {}
+        return cases, metadata
+        
+    except Exception as e:
+        st.error(f"Error loading CSV concern test dataset: {str(e)}")
+        return [], {}
+
+
 def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
     """Calculate comprehensive evaluation metrics using pre-computed case metrics."""
     total_cases = len(results_df)
@@ -291,7 +323,7 @@ def render_direct_input_interface() -> None:
 def render_batch_evaluation_interface() -> None:
     """Render UI interface for batch evaluation from test dataset files."""
     available_dataset_files = []
-    for search_pattern in ["datasets/**/*.json"]:
+    for search_pattern in ["datasets/**/*.json", "datasets/**/*.csv", "../datasets/**/*.json", "../datasets/**/*.csv"]:
         matched_files = glob.glob(search_pattern, recursive=True)
         available_dataset_files.extend(
             [f for f in matched_files if is_valid_dataset_file(f)]
@@ -309,14 +341,23 @@ def render_batch_evaluation_interface() -> None:
     )
 
     if selected_dataset_file:
-        test_dataset, dataset_metadata = load_concern_test_dataset(
-            selected_dataset_file
-        )
+        # Load dataset based on file extension
+        if selected_dataset_file.endswith(".csv"):
+            test_dataset, dataset_metadata = load_concern_test_dataset_csv(
+                selected_dataset_file
+            )
+        else:
+            test_dataset, dataset_metadata = load_concern_test_dataset(
+                selected_dataset_file
+            )
+            
         if test_dataset:
             st.success(
                 f"📊 Loaded **{len(test_dataset)}** test cases from `{selected_dataset_file}`"
             )
-            render_dataset_metadata(dataset_metadata)
+            # Only render metadata if it exists (JSON files)
+            if dataset_metadata:
+                render_dataset_metadata(dataset_metadata)
         else:
             st.error("❌ Failed to load test dataset")
             test_dataset = []

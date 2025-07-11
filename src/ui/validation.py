@@ -11,7 +11,8 @@ def is_openai_api_key_available() -> bool:
 
 
 def is_valid_dataset_file(file_path: str) -> bool:
-    """Check if file is a valid dataset file (JSON format, not candidate)."""
+    """Check if file is a valid dataset file (JSON or CSV format, not candidate)."""
     is_json_file = file_path.endswith(".json")
+    is_csv_file = file_path.endswith(".csv")
     is_not_candidate_file = "candidate" not in file_path
-    return is_json_file and is_not_candidate_file
+    return (is_json_file or is_csv_file) and is_not_candidate_file
