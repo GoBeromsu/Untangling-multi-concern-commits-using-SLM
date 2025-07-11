@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to remove wrong commits from sampled_commits.csv based on SHA values in wrong_commites.csv
+Script to remove wrong commits from sampled_css_dataset.csv based on SHA values in wrong_commites.csv
 """
 
 import pandas as pd
@@ -83,7 +83,7 @@ def main() -> None:
 
     # File paths
     wrong_commits_file = "wrong_commites.csv"
-    sampled_commits_file = "sampled_commits.csv"
+    sampled_commits_file = "sampled_css_dataset.csv"
 
     # Check if input files exist
     if not os.path.exists(wrong_commits_file):

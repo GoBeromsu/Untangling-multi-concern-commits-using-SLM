@@ -15,7 +15,7 @@ OUTPUT_COLUMNS = ["annotated_type", "masked_commit_message", "git_diff", "sha"]
 # Path constants
 CCS_SOURCE_PATH = Path("ccs/CCS Dataset Training Data.csv")
 SHA_BACKUP_PATH = Path("ccs/sha_backup.csv")
-SAMPLED_CSV_PATH = Path("ccs/sampled_commits.csv")
+SAMPLED_CSV_PATH = Path("ccs/sampled_css_dataset.csv")
 DIFF_OUTPUT_DIR = Path("ccs/extracted_diffs_by_type")
 
 

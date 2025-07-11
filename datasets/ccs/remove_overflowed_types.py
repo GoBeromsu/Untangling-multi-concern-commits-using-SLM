@@ -16,7 +16,7 @@ TARGET_COUNT = 30
 RANDOM_SEED = 42
 
 # Path constants
-SAMPLED_COMMITS_PATH = Path("sampled_commits.csv")
+SAMPLED_COMMITS_PATH = Path("sampled_css_dataset.csv")
 SHA_BACKUP_PATH = Path("sha_backup.csv")
 
 
@@ -71,7 +71,7 @@ def remove_commits_by_sha(file_path: Path, shas_to_remove: Set[str]) -> None:
         logging.info(f"Removed {removed_count} commits from {file_path}")
         logging.info(f"Remaining {final_count} entries")
 
-        # For sampled_commits.csv, show type count after removal
+        # For sampled_css_dataset.csv, show type count after removal
         if "annotated_type" in filtered_df.columns:
             type_counts = filtered_df["annotated_type"].value_counts()
             logging.info(f"Remaining commit counts by type: {type_counts.to_dict()}")
