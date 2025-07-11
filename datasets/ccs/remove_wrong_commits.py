@@ -36,16 +36,15 @@ def load_wrong_commit_shas(wrong_commits_file_path: str) -> Set[str]:
         sys.exit(1)
 
 
-def remove_wrong_commits_from_sampled_data(
-    sampled_commits_file_path: str, wrong_commit_shas: Set[str], output_file_path: str
+def remove_wrong_commits_inplace(
+    sampled_commits_file_path: str, wrong_commit_shas: Set[str]
 ) -> None:
     """
-    Remove wrong commits from sampled commits CSV file.
+    Remove wrong commits from sampled commits CSV file and save back to the same file.
 
     Args:
         sampled_commits_file_path: Path to the sampled commits CSV file
         wrong_commit_shas: Set of SHA values to remove
-        output_file_path: Path to save the cleaned CSV file
     """
     try:
         # Load the sampled commits data
@@ -55,18 +54,18 @@ def remove_wrong_commits_from_sampled_data(
 
         # Filter out wrong commits by SHA
         initial_count = len(sampled_commits_df)
-        cleaned_df = sampled_commits_df[
+        filtered_df = sampled_commits_df[
             ~sampled_commits_df["sha"].isin(wrong_commit_shas)
         ]
-        final_count = len(cleaned_df)
+        final_count = len(filtered_df)
         removed_count = initial_count - final_count
 
         print(f"Removed {removed_count} wrong commits")
         print(f"Remaining {final_count} valid commits")
 
-        # Save the cleaned data
-        cleaned_df.to_csv(output_file_path, index=False)
-        print(f"Cleaned data saved to {output_file_path}")
+        # Save back to the same file
+        filtered_df.to_csv(sampled_commits_file_path, index=False)
+        print(f"Updated {sampled_commits_file_path} with cleaned data")
 
     except FileNotFoundError:
         print(f"Error: File {sampled_commits_file_path} not found")
@@ -85,7 +84,6 @@ def main() -> None:
     # File paths
     wrong_commits_file = "wrong_commites.csv"
     sampled_commits_file = "sampled_commits.csv"
-    output_file = "sampled_commits_cleaned.csv"
 
     # Check if input files exist
     if not os.path.exists(wrong_commits_file):
@@ -103,10 +101,8 @@ def main() -> None:
     wrong_commit_shas = load_wrong_commit_shas(wrong_commits_file)
     print(f"Found {len(wrong_commit_shas)} unique wrong commit SHAs to remove")
 
-    # Remove wrong commits from sampled data
-    remove_wrong_commits_from_sampled_data(
-        sampled_commits_file, wrong_commit_shas, output_file
-    )
+    # Remove wrong commits from sampled data in-place
+    remove_wrong_commits_inplace(sampled_commits_file, wrong_commit_shas)
 
     print("=" * 50)
     print("Wrong commit removal process completed successfully!")
