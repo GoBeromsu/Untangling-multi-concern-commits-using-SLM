@@ -21,9 +21,9 @@ ENCODING_MODEL: str = "cl100k_base"  # GPT-4 encoding
 RANDOM_SEED: int = 42
 
 # File paths
-WRONG_COMMITS_FILE: str = "../data/excluded_commits.csv"
-SAMPLED_COMMITS_FILE: str = "../data/sampled_css_dataset.csv"
-SHA_BACKUP_FILE: str = "../data/processed_shas.csv"
+WRONG_COMMITS_FILE: str = "data/excluded_commits.csv"
+SAMPLED_COMMITS_FILE: str = "data/sampled_css_dataset.csv"
+SHA_BACKUP_FILE: str = "data/processed_shas.csv"
 
 
 def load_wrong_commit_shas(wrong_commits_file_path: str) -> Set[str]:

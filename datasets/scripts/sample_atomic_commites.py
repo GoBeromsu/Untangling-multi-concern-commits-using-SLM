@@ -7,32 +7,31 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Set
 
 
-CONVENTIONAL_COMMIT_TYPES = ["feat"]
-SAMPLES_PER_TYPE = 3
+CONVENTIONAL_COMMIT_TYPES = ["cicd"]
+SAMPLES_PER_TYPE = 1
 TARGET_TOKEN_LIMIT = 12288  # 16384 - 4096
 ENCODING_MODEL = "cl100k_base"  # GPT-4 encoding
 OUTPUT_COLUMNS = ["annotated_type", "masked_commit_message", "git_diff", "sha"]
 
 # Path constants
-CCS_SOURCE_PATH = Path("../data/CCS Dataset Training Data.csv")
-SHA_BACKUP_PATH = Path("../data/processed_shas.csv")
-SAMPLED_CSV_PATH = Path("../data/sampled_css_dataset.csv")
-DIFF_OUTPUT_DIR = Path("../data/types")
+CCS_SOURCE_PATH = Path("data/CCS Dataset Training Data.csv")
+SAMPLED_CSV_PATH = Path("data/sampled_css_dataset.csv")
+DIFF_OUTPUT_DIR = Path("data/types")
 
 
-def load_sha_backup(file_path: Path) -> Set[str]:
-    """Load SHA backup file and return set of SHAs to exclude."""
+def load_existing_shas(file_path: Path) -> Set[str]:
+    """Load existing SHAs from sampled dataset to exclude duplicates."""
     if not file_path.exists():
-        logging.warning(f"SHA backup file not found: {file_path}")
+        logging.warning(f"Sampled dataset file not found: {file_path}")
         return set()
 
     try:
         df = pd.read_csv(file_path, encoding="utf-8")
         sha_set = set(df["sha"].astype(str))
-        logging.info(f"Loaded {len(sha_set)} SHAs to exclude from backup")
+        logging.info(f"Loaded {len(sha_set)} SHAs to exclude from existing samples")
         return sha_set
     except Exception as e:
-        logging.error(f"Error loading SHA backup: {e}")
+        logging.error(f"Error loading existing SHAs: {e}")
         return set()
 
 
@@ -181,8 +180,8 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     logging.info("Starting CCS dataset processing for concern extraction.")
 
-    # Load SHA backup to exclude
-    excluded_shas = load_sha_backup(SHA_BACKUP_PATH)
+    # Load existing SHAs from sampled dataset to exclude duplicates
+    excluded_shas = load_existing_shas(SAMPLED_CSV_PATH)
 
     # Load CCS dataset
     ccs_dataset = load_ccs_dataset(CCS_SOURCE_PATH)
@@ -197,7 +196,7 @@ def main() -> None:
     ccs_dataset = filtered_dataset
     filtered_count = len(ccs_dataset)
     logging.info(
-        f"Filtered out {original_count - filtered_count} commits from SHA backup"
+        f"Filtered out {original_count - filtered_count} commits already in existing samples"
     )
 
     # Group commits by normalized type
@@ -218,16 +217,6 @@ def main() -> None:
 
     # Extract diff files by type
     extract_diffs(all_sampled_data, DIFF_OUTPUT_DIR)
-
-    # Append new SHAs to backup
-    new_shas = [
-        {"sha": record["sha"]} for record in all_sampled_data if record.get("sha")
-    ]
-    if new_shas:
-        with SHA_BACKUP_PATH.open("a", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=["sha"])
-            writer.writerows(new_shas)
-        logging.info(f"Appended {len(new_shas)} new SHAs to backup")
 
     # Print summary
     type_counts = {}

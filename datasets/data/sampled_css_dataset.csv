@@ -11601,97 +11601,6 @@ index ce5d936..3f54136 100755
  readonly DAGGER_BINARY=""${DAGGER_BINARY:-$d/../cmd/dagger/dagger}""
  # The default arguments are a no-op, but having ""anything"" is a little cheat necessary for ""${DAGGER_BINARY_ARGS[@]}"" to not be empty down there
 ",87d576e936e234d0429ad753267a2760c5dfd314
-cicd,"lint using dagger
-
-Signed-off-by: Andrea Luzzardi <aluzzardi@gmail.com>","diff --git a/.github/workflows/lint.yml b/.github/workflows/lint.yml
-index 16aa393..bdb0d6f 100644
---- a/.github/workflows/lint.yml
-+++ b/.github/workflows/lint.yml
-@@ -3,9 +3,9 @@ on:
-   push:
-     branches: [main]
-     paths:
--      - '**.go'
--      - '**.md'
--      - '.github/workflows/lint.yml'
-+      - ""**.go""
-+      - ""**.md""
-+      - "".github/workflows/lint.yml""
-   pull_request:
-   # Enable manual trigger for easy ad-hoc debugging
-   # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#onworkflow_dispatchinputs
-@@ -42,8 +42,11 @@ jobs:
-     runs-on: ubuntu-latest
-     steps:
-       - uses: actions/checkout@v3
-+      - uses: actions/setup-go@v3
-+        with:
-+          go-version: 1.19
-       - name: ""Lint markdown""
--        uses: avto-dev/markdown-lint@v1
-+        uses: magefile/mage-action@v2
-         with:
--          config: "".markdownlint.yaml""
--          args: ./docs README.md
-+          version: latest
-+          args: lint:markdown
-diff --git a/magefile.go b/magefile.go
-index 4ac385b..f5dec4c 100644
---- a/magefile.go
-+++ b/magefile.go
-@@ -20,10 +20,50 @@ type Lint mg.Namespace
- 
- // Run all lint targets
- func (t Lint) All(ctx context.Context) error {
--	mg.Deps(t.Codegen)
-+	mg.Deps(
-+		t.Codegen,
-+		t.Markdown,
-+	)
- 	return nil
- }
- 
-+// Markdown lint
-+func (Lint) Markdown(ctx context.Context) error {
-+	c, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stderr))
-+	if err != nil {
-+		return err
-+	}
-+	defer c.Close()
-+
-+	workdir := c.Host().Workdir().Read()
-+
-+	src, err := workdir.ID(ctx)
-+	if err != nil {
-+		return err
-+	}
-+
-+	cfg, err := workdir.File("".markdownlint.yaml"").ID(ctx)
-+	if err != nil {
-+		return err
-+	}
-+
-+	_, err = c.Container().
-+		From(""tmknom/markdownlint:0.31.1"").
-+		WithMountedDirectory(""/src"", src).
-+		WithMountedFile(""/src/.markdownlint.yaml"", cfg).
-+		WithWorkdir(""/src"").
-+		Exec(dagger.ContainerExecOpts{
-+			Args: []string{
-+				""-c"",
-+				"".markdownlint.yaml"",
-+				""--"",
-+				""./docs"",
-+				""README.md"",
-+			},
-+		}).ExitCode(ctx)
-+	return err
-+}
-+
- // Lint SDK code generation
- func (Lint) Codegen(ctx context.Context) error {
- 	c, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stderr))
-",bb00890fa896936d0be09cc5e5f411fb5e64aa5f
 cicd,exclude github.io from link checking to avoid rate limiting,"diff --git a/.github/workflows/ibis-docs-lint.yml b/.github/workflows/ibis-docs-lint.yml
 index 90c5a27..db6457b 100644
 --- a/.github/workflows/ibis-docs-lint.yml
@@ -33592,3 +33501,17 @@ index 7e9d06c..cbc5775 100644
  }
  
 ",fd8e563cc19ca4684885d4692acee6bebcca4ada
+cicd,e2e,"diff --git a/.github/workflows/kibbeh-e2e_tests.yaml b/.github/workflows/kibbeh-e2e_tests.yaml
+index 52bf3ed..74fe785 100644
+--- a/.github/workflows/kibbeh-e2e_tests.yaml
++++ b/.github/workflows/kibbeh-e2e_tests.yaml
+@@ -4,7 +4,7 @@ on:
+     branches:
+       - staging
+     paths:
+-      - '.github/workflows/end-to-end-tests.yaml'
++      - '.github/workflows/kibbeh-e2e_tests.yaml'
+       - 'kousa/lib/**'
+       - 'kibbeh/src/**'
+   pull_request:
+",02f9e79a755a1dd95e661c674d6966837f378442
