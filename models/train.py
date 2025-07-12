@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 import logging
 from typing import Dict, Any
@@ -68,8 +69,8 @@ Label selection must assign exactly one concern from the following unified set:
 - refactor: Restructures existing code without changing external behavior (e.g., improves readability, simplifies complexity, removes unused code).
 - docs: Modifies documentation or text (e.g., fixes typos, updates comments or docs).
 - test: Modifies test files (e.g., adds or updates tests).
-- cicd: Updates CI (Continuous Integration) configuration files or scripts (e.g., `.travis.yml`, `.github/workflows`).
-- build: Affects the build system (e.g., updates dependencies, changes build configs or scripts).# Example
+- cicd: Updates CI (Continuous Integration) configuration files or scripts (e.g., .travis.yml, .github/workflows).
+- build: Affects the build system (e.g., updates dependencies, changes build configs or scripts).
 """
 
 # Training constants

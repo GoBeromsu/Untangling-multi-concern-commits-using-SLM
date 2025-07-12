@@ -23,16 +23,13 @@ echo "GPU: $CUDA_VISIBLE_DEVICES"
 # Create logs directory
 mkdir -p logs
 
-# Load required HPC modules (latest versions for optimal bf16 support)
+# Load required HPC modules (HPC standard versions)
 module load GCC/13.2.0
 module load CUDA/12.4.0  
 module load cuDNN/9.0.0.312-CUDA-12.4.0
-module load Anaconda3/2023.09  
+module load Anaconda3/2022.05
 
-# Initialize conda for bash shell (HPC requirement)
-eval "$(conda shell.bash hook)"
-
-# Setup conda environment using environment.yml (pure conda approach)
+# Setup conda environment using environment.yml (HPC standard approach)
 if conda env list | grep -q "phi4_env"; then
     echo "🗑️ Removing existing phi4_env..."
     conda remove -n phi4_env --all -y
@@ -40,7 +37,7 @@ fi
 
 echo "🏗️ Creating conda environment from environment.yml..."
 conda env create -f models/environment.yml
-conda activate phi4_env
+source activate phi4_env
 
 echo "📦 All dependencies installed via conda environment.yml"
 
@@ -72,4 +69,4 @@ echo "To view GPU stats: head -5 gpu_stats_${SLURM_JOB_ID}.log"
 echo "For efficiency report: seff ${SLURM_JOB_ID}"
 
 # Clean up conda environment
-conda deactivate
+source deactivate
