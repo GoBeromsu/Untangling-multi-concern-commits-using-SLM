@@ -5,8 +5,8 @@ __pycache__/
 .DS_Store
 
 # Project specific
-models/
-datasets/codefuse-hqcm/
+models/llama.cpp
+
 
 # C extensions
 *.so
