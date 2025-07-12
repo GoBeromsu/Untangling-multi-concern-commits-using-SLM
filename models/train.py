@@ -58,8 +58,8 @@ Label selection must assign exactly one concern from the following unified set:
 # Instructions
 1. Review the code unit and determine the most appropriate label from the unified set.
 2. If multiple labels seem possible, resolve the overlap by applying the following rule:
-     - **Purpose + Purpose**: Choose the label that best reflects *why* the change was made — `fix` if resolving a bug, `feat` if adding new capability, `refactor` if improving structure without changing behavior.
-     - **Object + Object**: Choose the label that reflects the *functional role* of the artifact being modified — e.g., even if changing build logic, editing a CI script should be labeled as `cicd`.
+     - **Purpose + Purpose**: Choose the label that best reflects *why* the change was made - `fix` if resolving a bug, `feat` if adding new capability, `refactor` if improving structure without changing behavior.
+     - **Object + Object**: Choose the label that reflects the *functional role* of the artifact being modified - e.g., even if changing build logic, editing a CI script should be labeled as `cicd`.
      - **Purpose + Object**: If the change is driven by code behavior (e.g., fixing test logic), assign a purpose label; if it is entirely scoped to a support artifact (e.g., adding new tests), assign an object label.
 
 # Labels
