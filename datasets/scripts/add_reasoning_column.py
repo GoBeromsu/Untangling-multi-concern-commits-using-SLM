@@ -20,8 +20,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuration constants
-DATASET_FILE_PATH: Path = Path("data/tangled_css_dataset.csv")
-OUTPUT_FILE_PATH: Path = Path("data/tangled_css_dataset_with_reasoning.csv")
+DATASET_FILE_PATH: Path = Path("data/tangled_css_dataset_train.csv")
+OUTPUT_FILE_PATH: Path = Path("data/tangled_css_dataset_train_with_reasoning.csv")
 OPENAI_MODEL: str = "gpt-4.1-2025-04-14"
 REASONING_TEMPERATURE: float = 0.7
 REQUEST_DELAY_SECONDS: float = 0.5
@@ -51,20 +51,13 @@ REASONING_STRUCTURED_OUTPUT_FORMAT: Dict[str, Any] = {
 }
 
 # System prompt for reasoning generation
-SYSTEM_PROMPT: str = """You are a software engineer classifying individual code units extracted from a tangled commit.
+SYSTEM_PROMPT: str = """You are a software engineer analyzing individual code units extracted from a tangled commit.
 Each change unit (e.g., function, method, class, or code block) represents a reviewable atomic change, and must be assigned exactly one label.
 
 Label selection must assign exactly one concern from the following unified set:
 - Purpose labels: the motivation behind making a code change (feat, fix, refactor)
 - Object labels: the essence of the code changes that have been made (docs, test, cicd, build)
   - Use an object label only when the code unit is fully dedicated to that artifact category (e.g., writing test logic, modifying documentation).
-
-# Instructions
-1. Review the code unit and determine the most appropriate label from the unified set.
-2. If multiple labels seem possible, resolve the overlap by applying the following rule:
-   - **Purpose + Purpose**: Choose the label that best reflects *why* the change was made — `fix` if resolving a bug, `feat` if adding new capability, `refactor` if improving structure without changing behavior.
-   - **Object + Object**: Choose the label that reflects the *functional role* of the artifact being modified — e.g., even if changing build logic, editing a CI script should be labeled as `cicd`.
-   - **Purpose + Object**: If the change is driven by code behavior (e.g., fixing test logic), assign a purpose label; if it is entirely scoped to a support artifact (e.g., adding new tests), assign an object label.
 
 # Labels
 - feat: Introduces new features to the codebase.
@@ -75,7 +68,24 @@ Label selection must assign exactly one concern from the following unified set:
 - cicd: Updates CI (Continuous Integration) configuration files or scripts (e.g., `.travis.yml`, `.github/workflows`).
 - build: Affects the build system (e.g., updates dependencies, changes build configs or scripts).
 
-Based on the provided commit message, diff, and assigned types, generate a detailed reasoning that explains how you would apply the above instructions to classify each code unit in this tangled commit. Focus on describing the classification process and decision-making steps."""
+# 2-Step Justification Instructions
+For each assigned type, provide justification following this exact 2-step process:
+
+**Step 1: Code Change Analysis**
+- Analyze the specific code changes in the diff
+- Identify what files, functions, or components are being modified
+- Determine the scope and nature of the changes
+- Consider the context provided by the commit message
+
+**Step 2: Label Classification Justification**
+- Apply the classification rules to determine the appropriate label
+- Explain why this specific label was chosen over alternatives
+- Address any potential conflicts between Purpose and Object labels using these rules:
+  - **Purpose + Purpose**: Choose the label that best reflects *why* the change was made — `fix` if resolving a bug, `feat` if adding new capability, `refactor` if improving structure without changing behavior.
+  - **Object + Object**: Choose the label that reflects the *functional role* of the artifact being modified — e.g., even if changing build logic, editing a CI script should be labeled as `cicd`.
+  - **Purpose + Object**: If the change is driven by code behavior (e.g., fixing test logic), assign a purpose label; if it is entirely scoped to a support artifact (e.g., adding new tests), assign an object label.
+
+Generate detailed reasoning that follows this 2-step process to justify why each assigned type is correct for the corresponding code unit in this tangled commit in 3 lines for each step"""
 
 
 def load_dataset_from_path(file_path: Path) -> pd.DataFrame:
@@ -160,9 +170,9 @@ def generate_reasoning_with_openai(
 
 
 def add_reasoning_column_to_dataset(
-    df: pd.DataFrame, client: openai.OpenAI
+    df: pd.DataFrame, client: openai.OpenAI, output_path: Path
 ) -> pd.DataFrame:
-    """Add reasoning column to dataset using OpenAI API with sequential index assignment."""
+    """Add reasoning column to dataset using OpenAI API with real-time saving."""
     total_rows = len(df)
 
     # Initialize reason column with empty values
@@ -186,6 +196,10 @@ def add_reasoning_column_to_dataset(
 
         # Log assignment confirmation
         logging.info(f"Assigned reasoning to index {idx}: {reasoning[:50]}...")
+
+        # Save progress immediately after each row
+        save_dataset_to_path(df, output_path)
+        logging.info(f"Saved progress after row {idx + 1}")
 
         # Rate limiting delay
         time.sleep(REQUEST_DELAY_SECONDS)
@@ -258,10 +272,10 @@ def process_reasoning_generation(
     # Authenticate OpenAI client
     client = authenticate_openai_client()
 
-    # Generate reasoning
-    df_with_reasoning = add_reasoning_column_to_dataset(df, client)
+    # Generate reasoning with real-time saving
+    df_with_reasoning = add_reasoning_column_to_dataset(df, client, output_file_path)
 
-    # Save results
+    # Final save (already saved during processing, but ensure final state)
     save_dataset_to_path(df_with_reasoning, output_file_path)
 
 

@@ -22,15 +22,15 @@ DATA_PATH = DATASETS_PATH / "data"
 SCRIPTS_PATH = DATASETS_PATH / "scripts"
 
 REQUIRED_FILES = [
-    DATA_PATH / "sampled_css_dataset.csv",
-    DATA_PATH / "tangled_css_dataset.csv",
+    DATA_PATH / "tangled_css_dataset_train.csv",
+    DATA_PATH / "tangled_css_dataset_test.csv",
 ]
 
 UPLOAD_FILES = [
     ("README.md", DATASETS_PATH / "README.md"),
     ("dataset_info.yaml", DATASETS_PATH / "dataset_info.yaml"),
-    ("data/sampled_css_dataset.csv", DATA_PATH / "sampled_css_dataset.csv"),
-    ("data/tangled_css_dataset.csv", DATA_PATH / "tangled_css_dataset.csv"),
+    ("data/tangled_css_dataset_train.csv", DATA_PATH / "tangled_css_dataset_train.csv"),
+    ("data/tangled_css_dataset_test.csv", DATA_PATH / "tangled_css_dataset_test.csv"),
     ("data/excluded_commits.csv", DATA_PATH / "excluded_commits.csv"),
     ("scripts/clean_ccs_dataset.py", SCRIPTS_PATH / "clean_ccs_dataset.py"),
     (
@@ -126,13 +126,13 @@ def verify_upload(repo_id: str) -> None:
     print("\nVerifying dataset upload...")
 
     try:
-        sampled_dataset = load_dataset(repo_id, "sampled", split="train")
-        print(f"✓ Sampled dataset loaded: {len(sampled_dataset)} samples")
-        print(f"  Columns: {sampled_dataset.column_names}")
+        train_dataset = load_dataset(repo_id, "train", split="train")
+        print(f"✓ Train dataset loaded: {len(train_dataset)} samples")
+        print(f"  Columns: {train_dataset.column_names}")
 
-        tangled_dataset = load_dataset(repo_id, "tangled", split="train")
-        print(f"✓ Tangled dataset loaded: {len(tangled_dataset)} samples")
-        print(f"  Columns: {tangled_dataset.column_names}")
+        test_dataset = load_dataset(repo_id, "test", split="train")
+        print(f"✓ Test dataset loaded: {len(test_dataset)} samples")
+        print(f"  Columns: {test_dataset.column_names}")
 
         print("\n✓ Dataset upload verification successful!")
 

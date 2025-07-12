@@ -1,20 +1,22 @@
 configs:
-  - config_name: sampled
+  - config_name: train
     data_files:
-      - data/sampled_css_dataset.csv
+      - data/tangled_css_dataset_train.csv
     features:
-      - name: annotated_type
+      - name: description
         dtype: string
-      - name: masked_commit_message
+      - name: diff
         dtype: string
-      - name: git_diff
+      - name: concern_count
+        dtype: int32
+      - name: shas
         dtype: string
-      - name: sha
+      - name: types
         dtype: string
 
-  - config_name: tangled
+  - config_name: test
     data_files:
-      - data/tangled_css_dataset.csv
+      - data/tangled_css_dataset_test.csv
     features:
       - name: description
         dtype: string
