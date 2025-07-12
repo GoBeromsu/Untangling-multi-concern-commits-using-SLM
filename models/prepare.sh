@@ -62,8 +62,8 @@ export CUDA_VISIBLE_DEVICES=0
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 export TOKENIZERS_PARALLELISM=false
 
-# Monitor GPU usage in background
-nvidia-smi --query-gpu=index,timestamp,utilization.gpu,memory.total,memory.used,memory.free,temperature.gpu --format=csv -l 30 > logs/gpu_usage_${SLURM_JOB_ID}.log &
+# Monitor GPU usage in background (HPC recommended)
+nvidia-smi --query-gpu=index,timestamp,utilization.gpu,memory.total,memory.used,memory.free --format=csv -l 2 > gpu_stats_${SLURM_JOB_ID}.log &
 GPU_MONITOR_PID=$!
 
 # Run training
@@ -74,11 +74,14 @@ python models/train.py
 kill $GPU_MONITOR_PID 2>/dev/null || true
 
 echo "Training completed at $(date)"
-echo "Check logs/gpu_usage_${SLURM_JOB_ID}.log for GPU utilization"
+echo "Check gpu_stats_${SLURM_JOB_ID}.log for GPU utilization"
 
-# Resource usage summary
+# Resource usage summary (HPC recommended)
 echo "📊 Resource Usage Summary:"
 sacct -j $SLURM_JOB_ID --format=JobID,JobName,MaxRSS,MaxVMSize,Elapsed,State
+echo "📈 GPU Utilization Summary:"
+echo "To view GPU stats: head -5 gpu_stats_${SLURM_JOB_ID}.log"
+echo "For efficiency report: seff ${SLURM_JOB_ID}"
 
 # Clean up
 deactivate
