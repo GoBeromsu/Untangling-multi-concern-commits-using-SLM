@@ -14,10 +14,10 @@ ENCODING_MODEL = "cl100k_base"  # GPT-4 encoding
 OUTPUT_COLUMNS = ["annotated_type", "masked_commit_message", "git_diff", "sha"]
 
 # Path constants
-CCS_SOURCE_PATH = Path("ccs/CCS Dataset Training Data.csv")
-SHA_BACKUP_PATH = Path("ccs/processed_shas.csv")
-SAMPLED_CSV_PATH = Path("ccs/sampled_css_dataset.csv")
-DIFF_OUTPUT_DIR = Path("ccs/types")
+CCS_SOURCE_PATH = Path("../data/CCS Dataset Training Data.csv")
+SHA_BACKUP_PATH = Path("../data/processed_shas.csv")
+SAMPLED_CSV_PATH = Path("../data/sampled_css_dataset.csv")
+DIFF_OUTPUT_DIR = Path("../data/types")
 
 
 def load_sha_backup(file_path: Path) -> Set[str]:

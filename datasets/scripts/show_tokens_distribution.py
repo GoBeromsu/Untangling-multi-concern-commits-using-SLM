@@ -337,7 +337,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--csv-file",
-        default="data/tangled_css_dataset.csv",
+        default="../data/tangled_css_dataset.csv",
         help="Path to CSV file to analyze",
     )
     parser.add_argument(
@@ -348,7 +348,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output",
-        default="tangled_css_token_distribution_analysis.md",
+        default="../tangled_css_token_distribution_analysis.md",
         help="Output markdown file name",
     )
 
