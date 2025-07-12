@@ -147,7 +147,7 @@ logger.info(f"PEFT parameters {peft_conf}")
 ################
 # Model Loading
 ################
-checkpoint_path = "microsoft/Phi-4-mini-instruct"
+checkpoint_path = "microsoft/phi-4"
 model_kwargs = dict(
     use_cache=False,
     trust_remote_code=True,
