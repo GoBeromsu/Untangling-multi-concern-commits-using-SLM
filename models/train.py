@@ -150,7 +150,7 @@ checkpoint_path = "microsoft/phi-4"
 model_kwargs = dict(
     use_cache=False,
     trust_remote_code=True,
-    attn_implementation="flash_attention_2",  # A100 optimized flash attention
+    attn_implementation="sdpa",  # PyTorch native Scaled Dot Product Attention
     torch_dtype=torch.bfloat16,
     device_map=None,
 )
@@ -194,13 +194,13 @@ def apply_chat_template(example, tokenizer) -> Dict[str, Any]:
 
 
 train_dataset = load_dataset(
-    "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models", 
-    split="train"
+    "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models",
+    split="train",
 )
 
 test_dataset = load_dataset(
     "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models",
-    split="test" 
+    split="test",
 )
 
 column_names = list(train_dataset.features)
