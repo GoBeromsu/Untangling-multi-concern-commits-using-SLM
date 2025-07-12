@@ -1,0 +1,30 @@
+name: phi4_env
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - huggingface
+dependencies:
+  - python=3.10
+
+  # Core scientific computing
+  - numpy<2.0
+  - scipy
+  - pandas
+
+    # PyTorch with CUDA support - bf16 minimum requirements
+  - pytorch>=2.0
+  - torchvision
+  - torchaudio
+  - pytorch-cuda=12.4
+
+  # Hugging Face ecosystem - bf16 minimum requirements
+  - transformers>=4.36.0
+  - accelerate>=1.0.0
+  - datasets>=2.0.0
+
+  # LoRA fine-tuning - bf16 minimum requirements
+  - pip
+  - pip:
+      - peft>=0.4.0
+      - trl>=0.7.0
