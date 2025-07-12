@@ -1,20 +1,22 @@
 #!/bin/bash
 #SBATCH --job-name=phi4_commit_sft
-#SBATCH --time=12:00:00
+#SBATCH --time=48:00:00
 #SBATCH --partition=gpu
 #SBATCH --qos=gpu
 #SBATCH --gres=gpu:a100:1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=82G
+#SBATCH --cpus-per-task=16 
+#SBATCH --mem=128G
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --output=logs/phi4_training_%j.out
 #SBATCH --error=logs/phi4_training_%j.err
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=bkoh3@sheffield.ac.uk
 
 # Sheffield HPC Stanage - A100 GPU Training
 # Multi-Concern Commit Classification with Phi-4
 
-echo "Starting Phi-4 training job: $SLURM_JOB_ID"
+echo "Starting Phi-4 LoRA fine-tuning job: $SLURM_JOB_ID"
 echo "Node: $SLURM_NODELIST"
 echo "GPU: $CUDA_VISIBLE_DEVICES"
 
@@ -44,9 +46,16 @@ pip install accelerate==1.3.0
 pip install bitsandbytes
 pip install flash-attn --no-build-isolation
 
-# Verify GPU availability
-echo "Checking GPU availability..."
-python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'GPU count: {torch.cuda.device_count()}'); print(f'GPU name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"No GPU\"}')"
+# Verify GPU setup
+echo "🔍 Checking GPU availability..."
+python -c "
+import torch
+print(f'CUDA available: {torch.cuda.is_available()}')
+print(f'GPU count: {torch.cuda.device_count()}')
+if torch.cuda.is_available():
+    print(f'GPU 0: {torch.cuda.get_device_name(0)}')
+    print(f'  Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB')
+"
 
 # Set environment variables for optimization
 export CUDA_VISIBLE_DEVICES=0
@@ -58,14 +67,18 @@ nvidia-smi --query-gpu=index,timestamp,utilization.gpu,memory.total,memory.used,
 GPU_MONITOR_PID=$!
 
 # Run training
-echo "Starting training at $(date)"
+echo "🔥 Starting LoRA fine-tuning at $(date)"
 python models/train.py
 
-# Stop GPU monitoring
+# Stop monitoring
 kill $GPU_MONITOR_PID 2>/dev/null || true
 
 echo "Training completed at $(date)"
 echo "Check logs/gpu_usage_${SLURM_JOB_ID}.log for GPU utilization"
+
+# Resource usage summary
+echo "📊 Resource Usage Summary:"
+sacct -j $SLURM_JOB_ID --format=JobID,JobName,MaxRSS,MaxVMSize,Elapsed,State
 
 # Clean up
 deactivate
