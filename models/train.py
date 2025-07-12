@@ -171,14 +171,16 @@ tokenizer.padding_side = "right"
 def apply_chat_template(example, tokenizer) -> Dict[str, Any]:
     """Apply chat template for multi-concern commit classification."""
     # Create structured prompt for commit analysis
-    user_content = f"""Analyze this commit for multiple concerns:
-
-Commit Message: {example['description']}
-Types: {example['types']}
-
-Provide reasoning for the classification:"""
-
-    assistant_content = example["reason"]
+    user_content = f"""# Commit Message
+{example['description']}
+# Diff
+{example['diff']}
+"""
+    assistant_content = f"""# Reasoning
+{example['reason']}
+# Result types
+{example['types']}
+"""
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -192,20 +194,15 @@ Provide reasoning for the classification:"""
     return example
 
 
-def load_commit_dataset(repo_name: str, split: str = "train"):
-    """Load multi-concern commit dataset from HuggingFace."""
-    return load_dataset(repo_name, split=split)
-
-
-# Load dataset
-train_dataset = load_commit_dataset(
-    "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models", "train"
+train_dataset = load_dataset(
+    "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models", 
+    split="train"
 )
 
-# For evaluation, we can use a portion of training data or create a validation split
-eval_dataset = train_dataset.train_test_split(test_size=0.1, seed=42)
-train_dataset = eval_dataset["train"]
-test_dataset = eval_dataset["test"]
+test_dataset = load_dataset(
+    "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models",
+    split="test" 
+)
 
 column_names = list(train_dataset.features)
 
@@ -217,13 +214,13 @@ processed_train_dataset = train_dataset.map(
     desc="Applying chat template to multi-concern commit train data",
 )
 
-processed_test_dataset = test_dataset.map(
-    apply_chat_template,
-    fn_kwargs={"tokenizer": tokenizer},
-    num_proc=NUM_WORKERS,
-    remove_columns=column_names,
-    desc="Applying chat template to multi-concern commit test data",
-)
+# processed_test_dataset = test_dataset.map(
+#     apply_chat_template,
+#     fn_kwargs={"tokenizer": tokenizer},
+#     num_proc=NUM_WORKERS,
+#     remove_columns=column_names,
+#     desc="Applying chat template to multi-concern commit test data",
+# )
 
 ###########
 # Training
@@ -233,7 +230,7 @@ trainer = SFTTrainer(
     args=train_conf,
     peft_config=peft_conf,
     train_dataset=processed_train_dataset,
-    eval_dataset=processed_test_dataset,
+    # eval_dataset=processed_test_dataset,
     max_seq_length=MAX_SEQ_LENGTH,
     dataset_text_field="text",
     tokenizer=tokenizer,
@@ -249,11 +246,11 @@ trainer.save_state()
 #############
 # Evaluation
 #############
-tokenizer.padding_side = "left"
-metrics = trainer.evaluate()
-metrics["eval_samples"] = len(processed_test_dataset)
-trainer.log_metrics("eval", metrics)
-trainer.save_metrics("eval", metrics)
+# tokenizer.padding_side = "left"
+# metrics = trainer.evaluate()
+# metrics["eval_samples"] = len(processed_test_dataset)
+# trainer.log_metrics("eval", metrics)
+# trainer.save_metrics("eval", metrics)
 
 ############
 # Save model
