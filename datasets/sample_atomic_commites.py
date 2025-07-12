@@ -54,9 +54,8 @@ def load_ccs_dataset(file_path: Path) -> List[Dict[str, Any]]:
         token_filtered_count = 0
 
         for item in data:
-            combined_text = " ".join(
-                [str(item.get(col, "")) for col in OUTPUT_COLUMNS if item.get(col)]
-            )
+            # Only combine diff and commit message for token counting
+            combined_text = f"{str(item.get('git_diff', ''))} {str(item.get('masked_commit_message', ''))}"
             token_count = len(encoding.encode(combined_text))
 
             if token_count <= TARGET_TOKEN_LIMIT:
