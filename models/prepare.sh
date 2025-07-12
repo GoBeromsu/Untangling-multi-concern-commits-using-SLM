@@ -26,7 +26,8 @@ mkdir -p logs
 # Load required modules (HPC recommended versions)
 module load GCC/12.3.0
 module load CUDA/12.4.0
-module load Miniconda3/24.1.2-0  # HPC recommends conda for PyTorch
+module load cuDNN/8.9.2.26-CUDA-12.1.1  # HPC requirement for GPU PyTorch
+module load Anaconda3/2022.05  # HPC recommended stable version  
 
 # Setup conda environment (HPC best practice for PyTorch)
 if conda env list | grep -q "phi4_env"; then
@@ -36,28 +37,28 @@ fi
 
 echo "🏗️ Creating conda environment..."
 conda create -n phi4_env python=3.11 -y
-conda activate phi4_env
+source activate phi4_env  # HPC requires 'source activate' instead of 'conda activate'
 
 # Upgrade pip
 pip install --upgrade pip
 
-# Install dependencies (HPC conda-first approach for better glibc compatibility)
+# Install dependencies (HPC Stanage conda-first approach)
 echo "Installing dependencies..."
 
-# Install core packages via conda (HPC recommended for PyTorch)
+# Install core ML packages via conda (HPC strongly recommended)
 echo "📦 Installing conda packages..."
-conda install -c conda-forge numpy=1.24.4 -y  # Compatible NumPy version
-conda install -c pytorch -c nvidia pytorch=2.1.0 torchvision torchaudio pytorch-cuda=12.1 -y
+conda install -c conda-forge numpy=1.24.4 -y  # NumPy 1.x compatibility
+conda install -c pytorch -c nvidia pytorch=2.1.0 torchvision torchaudio pytorch-cuda=12.1 -y  # Official PyTorch
+conda install -c conda-forge scipy pandas -y  # Scientific computing
+conda install -c conda-forge accelerate -y  # Available in conda-forge
 
-# Install HuggingFace ecosystem via pip (not available in conda)
+# Install specialized ML packages via pip (not in conda)
 echo "📦 Installing pip packages..."
-pip install wheel  # Install wheel first
+pip install wheel setuptools  # Essential build tools
 pip install transformers==4.48.1
-pip install datasets
+pip install datasets  
 pip install peft==0.14.0
-pip install accelerate>=1.4.0  # TRL requirement fix
-pip install trl
-pip install bitsandbytes
+pip install trl  # Not available in conda
 
 # Note: flash-attn removed due to glibc compatibility - using PyTorch SDPA fallback
 
@@ -98,5 +99,5 @@ echo "📈 GPU Utilization Summary:"
 echo "To view GPU stats: head -5 gpu_stats_${SLURM_JOB_ID}.log"
 echo "For efficiency report: seff ${SLURM_JOB_ID}"
 
-# Clean up
-conda deactivate
+# Clean up  
+source deactivate  # HPC conda deactivation
