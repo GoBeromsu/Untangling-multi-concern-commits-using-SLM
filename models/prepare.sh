@@ -23,28 +23,43 @@ echo "GPU: $CUDA_VISIBLE_DEVICES"
 # Create logs directory
 mkdir -p logs
 
-# Load required modules
+# Load required modules (HPC recommended versions)
 module load GCC/12.3.0
 module load CUDA/12.4.0
-module load Python/3.11.3-GCCcore-12.3.0
+module load Miniconda3/24.1.2-0  # HPC recommends conda for PyTorch
 
-# Setup Python environment
-python -m venv phi4_env
-source phi4_env/bin/activate
+# Setup conda environment (HPC best practice for PyTorch)
+if conda env list | grep -q "phi4_env"; then
+    echo "🗑️ Removing existing phi4_env..."
+    conda remove -n phi4_env --all -y
+fi
+
+echo "🏗️ Creating conda environment..."
+conda create -n phi4_env python=3.11 -y
+conda activate phi4_env
 
 # Upgrade pip
 pip install --upgrade pip
 
-# Install dependencies
+# Install dependencies (HPC conda-first approach for better glibc compatibility)
 echo "Installing dependencies..."
-pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu121
+
+# Install core packages via conda (HPC recommended for PyTorch)
+echo "📦 Installing conda packages..."
+conda install -c conda-forge numpy=1.24.4 -y  # Compatible NumPy version
+conda install -c pytorch -c nvidia pytorch=2.1.0 torchvision torchaudio pytorch-cuda=12.1 -y
+
+# Install HuggingFace ecosystem via pip (not available in conda)
+echo "📦 Installing pip packages..."
+pip install wheel  # Install wheel first
 pip install transformers==4.48.1
 pip install datasets
 pip install peft==0.14.0
+pip install accelerate>=1.4.0  # TRL requirement fix
 pip install trl
-pip install accelerate==1.3.0
 pip install bitsandbytes
-pip install flash-attn --no-build-isolation
+
+# Note: flash-attn removed due to glibc compatibility - using PyTorch SDPA fallback
 
 # Verify GPU setup
 echo "🔍 Checking GPU availability..."
@@ -84,4 +99,4 @@ echo "To view GPU stats: head -5 gpu_stats_${SLURM_JOB_ID}.log"
 echo "For efficiency report: seff ${SLURM_JOB_ID}"
 
 # Clean up
-deactivate
+conda deactivate
