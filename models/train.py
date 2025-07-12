@@ -76,7 +76,7 @@ Label selection must assign exactly one concern from the following unified set:
 # Training constants
 DEFAULT_BATCH_SIZE: int = 4
 NUM_WORKERS: int = 4
-MAX_SEQ_LENGTH: int = 2048
+MAX_SEQ_LENGTH: int = 16_384
 LORA_RANK: int = 16
 LORA_ALPHA: int = 32
 LEARNING_RATE: float = 5.0e-06
