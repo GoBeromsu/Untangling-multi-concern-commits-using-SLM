@@ -23,10 +23,8 @@ echo "GPU: $CUDA_VISIBLE_DEVICES"
 # Create logs directory
 mkdir -p logs
 
-# Load required HPC modules (HPC standard versions)
-module load GCC/13.2.0
+# Load required HPC modules (minimal setup)
 module load CUDA/12.4.0  
-module load cuDNN/9.0.0.312-CUDA-12.4.0
 module load Anaconda3/2022.05
 
 # Setup conda environment using environment.yml (HPC standard approach)
