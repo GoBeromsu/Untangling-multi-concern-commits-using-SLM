@@ -1,14 +1,10 @@
-"""
-RQ1: Context Ablation Study
-Studies the impact of commit message context on model performance.
-"""
+"""RQ1: Context Ablation Study - Studies the impact of commit message context on model performance."""
 
 import yaml
 import sys
 import pandas as pd
 from pathlib import Path
 
-# Add utils to path
 sys.path.append(str(Path(__file__).parent.parent))
 from utils import (
     load_dataset,
@@ -22,41 +18,29 @@ from utils import (
 
 
 def main():
-    # Load configuration
     with open("config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
     print(f"Running {config['experiment_name']}")
 
-    # Load dataset
-    print("Loading dataset...")
     df = load_dataset(config["dataset_name"], config["dataset_split"])
-
     results = []
 
-    # Process each model
     for model_name in config["models"]:
         print(f"Processing model: {model_name}")
         print(f"Include message: {config['include_message']}")
 
-        # Load model
         model_info = load_model_and_tokenizer(model_name)
-
         model_results = []
 
-        # Process each sample
         for idx, sample in df.iterrows():
-            # Create prompt without message context
             prompt = create_prompt(
                 sample.to_dict(),
                 config["prompt_template"],
                 with_message=config["include_message"],
             )
 
-            # Get prediction
             prediction, latency = get_prediction(model_info, prompt)
-
-            # Parse output
             predicted_concerns = parse_model_output(prediction)
             ground_truth_concerns = set(sample.get("concerns", []))
 
@@ -76,7 +60,6 @@ def main():
 
         results.extend(model_results)
 
-    # Create results DataFrame
     results_df = pd.DataFrame(results)
 
     # Calculate metrics for each model
@@ -91,7 +74,6 @@ def main():
             f"Recall: {metrics['recall']:.3f}"
         )
 
-    # Save results
     save_results(results_df, all_metrics, config["output_dir"])
     print(f"Results saved to {config['output_dir']}")
 

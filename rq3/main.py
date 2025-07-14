@@ -1,14 +1,10 @@
-"""
-RQ3: Latency vs. Context Length
-Analyzes the relationship between context length and model inference latency.
-"""
+"""RQ3: Latency vs. Context Length - Analyzes the relationship between context length and model inference latency."""
 
 import yaml
 import sys
 import pandas as pd
 from pathlib import Path
 
-# Add utils to path
 sys.path.append(str(Path(__file__).parent.parent))
 from utils import (
     load_dataset,
@@ -23,7 +19,6 @@ from utils import (
 
 
 def main():
-    # Load configuration
     with open("config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
@@ -32,41 +27,32 @@ def main():
     results = []
     latency_data = []
 
-    # Process each context length
     for context_length in config["context_lengths"]:
         print(f"\nProcessing context length: {context_length}")
 
-        # Load dataset with specific context length configuration
         df = load_dataset(
             config["dataset_name"],
             config["dataset_split"],
-            config_name=str(context_length),  # Use context length as config name
+            config_name=str(context_length),
         )
 
-        # Process each model
         for model_name in config["models"]:
             print(f"Processing model: {model_name}")
 
-            # Load model
             model_info = load_model_and_tokenizer(model_name)
-
             model_results = []
             latencies = []
 
-            # Process each sample
             for idx, sample in df.iterrows():
-                # Create prompt
                 prompt = create_prompt(
                     sample.to_dict(),
                     config["prompt_template"],
                     with_message=config["include_message"],
                 )
 
-                # Get prediction with latency measurement
                 prediction, latency = get_prediction(model_info, prompt)
                 latencies.append(latency)
 
-                # Parse output
                 predicted_concerns = parse_model_output(prediction)
                 ground_truth_concerns = set(sample.get("concerns", []))
 
@@ -90,7 +76,6 @@ def main():
             min_latency = min(latencies)
             max_latency = max(latencies)
 
-            # Store latency data for plotting
             latency_data.append(
                 {
                     "context_length": context_length,
@@ -108,7 +93,6 @@ def main():
 
             results.extend(model_results)
 
-    # Create results DataFrame
     results_df = pd.DataFrame(results)
     latency_df = pd.DataFrame(latency_data)
 
@@ -123,10 +107,8 @@ def main():
             "max_latency": length_df["latency"].max(),
         }
 
-    # Save results
     save_results(results_df, latency_metrics, config["output_dir"])
 
-    # Create latency vs length plot
     plot_graph(
         latency_df,
         "context_length",

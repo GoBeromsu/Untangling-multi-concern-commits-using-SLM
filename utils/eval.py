@@ -1,6 +1,4 @@
-"""
-Evaluation utilities for parsing outputs and calculating metrics.
-"""
+"""Evaluation utilities for parsing outputs and calculating metrics."""
 
 from typing import Dict, Any, Set
 import json
@@ -13,16 +11,7 @@ from sklearn.metrics import precision_recall_fscore_support
 
 
 def parse_model_output(output_str: str) -> Set[str]:
-    """
-    Parse model output text to extract concerns as a set.
-
-    Args:
-        output_str: Raw model output string
-
-    Returns:
-        Set of extracted concern strings
-    """
-    # Remove common formatting and extract concerns
+    """Parse model output text to extract concerns as a set."""
     concerns = set()
 
     # Try to find JSON-like structures first
@@ -31,7 +20,6 @@ def parse_model_output(output_str: str) -> Set[str]:
 
     if matches:
         for match in matches:
-            # Split by comma and clean up
             items = [item.strip().strip("\"'") for item in match.split(",")]
             concerns.update(item for item in items if item)
     else:
@@ -39,7 +27,6 @@ def parse_model_output(output_str: str) -> Set[str]:
         lines = output_str.split("\n")
         for line in lines:
             line = line.strip()
-            # Match patterns like "1. concern", "- concern", "* concern"
             if re.match(r"^[\d\-\*\•]\s*\.?\s*", line):
                 concern = re.sub(r"^[\d\-\*\•]\s*\.?\s*", "", line).strip()
                 if concern:
@@ -49,15 +36,7 @@ def parse_model_output(output_str: str) -> Set[str]:
 
 
 def calculate_metrics(df: pd.DataFrame) -> Dict[str, float]:
-    """
-    Calculate F1, Precision, Recall metrics from predictions DataFrame.
-
-    Args:
-        df: DataFrame with 'predictions' and 'ground_truth' columns (sets)
-
-    Returns:
-        Dictionary containing calculated metrics
-    """
+    """Calculate F1, Precision, Recall metrics from predictions DataFrame."""
     # Convert sets to binary vectors for each unique concern
     all_concerns = set()
     for pred_set in df["predictions"]:
@@ -94,21 +73,12 @@ def calculate_metrics(df: pd.DataFrame) -> Dict[str, float]:
 
 
 def save_results(df: pd.DataFrame, metrics: Dict[str, float], output_dir: str) -> None:
-    """
-    Save DataFrame as predictions.csv and metrics as metrics.json.
-
-    Args:
-        df: Results DataFrame
-        metrics: Metrics dictionary
-        output_dir: Output directory path
-    """
+    """Save DataFrame as predictions.csv and metrics as metrics.json."""
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Save predictions CSV
     df.to_csv(output_path / "predictions.csv", index=False)
 
-    # Save metrics JSON
     with open(output_path / "metrics.json", "w") as f:
         json.dump(metrics, f, indent=2)
 
@@ -122,20 +92,8 @@ def plot_graph(
     xlabel: str = None,
     ylabel: str = None,
 ) -> None:
-    """
-    Create and save a line plot for RQ2 and RQ3 analysis.
-
-    Args:
-        df: DataFrame containing data to plot
-        x_col: Column name for x-axis
-        y_col: Column name for y-axis
-        output_path: Path to save the plot
-        title: Optional plot title
-        xlabel: Optional x-axis label
-        ylabel: Optional y-axis label
-    """
+    """Create and save a line plot for analysis."""
     plt.figure(figsize=(10, 6))
-
     sns.lineplot(data=df, x=x_col, y=y_col, marker="o")
 
     if title:

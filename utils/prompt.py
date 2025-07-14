@@ -143,7 +143,7 @@ def get_system_prompt() -> str:
 
 
 def get_system_prompt_with_message() -> str:
-    """Return system prompt that includes commit message context for classification."""
+    """Return system prompt that includes commit message context."""
     shot_1_with_message = (
         f"<commit_message>{SHOT_1_COMMIT_MESSAGE}</commit_message>\n{SHOT_1}"
     )
