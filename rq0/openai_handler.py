@@ -1,8 +1,7 @@
 """OpenAI API handler for RQ0 experiment."""
 
 import openai
-from typing import Dict, Any, Tuple
-import time
+from typing import Dict, Any
 import os
 from dotenv import load_dotenv
 
@@ -42,10 +41,8 @@ def load_openai_client(model_name: str) -> Dict[str, Any]:
 
 def get_openai_prediction(
     model_info: Dict[str, Any], prompt: str, temperature: float, max_tokens: int
-) -> Tuple[str, float]:
-    """Get prediction from OpenAI API with latency measurement."""
-    start_time = time.time()
-    
+) -> str:
+    """Get prediction from OpenAI API."""
     try:
         response = model_info["client"].chat.completions.create(
             model=model_info["model_name"],
@@ -59,5 +56,5 @@ def get_openai_prediction(
         prediction = f"An OpenAI API error occurred: {e}"
     except Exception as e:
         prediction = f"An unexpected error occurred: {e}"
-    
-    return prediction, time.time() - start_time
+
+    return prediction

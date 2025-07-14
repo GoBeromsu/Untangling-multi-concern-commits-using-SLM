@@ -15,6 +15,7 @@ from utils import (
     calculate_metrics,
     save_results,
 )
+from utils.prompt import get_system_prompt_diff_only
 
 
 def main():
@@ -34,13 +35,14 @@ def main():
         model_results = []
 
         for idx, sample in df.iterrows():
+            prompt_template = get_system_prompt_diff_only()
             prompt = create_prompt(
                 sample.to_dict(),
-                config["prompt_template"],
+                prompt_template,
                 with_message=config["include_message"],
             )
 
-            prediction, latency = get_prediction(
+            prediction = get_prediction(
                 model_info, prompt, config["temperature"], config["max_tokens"]
             )
             predicted_concerns = parse_model_output(prediction)
@@ -52,7 +54,6 @@ def main():
                     "model": model_name,
                     "predictions": predicted_concerns,
                     "ground_truth": ground_truth_concerns,
-                    "latency": latency,
                     "raw_output": prediction,
                 }
             )

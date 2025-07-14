@@ -16,6 +16,7 @@ from utils import (
     save_results,
     plot_graph,
 )
+from utils.prompt import get_system_prompt_with_message
 
 
 def main():
@@ -44,9 +45,10 @@ def main():
             latencies = []
 
             for idx, sample in df.iterrows():
+                prompt_template = get_system_prompt_with_message()
                 prompt = create_prompt(
                     sample.to_dict(),
-                    config["prompt_template"],
+                    prompt_template,
                     with_message=config["include_message"],
                 )
 

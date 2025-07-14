@@ -1,10 +1,11 @@
 experiment_name: "RQ0_Performance_Gap"
-dataset_name: "your-hf-org/your-dataset"
+dataset_name: "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models"
 dataset_split: "test"
 models:
-  - "gpt-4-turbo"
-  - "microsoft/phi-4"
-prompt_template: "Given the commit diff and message, untangle the concerns and list them separately. Format your response as a JSON list of concern descriptions.\n\n{few_shot_examples}{content}\n\nConcerns:"
+  slm:
+    - "microsoft/phi-4"
+  llm:
+    - "gpt-4-turbo"
 include_message: true
 output_dir: "../results/rq0"
 temperature: 0
