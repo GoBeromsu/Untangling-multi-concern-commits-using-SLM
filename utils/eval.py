@@ -10,6 +10,20 @@ from pathlib import Path
 from sklearn.metrics import precision_recall_fscore_support
 
 
+def load_dataset(dataset_split: str) -> pd.DataFrame:
+    """Load dataset from local CSV file."""
+    if dataset_split == "test":
+        csv_path = Path("../datasets/data/tangled_ccs_dataset_test.csv")
+    elif dataset_split == "train":
+        csv_path = Path("../datasets/data/tangled_ccs_dataset_train.csv")
+    else:
+        csv_path = Path("../datasets/data/tangled_ccs_dataset.csv")
+
+    df = pd.read_csv(csv_path)
+    print(f"Loaded {len(df)} samples from {csv_path}")
+    return df
+
+
 def parse_model_output(output_str: str) -> Set[str]:
     """Parse model output text to extract concerns as a set."""
     concerns = set()
@@ -72,29 +86,37 @@ def calculate_metrics(df: pd.DataFrame) -> Dict[str, float]:
     }
 
 
-def save_metric_csvs(all_metrics: Dict[str, Dict[str, float]], output_dir: str) -> None:
-    """Save three separate CSV files for F1, Precision, and Recall metrics."""
+def save_metric_csvs(
+    model_name: str, metrics: Dict[str, float], output_dir: str
+) -> None:
+    """Save metrics for a single model to CSV files in real-time."""
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Extract model names
-    model_names = list(all_metrics.keys())
+    # File paths
+    f1_path = output_path / "macro_f1.csv"
+    precision_path = output_path / "macro_precision.csv"
+    recall_path = output_path / "macro_recall.csv"
 
-    # Create single-row DataFrames with models as columns
-    f1_df = pd.DataFrame(
-        {model: [all_metrics[model]["f1_score"]] for model in model_names}
-    )
-    precision_df = pd.DataFrame(
-        {model: [all_metrics[model]["precision"]] for model in model_names}
-    )
-    recall_df = pd.DataFrame(
-        {model: [all_metrics[model]["recall"]] for model in model_names}
-    )
+    # Read existing data or create new
+    try:
+        f1_df = pd.read_csv(f1_path)
+        precision_df = pd.read_csv(precision_path)
+        recall_df = pd.read_csv(recall_path)
+    except FileNotFoundError:
+        f1_df = pd.DataFrame()
+        precision_df = pd.DataFrame()
+        recall_df = pd.DataFrame()
 
-    # Save CSV files
-    f1_df.to_csv(output_path / "macro_f1.csv", index=False)
-    precision_df.to_csv(output_path / "macro_precision.csv", index=False)
-    recall_df.to_csv(output_path / "macro_recall.csv", index=False)
+    # Add new model data
+    f1_df[model_name] = [metrics["f1_score"]]
+    precision_df[model_name] = [metrics["precision"]]
+    recall_df[model_name] = [metrics["recall"]]
+
+    # Save updated CSV files
+    f1_df.to_csv(f1_path, index=False)
+    precision_df.to_csv(precision_path, index=False)
+    recall_df.to_csv(recall_path, index=False)
 
 
 def save_results(df: pd.DataFrame, metrics: Dict[str, float], output_dir: str) -> None:

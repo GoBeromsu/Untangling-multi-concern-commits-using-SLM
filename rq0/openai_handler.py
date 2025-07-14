@@ -7,24 +7,29 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# OpenAI API configuration will be passed from config
+# Response schema matching LM Studio format
+RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "types": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": ["docs", "test", "cicd", "build", "refactor", "feat", "fix"],
+            },
+        },
+        "count": {"type": "integer"},
+        "reason": {"type": "string"},
+    },
+    "required": ["types", "count", "reason"],
+    "additionalProperties": False,
+}
 
-# Structured output format for OpenAI
 OPENAI_STRUCTURED_OUTPUT_FORMAT: Dict[str, Any] = {
     "type": "json_schema",
     "json_schema": {
-        "name": "commit_concerns_response",
-        "schema": {
-            "type": "object",
-            "properties": {
-                "concerns": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-            },
-            "required": ["concerns"],
-            "additionalProperties": False,
-        },
+        "name": "commit_classification_response",
+        "schema": RESPONSE_SCHEMA,
         "strict": True,
     },
 }
@@ -40,13 +45,15 @@ def load_openai_client(model_name: str) -> Dict[str, Any]:
 
 
 def get_openai_prediction(
-    api_key: str,
+    model_info: Dict[str, Any],
     user_prompt: str,
     system_prompt: str,
-    model: str,
     temperature: float,
+    max_tokens: int,
 ) -> str:
-    client = openai.OpenAI(api_key=api_key)
+    """Get prediction from OpenAI API."""
+    client = model_info["client"]
+    model = model_info["model_name"]
 
     try:
         response = client.chat.completions.create(
@@ -56,9 +63,11 @@ def get_openai_prediction(
                 {"role": "user", "content": user_prompt},
             ],
             temperature=temperature,
+            max_tokens=max_tokens,
             response_format=OPENAI_STRUCTURED_OUTPUT_FORMAT,
         )
         return response.choices[0].message.content or "No response from API."
+
     except openai.APIError as e:
         return f"An OpenAI API error occurred: {e}"
     except Exception as e:
