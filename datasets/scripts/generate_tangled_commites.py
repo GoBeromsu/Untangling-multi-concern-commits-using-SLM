@@ -8,12 +8,12 @@ import numpy as np
 import tiktoken
 
 # Configuration constants
-DATASET_PATH = Path("data/sampled_css_dataset.csv")
+DATASET_PATH = Path("data/sampled_ccs_dataset.csv")
 CASES_PER_CONCERN_COUNT = 350
 CONCERN_COUNTS = [1, 2, 3]
 TOTAL_CASES = CASES_PER_CONCERN_COUNT * len(CONCERN_COUNTS)  # 334 * 3 = 1002
 SEED = 42
-OUTPUT_PATH = Path("data/tangled_css_dataset.csv")
+OUTPUT_PATH = Path("data/tangled_ccs_dataset.csv")
 
 # Token limit for diff size (16384 - 4096 = 12288)
 MAX_DIFF_TOKENS = 12288

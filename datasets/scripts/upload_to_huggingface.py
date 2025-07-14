@@ -22,15 +22,15 @@ DATA_PATH = DATASETS_PATH / "data"
 SCRIPTS_PATH = DATASETS_PATH / "scripts"
 
 REQUIRED_FILES = [
-    DATA_PATH / "tangled_css_dataset_train.csv",
-    DATA_PATH / "tangled_css_dataset_test.csv",
+    DATA_PATH / "tangled_ccs_dataset_train.csv",
+    DATA_PATH / "tangled_ccs_dataset_test.csv",
 ]
 
 UPLOAD_FILES = [
     ("README.md", DATASETS_PATH / "README.md"),
     ("dataset_info.yaml", DATASETS_PATH / "dataset_info.yaml"),
-    ("data/tangled_css_dataset_train.csv", DATA_PATH / "tangled_css_dataset_train.csv"),
-    ("data/tangled_css_dataset_test.csv", DATA_PATH / "tangled_css_dataset_test.csv"),
+    ("data/tangled_ccs_dataset_train.csv", DATA_PATH / "tangled_ccs_dataset_train.csv"),
+    ("data/tangled_ccs_dataset_test.csv", DATA_PATH / "tangled_ccs_dataset_test.csv"),
     ("data/excluded_commits.csv", DATA_PATH / "excluded_commits.csv"),
     ("scripts/clean_ccs_dataset.py", SCRIPTS_PATH / "clean_ccs_dataset.py"),
     (

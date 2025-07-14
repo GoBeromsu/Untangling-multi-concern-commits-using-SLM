@@ -337,7 +337,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--csv-file",
-        default="../data/tangled_css_dataset.csv",
+        default="../data/tangled_ccs_dataset.csv",
         help="Path to CSV file to analyze",
     )
     parser.add_argument(

@@ -25,7 +25,7 @@ This dataset consists of two main configurations:
 
 ### 1. Sampled Dataset (`sampled`)
 
-- **File**: `data/sampled_css_dataset.csv`
+- **File**: `data/sampled_ccs_dataset.csv`
 - **Description**: Individual atomic commits with single concerns
 - **Features**:
   - `annotated_type`: The type of concern/change in the commit
@@ -35,7 +35,7 @@ This dataset consists of two main configurations:
 
 ### 2. Tangled Dataset (`tangled`)
 
-- **File**: `data/tangled_css_dataset.csv`
+- **File**: `data/tangled_ccs_dataset.csv`
 - **Description**: Multi-concern commits that combine multiple atomic commits
 - **Features**:
   - `description`: Combined description of all concerns
@@ -82,7 +82,7 @@ If you use this dataset in your research, please cite:
 
 This dataset includes several Python scripts for data processing and analysis:
 
-- `sample_css_dataset.py`: Script for sampling and filtering commits
+- `sample_ccs_dataset.py`: Script for sampling and filtering commits
 - `generate_tangled.py`: Script for creating tangled multi-concern commits
 - `clean_ccs_dataset.py`: Data cleaning and preprocessing utilities
 - `show_sampled_diffs.py`: Visualization of sampled commit diffs

@@ -66,7 +66,7 @@ def main():
     print("CCS Git Diff Extractor - Processing sampled commits...")
 
     # Configuration
-    csv_file = Path("../data/sampled_css_dataset.csv")
+    csv_file = Path("../data/sampled_ccs_dataset.csv")
     base_output_dir = Path("../data/extracted_diffs_by_type")
 
     if not csv_file.exists():

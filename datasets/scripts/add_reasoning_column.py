@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Add reasoning column to tangled_css_dataset.csv using OpenAI API.
+Add reasoning column to tangled_ccs_dataset.csv using OpenAI API.
 Follows established patterns from openai.py with structured output and proper error handling.
 """
 
@@ -20,8 +20,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuration constants
-DATASET_FILE_PATH: Path = Path("data/tangled_css_dataset_train.csv")
-OUTPUT_FILE_PATH: Path = Path("data/tangled_css_dataset_train_with_reasoning.csv")
+DATASET_FILE_PATH: Path = Path("data/tangled_ccs_dataset_train.csv")
+OUTPUT_FILE_PATH: Path = Path("data/tangled_ccs_dataset_train_with_reasoning.csv")
 OPENAI_MODEL: str = "gpt-4.1-2025-04-14"
 REASONING_TEMPERATURE: float = 0.7
 REQUEST_DELAY_SECONDS: float = 0.5

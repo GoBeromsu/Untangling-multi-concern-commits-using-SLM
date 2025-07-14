@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to clean sampled_css_dataset.csv by removing:
+Script to clean sampled_ccs_dataset.csv by removing:
 1. Wrong commits based on SHA values in wrong_commites.csv
 2. Overflowed types to achieve target count
 3. Commits exceeding token limit
@@ -22,7 +22,7 @@ RANDOM_SEED: int = 42
 
 # File paths
 WRONG_COMMITS_FILE: str = "data/excluded_commits.csv"
-SAMPLED_COMMITS_FILE: str = "data/sampled_css_dataset.csv"
+SAMPLED_COMMITS_FILE: str = "data/sampled_ccs_dataset.csv"
 SHA_BACKUP_FILE: str = "data/processed_shas.csv"
 
 

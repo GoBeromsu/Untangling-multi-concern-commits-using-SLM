@@ -1,7 +1,7 @@
 configs:
   - config_name: train
     data_files:
-      - data/tangled_css_dataset_train.csv
+      - data/tangled_ccs_dataset_train.csv
     features:
       - name: description
         dtype: string
@@ -16,7 +16,7 @@ configs:
 
   - config_name: test
     data_files:
-      - data/tangled_css_dataset_test.csv
+      - data/tangled_ccs_dataset_test.csv
     features:
       - name: description
         dtype: string

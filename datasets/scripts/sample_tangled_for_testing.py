@@ -71,7 +71,7 @@ def main():
     print("Tangled Dataset Random Sampler - Extracting 10 commits for testing...")
 
     # Configuration
-    csv_file = Path("../data/tangled_css_dataset.csv")
+    csv_file = Path("../data/tangled_ccs_dataset.csv")
     output_file = Path("../data/tangled_test_sample.csv")
     sample_size = 10
 
