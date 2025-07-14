@@ -23,6 +23,9 @@ Label selection must assign exactly one concern from the following unified set:
 - cicd: Updates CI (Continuous Integration) configuration files or scripts (e.g., `.travis.yml`, `.github/workflows`).
 - build: Affects the build system (e.g., updates dependencies, changes build configs or scripts).
 """
+
+# TODO: Add more examples (Object + Object, Purpose + Object, Purpose + Purpose)
+
 SHOT_1_COMMIT_MESSAGE = "convert to record"
 SHOT_1 = """
 <commit_diff id="example-1">
