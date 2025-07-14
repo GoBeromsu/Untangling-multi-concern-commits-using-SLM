@@ -87,9 +87,9 @@ def calculate_metrics(df: pd.DataFrame) -> Dict[str, float]:
 
 
 def save_metric_csvs(
-    model_name: str, metrics: Dict[str, float], output_dir: str
+    model_name: str, metrics: Dict[str, float], output_dir: str, sample_idx: int
 ) -> None:
-    """Save metrics for a single model to CSV files in real-time."""
+    """Save cumulative metrics for each sample to CSV files with model-specific columns."""
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -98,7 +98,7 @@ def save_metric_csvs(
     precision_path = output_path / "macro_precision.csv"
     recall_path = output_path / "macro_recall.csv"
 
-    # Read existing data or create new
+    # Read existing data or create new DataFrame
     try:
         f1_df = pd.read_csv(f1_path)
         precision_df = pd.read_csv(precision_path)
@@ -108,10 +108,27 @@ def save_metric_csvs(
         precision_df = pd.DataFrame()
         recall_df = pd.DataFrame()
 
-    # Add new model data
-    f1_df[model_name] = [metrics["f1_score"]]
-    precision_df[model_name] = [metrics["precision"]]
-    recall_df[model_name] = [metrics["recall"]]
+        # Add model column if it doesn't exist
+    if model_name not in f1_df.columns:
+        f1_df[model_name] = None
+        precision_df[model_name] = None
+        recall_df[model_name] = None
+
+    # Ensure DataFrame has enough rows for current sample_idx
+    required_rows = sample_idx + 1
+
+    # Extend DataFrames if needed
+    if len(f1_df) < required_rows:
+        # Add missing rows with NaN values
+        for i in range(len(f1_df), required_rows):
+            f1_df.loc[i] = None
+            precision_df.loc[i] = None
+            recall_df.loc[i] = None
+
+    # Update the specific sample row and model column
+    f1_df.loc[sample_idx, model_name] = metrics["f1_score"]
+    precision_df.loc[sample_idx, model_name] = metrics["precision"]
+    recall_df.loc[sample_idx, model_name] = metrics["recall"]
 
     # Save updated CSV files
     f1_df.to_csv(f1_path, index=False)

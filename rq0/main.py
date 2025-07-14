@@ -107,7 +107,7 @@ def main():
 
             if len(model_df) > 0:
                 metrics = calculate_metrics(model_df)
-                save_metric_csvs(model_name, metrics, output_dir)
+                save_metric_csvs(model_name, metrics, output_dir, idx)
 
             if (idx + 1) % 10 == 0:
                 print(f"Processed {idx + 1}/{len(df)} samples for {model_name}")
