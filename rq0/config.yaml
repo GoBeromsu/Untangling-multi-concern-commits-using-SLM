@@ -7,3 +7,5 @@ models:
 prompt_template: "Given the commit diff and message, untangle the concerns and list them separately. Format your response as a JSON list of concern descriptions.\n\n{few_shot_examples}{content}\n\nConcerns:"
 include_message: true
 output_dir: "../results/rq0"
+temperature: 0
+max_tokens: 16384

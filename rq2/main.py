@@ -62,7 +62,9 @@ def main():
                 )
 
                 # Get prediction
-                prediction, latency = get_prediction(model_info, prompt)
+                prediction, latency = get_prediction(
+                    model_info, prompt, config["temperature"], config["max_tokens"]
+                )
 
                 # Parse output
                 predicted_concerns = parse_model_output(prediction)

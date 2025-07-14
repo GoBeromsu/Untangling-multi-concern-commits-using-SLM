@@ -15,6 +15,7 @@ from utils import (
     calculate_metrics,
     save_results,
 )
+from openai_handler import load_openai_client, get_openai_prediction
 
 
 def main():
@@ -28,7 +29,13 @@ def main():
 
     for model_name in config["models"]:
         print(f"Processing model: {model_name}")
-        model_info = load_model_and_tokenizer(model_name)
+
+        # Use different handlers for different model types
+        if "gpt-4" in model_name.lower():
+            model_info = load_openai_client(model_name)
+        else:
+            model_info = load_model_and_tokenizer(model_name)
+
         model_results = []
 
         for idx, sample in df.iterrows():
@@ -38,7 +45,16 @@ def main():
                 with_message=config["include_message"],
             )
 
-            prediction, latency = get_prediction(model_info, prompt)
+            # Use appropriate prediction function based on model type
+            if "gpt-4" in model_name.lower():
+                prediction, latency = get_openai_prediction(
+                    model_info, prompt, config["temperature"], config["max_tokens"]
+                )
+            else:
+                prediction, latency = get_prediction(
+                    model_info, prompt, config["temperature"], config["max_tokens"]
+                )
+
             predicted_concerns = parse_model_output(prediction)
             ground_truth_concerns = set(sample.get("concerns", []))
 

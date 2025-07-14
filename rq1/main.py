@@ -40,7 +40,9 @@ def main():
                 with_message=config["include_message"],
             )
 
-            prediction, latency = get_prediction(model_info, prompt)
+            prediction, latency = get_prediction(
+                model_info, prompt, config["temperature"], config["max_tokens"]
+            )
             predicted_concerns = parse_model_output(prediction)
             ground_truth_concerns = set(sample.get("concerns", []))
 

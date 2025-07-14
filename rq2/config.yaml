@@ -7,3 +7,5 @@ prompt_template: "Given the commit diff and message, untangle the concerns and l
 include_message: true
 context_lengths: [256, 512, 1024, 2048, 4096]
 output_dir: "../results/rq2"
+temperature: 0
+max_tokens: 16384
