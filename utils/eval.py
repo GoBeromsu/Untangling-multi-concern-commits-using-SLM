@@ -16,6 +16,8 @@ def load_dataset(dataset_split: str) -> pd.DataFrame:
         csv_path = Path("../datasets/data/tangled_ccs_dataset_test.csv")
     elif dataset_split == "train":
         csv_path = Path("../datasets/data/tangled_ccs_dataset_train.csv")
+    elif dataset_split == "test_small":
+        csv_path = Path("../datasets/data/tangled_ccs_dataset_test_small.csv")
     else:
         csv_path = Path("../datasets/data/tangled_ccs_dataset.csv")
 

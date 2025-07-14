@@ -1,0 +1,455 @@
+description,diff,concern_count,shas,types,reason
+exclude github.io from link checking to avoid rate limiting | don't consider cases where there are no txids,"diff --git a/.github/workflows/ibis-docs-lint.yml b/.github/workflows/ibis-docs-lint.yml
+index 90c5a27..db6457b 100644
+--- a/.github/workflows/ibis-docs-lint.yml
++++ b/.github/workflows/ibis-docs-lint.yml
+@@ -101,6 +101,7 @@ jobs:
+             --exclude-mail \\
+             --exclude fonts.gstatic.com \\
+             --exclude github.com \\
++            --exclude github.io \\
+             --no-progress \\
+             --github-token ${{ steps.generate_token.outputs.token }}
+ 
+
+diff --git a/src/main.rs b/src/main.rs
+index 25d9580..9ba4e38 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -441,6 +441,9 @@ fn main() {
+             let mut delta_tx_fees = vec![];
+             let empty_txids = vec![];
+             let txids = tx_mined_deltas.get(&delta).unwrap_or(&empty_txids);
++            if txids.len() == 0 {
++                continue;
++            }
+             for txid in txids.iter() {
+                 delta_tx_fees.push(*tx_fees.get(txid).unwrap_or(&0));
+             }
+",2,"[""ce0539a32b927a3559feebf8f5307e3863e992a1"", ""37a1b5bbb5270befcee5d9b9621af196c787a61f""]","[""cicd"", ""fix""]","Step 1: Code Change Analysis
+- The commit modifies two files: a GitHub Actions workflow YAML and a Rust source file (main.rs).
+- In .github/workflows/ibis-docs-lint.yml, a new --exclude github.io flag is added to link checking, likely to avoid unnecessary checks and rate limiting.
+- In src/main.rs, a guard is added to skip processing if there are no txids, preventing logic from executing on empty cases.
+
+Step 2: Label Classification Justification
+- The YAML workflow file (.github/workflows/ibis-docs-lint.yml) is entirely a CI configuration change, so 'cicd' is the correct label, as it affects only CI scripts.
+- The Rust source file change in main.rs prevents a potential bug (processing empty txids), so 'fix' is chosen as it corrects unintended behavior rather than adding features or refactoring.
+- Object labels (like 'cicd') take precedence for pure CI config edits, while purpose labels (like 'fix') are used for changes that alter runtime behavior in application code."
+"convert `run_tag_values_test_case` to a function | ensure ""dist"" dirs exist","diff --git a/query_tests/src/influxrpc/tag_values.rs b/query_tests/src/influxrpc/tag_values.rs
+index 01fd411..3570cae 100644
+--- a/query_tests/src/influxrpc/tag_values.rs
++++ b/query_tests/src/influxrpc/tag_values.rs
+@@ -1,5 +1,5 @@
+ use datafusion::logical_plan::{col, lit};
+-use predicate::predicate::PredicateBuilder;
++use predicate::predicate::{Predicate, PredicateBuilder};
+ use query::{
+     exec::stringset::{IntoStringSet, StringSetRef},
+     frontend::influxrpc::InfluxRpcPlanner,
+@@ -9,39 +9,42 @@ use crate::scenarios::*;
+ 
+ /// runs tag_value(predicate) and compares it to the expected
+ /// output
+-macro_rules! run_tag_values_test_case {
+-    ($DB_SETUP:expr, $TAG_NAME:expr, $PREDICATE:expr, $EXPECTED_VALUES:expr) => {
+-        test_helpers::maybe_start_logging();
+-        let predicate = $PREDICATE;
+-        let tag_name = $TAG_NAME;
+-        let expected_values = $EXPECTED_VALUES;
+-        for scenario in $DB_SETUP.make().await {
+-            let DbScenario {
+-                scenario_name, db, ..
+-            } = scenario;
+-            println!(""Running scenario '{}'"", scenario_name);
+-            println!(""Predicate: '{:#?}'"", predicate);
+-            let planner = InfluxRpcPlanner::new();
+-            let ctx = db.executor().new_context(query::exec::ExecutorType::Query);
+-
+-            let plan = planner
+-                .tag_values(db.as_ref(), &tag_name, predicate.clone())
+-                .expect(""built plan successfully"");
+-            let names = ctx
+-                .to_string_set(plan)
+-                .await
+-                .expect(""converted plan to strings successfully"");
+-
+-            assert_eq!(
+-                names,
+-                to_stringset(&expected_values),
+-                ""Error in  scenario '{}'\\n\\nexpected:\\n{:?}\\nactual:\\n{:?}"",
+-                scenario_name,
+-                expected_values,
+-                names
+-            );
+-        }
+-    };
++async fn run_tag_values_test_case<D>(
++    db_setup: D,
++    tag_name: &str,
++    predicate: Predicate,
++    expected_tag_values: Vec<&str>,
++) where
++    D: DbSetup,
++{
++    test_helpers::maybe_start_logging();
++
++    for scenario in db_setup.make().await {
++        let DbScenario {
++            scenario_name, db, ..
++        } = scenario;
++        println!(""Running scenario '{}'"", scenario_name);
++        println!(""Predicate: '{:#?}'"", predicate);
++        let planner = InfluxRpcPlanner::new();
++        let ctx = db.executor().new_context(query::exec::ExecutorType::Query);
++
++        let plan = planner
++            .tag_values(db.as_ref(), tag_name, predicate.clone())
++            .expect(""built plan successfully"");
++        let names = ctx
++            .to_string_set(plan)
++            .await
++            .expect(""converted plan to strings successfully"");
++
++        assert_eq!(
++            names,
++            to_stringset(&expected_tag_values),
++            ""Error in  scenario '{}'\\n\\nexpected:\\n{:?}\\nactual:\\n{:?}"",
++            scenario_name,
++            expected_tag_values,
++            names
++        );
++    }
+ }
+ 
+ #[tokio::test]
+@@ -50,12 +53,13 @@ async fn list_tag_values_no_tag() {
+     // If the tag is not present, expect no values back (not error)
+     let tag_name = ""tag_not_in_chunks"";
+     let expected_tag_keys = vec![];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -63,12 +67,13 @@ async fn list_tag_values_no_predicate_state_col() {
+     let predicate = PredicateBuilder::default().build();
+     let tag_name = ""state"";
+     let expected_tag_keys = vec![""CA"", ""MA"", ""NY""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -76,12 +81,13 @@ async fn list_tag_values_no_predicate_city_col() {
+     let tag_name = ""city"";
+     let predicate = PredicateBuilder::default().build();
+     let expected_tag_keys = vec![""Boston"", ""LA"", ""NYC""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -89,12 +95,13 @@ async fn list_tag_values_timestamp_pred_state_col() {
+     let tag_name = ""state"";
+     let predicate = PredicateBuilder::default().timestamp_range(50, 201).build();
+     let expected_tag_keys = vec![""CA"", ""MA""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -104,12 +111,13 @@ async fn list_tag_values_state_pred_state_col() {
+         .add_expr(col(""state"").eq(lit(""MA""))) // state=MA
+         .build();
+     let expected_tag_keys = vec![""Boston""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -120,12 +128,13 @@ async fn list_tag_values_timestamp_and_state_pred_state_col() {
+         .add_expr(col(""state"").eq(lit(""MA""))) // state=MA
+         .build();
+     let expected_tag_keys = vec![""MA""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -133,12 +142,13 @@ async fn list_tag_values_table_pred_state_col() {
+     let tag_name = ""state"";
+     let predicate = PredicateBuilder::default().table(""h2o"").build();
+     let expected_tag_keys = vec![""CA"", ""MA""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -146,12 +156,13 @@ async fn list_tag_values_table_pred_city_col() {
+     let tag_name = ""city"";
+     let predicate = PredicateBuilder::default().table(""o2"").build();
+     let expected_tag_keys = vec![""Boston"", ""NYC""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -162,12 +173,13 @@ async fn list_tag_values_table_and_timestamp_and_table_pred_state_col() {
+         .timestamp_range(50, 201)
+         .build();
+     let expected_tag_keys = vec![""MA""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -178,12 +190,13 @@ async fn list_tag_values_table_and_state_pred_state_col() {
+         .add_expr(col(""state"").eq(lit(""NY""))) // state=NY
+         .build();
+     let expected_tag_keys = vec![""NY""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -195,12 +208,13 @@ async fn list_tag_values_table_and_timestamp_and_state_pred_state_col() {
+         .add_expr(col(""state"").eq(lit(""NY""))) // state=NY
+         .build();
+     let expected_tag_keys = vec![""NY""];
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -213,12 +227,13 @@ async fn list_tag_values_table_and_timestamp_and_state_pred_state_col_no_rows() 
+         .build();
+     let expected_tag_keys = vec![];
+ 
+-    run_tag_values_test_case!(
++    run_tag_values_test_case(
+         TwoMeasurementsManyNulls {},
+         tag_name,
+         predicate,
+-        expected_tag_keys
+-    );
++        expected_tag_keys,
++    )
++    .await;
+ }
+ 
+ #[tokio::test]
+
+diff --git a/scripts/prepare.js b/scripts/prepare.js
+index 9eb8cb8..f285825 100644
+--- a/scripts/prepare.js
++++ b/scripts/prepare.js
+@@ -68,6 +68,9 @@ async function prepare() {
+     names.push(json.name)
+   }
+ 
++  // Ensure all ""dist"" directories exist.
++  dirs.forEach(dir => fs.ensureDirSync(join(dir, distId)))
++
+   log(``)
+   for (let i = 0; i < names.length; i++) {
+     const dir = dirs[i]
+",2,"[""1db13ec43727aca872a0f3836e4023ed85db665e"", ""ca060bf255a55b99000ddf0c67f7422f28b735a6""]","[""refactor"", ""build""]","Step 1: Code Change Analysis
+- The first change in `tag_values.rs` replaces a macro with an equivalent async function (`run_tag_values_test_case`) and updates all call sites accordingly, affecting only code structure and not behavior. The second change in `prepare.js` adds logic to ensure all ""dist"" directories exist before proceeding, modifying a build-related script.
+
+Step 2: Label Classification Justification
+- The Rust module change is a clear `refactor`: it restructures test code from macro to function without altering test logic or external behavior. The JavaScript change is a `build` modification: it changes the build preparation script (`prepare.js`), ensuring directory existence, directly impacting the build system. These labels are chosen because the Rust change is about internal test harness structure (not adding tests or fixing bugs), and the JS change is scoped to the build artifact, not application logic."
+Fix typo | simplify loadFiles code,"diff --git a/README.md b/README.md
+index a8ef3bf..2947cd9 100644
+--- a/README.md
++++ b/README.md
+@@ -69,7 +69,7 @@ Follow the instructions on the `rustup` site for your operating system.
+ 
+ [`rustup`]: https://rustup.rs/
+ 
+-By default, `rustup` will install the latest stable verison of Rust. InfluxDB IOx is currently
++By default, `rustup` will install the latest stable version of Rust. InfluxDB IOx is currently
+ using a nightly version of Rust to get performance benefits from the unstable `simd` feature. The
+ exact nightly version is specified in the `rust-toolchain` file. When you're in the directory
+ containing this repository's code, `rustup` will look in the `rust-toolchain` file and
+
+diff --git a/frontend/app/player/web/network/loadFiles.ts b/frontend/app/player/web/network/loadFiles.ts
+index ec174fc..d164333 100644
+--- a/frontend/app/player/web/network/loadFiles.ts
++++ b/frontend/app/player/web/network/loadFiles.ts
+@@ -1,43 +1,33 @@
+ import APIClient from 'App/api_client';
+ 
+-const NO_NTH_FILE = ""nnf""
+-const NO_UNPROCESSED_FILES = ""nuf""
++const NO_FILE_OK = ""No-file-but-this-is-ok""
++const NO_BACKUP_FILE = ""No-efs-file""
+ 
+ export const loadFiles = (
+   urls: string[],
+   onData: (data: Uint8Array) => void,
+ ): Promise<void> => {
+-  const firstFileURL = urls[0]
+-  urls = urls.slice(1)
+-  if (!firstFileURL) {
++  if (!urls.length) {
+     return Promise.reject(""No urls provided"")
+   }
+-  return window.fetch(firstFileURL)
+-  .then(r => {
+-    return processAPIStreamResponse(r, true)
+-  })
+-  .then(onData)
+-  .then(() =>
+-    urls.reduce((p, url) =>
+-      p.then(() =>
+-        window.fetch(url)
+-        .then(r => {
+-          return processAPIStreamResponse(r, false)
+-        })
+-        .then(onData)
+-      ),
+-      Promise.resolve(),
+-    )
++  return urls.reduce((p, url, index) =>
++    p.then(() =>
++      window.fetch(url)
++      .then(r => {
++        return processAPIStreamResponse(r, index===0)
++      })
++      .then(onData)
++    ),
++    Promise.resolve(),
+   )
+   .catch(e => {
+-    if (e === NO_NTH_FILE) {
++    if (e === NO_FILE_OK) {
+       return
+     }
+     throw e
+   })
+ }
+ 
+-
+ export async function requestEFSDom(sessionId: string) {
+   return await requestEFSMobFile(sessionId + ""/dom.mob"")
+ }
+@@ -50,21 +40,18 @@ async function requestEFSMobFile(filename: string) {
+   const api = new APIClient()
+   const res = await api.fetch('/unprocessed/' + filename)
+   if (res.status >= 400) {
+-    throw NO_UNPROCESSED_FILES
++    throw NO_BACKUP_FILE
+   }
+   return await processAPIStreamResponse(res, false)
+ }
+ 
+-const processAPIStreamResponse = (response: Response, isFirstFile: boolean) => {
++const processAPIStreamResponse = (response: Response, canBeMissed: boolean) => {
+   return new Promise<ArrayBuffer>((res, rej) => {
+-    if (response.status === 404 && !isFirstFile) {
+-      return rej(NO_NTH_FILE)
++    if (response.status === 404 && canBeMissed) {
++      return rej(NO_FILE_OK)
+     }
+     if (response.status >= 400) {
+-      return rej(
+-        isFirstFile ? `no start file. status code ${ response.status }`
+-        : `Bad endfile status code ${response.status}`
+-      )
++      return rej(`Bad file status code ${response.status}. Url: ${response.url}`)
+     }
+     res(response.arrayBuffer())
+   }).then(buffer => new Uint8Array(buffer))
+",2,"[""bf83c9155e9bee6925aa7102fab53fb803d52533"", ""983fef55ef08ca2ca25349bb2d5bdff10ecf89f4""]","[""docs"", ""refactor""]","Step 1: Code Change Analysis
+- The diff shows two code units being modified: a documentation fix in README.md correcting a typo ('verison' to 'version'), and a substantial rewrite/simplification of the loadFiles.ts logic (variable renaming, logic restructuring, error message changes, and simplified control flow).
+
+Step 2: Label Classification Justification
+- The README.md change is correcting a typo, which exclusively modifies documentation; thus, the 'docs' label applies as the change is entirely documentation-focused. The loadFiles.ts changes are not adding new features or fixing bugs, but instead simplifying and improving the structure without altering external behavior, so 'refactor' is the most accurate label, as per the rules. No object label applies to the code refactor since the changes are not test- or build-specific."

@@ -11,9 +11,10 @@ from utils import (
     load_dataset,
     calculate_metrics,
     save_metric_csvs,
+    load_openai_client,
+    get_openai_prediction,
 )
 from utils.prompt import get_system_prompt_with_message
-from openai_handler import load_openai_client, get_openai_prediction
 from lmstudio_handler import (
     load_lmstudio_client,
     get_lmstudio_prediction,
@@ -24,7 +25,8 @@ def main():
     with open("config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
-    dataset_split = config["dataset_split"]
+    # Use small dataset for testing
+    dataset_split = "test_small"
     slm_models = config["models"].get("slm", [])
     llm_models = config["models"].get("llm", [])
     output_dir = config["output_dir"]
@@ -45,7 +47,7 @@ def main():
         model_type = "LLM" if is_llm else "SLM"
         print(f"Processing {model_type} model: {model_name}")
 
-        # Load model based on type
+        # Load model based on type - use shared OpenAI utilities
         if is_llm:
             model_info = load_openai_client(model_name)
         else:

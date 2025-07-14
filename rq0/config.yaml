@@ -2,8 +2,6 @@ experiment_name: "RQ0_Performance_Gap"
 dataset_name: "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models"
 dataset_split: "test"
 models:
-  slm:
-    - "microsoft/phi-4"
   llm:
     - "gpt-4-turbo"
 output_dir: "../results/rq0"

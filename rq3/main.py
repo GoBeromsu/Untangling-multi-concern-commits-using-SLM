@@ -3,20 +3,38 @@
 import yaml
 import sys
 import pandas as pd
+import json
+import time
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
 from utils import (
     load_dataset,
-    create_prompt,
-    load_model_and_tokenizer,
-    get_prediction,
     parse_model_output,
     calculate_metrics,
     save_results,
     plot_graph,
+    load_openai_client,
+    get_openai_prediction,
 )
 from utils.prompt import get_system_prompt_with_message
+
+
+def get_openai_prediction_with_latency(
+    model_info, user_prompt, system_prompt, temperature, max_tokens
+):
+    """Get OpenAI prediction with latency measurement."""
+    start_time = time.time()
+
+    # Use the existing get_openai_prediction function
+    from utils.openai import get_openai_prediction as base_get_prediction
+
+    prediction = base_get_prediction(
+        model_info, user_prompt, system_prompt, temperature, max_tokens
+    )
+
+    latency = time.time() - start_time
+    return prediction, latency
 
 
 def main():
@@ -28,54 +46,89 @@ def main():
     results = []
     latency_data = []
 
+    # Use small dataset for testing
+    df = load_dataset("test_small")
+
     for context_length in config["context_lengths"]:
         print(f"\nProcessing context length: {context_length}")
 
-        df = load_dataset(
-            config["dataset_name"],
-            config["dataset_split"],
-            config_name=str(context_length),
-        )
+        # Use OpenAI model instead of HuggingFace for testing
+        model_name = "gpt-4-turbo"  # Use OpenAI for testing
+        print(f"Processing model: {model_name}")
 
-        for model_name in config["models"]:
-            print(f"Processing model: {model_name}")
+        model_info = load_openai_client(model_name)
+        model_results = []
+        latencies = []
+        system_prompt = get_system_prompt_with_message()
 
-            model_info = load_model_and_tokenizer(model_name)
-            model_results = []
-            latencies = []
+        for idx, sample in df.iterrows():
+            description = sample.get("description", "")
+            diff = sample.get("diff", "")
 
-            for idx, sample in df.iterrows():
-                prompt_template = get_system_prompt_with_message()
-                prompt = create_prompt(
-                    sample.to_dict(),
-                    prompt_template,
-                    with_message=config["include_message"],
-                )
+            # Truncate diff to simulate context length limitation
+            # Simple truncation for testing (could be more sophisticated)
+            if len(diff) > context_length * 4:  # Rough token estimation
+                diff = diff[: context_length * 4] + "..."
 
-                prediction, latency = get_prediction(
-                    model_info, prompt, config["temperature"], config["max_tokens"]
+            user_prompt = f"<commit_message>{description}</commit_message>\n<commit_diff>{diff}</commit_diff>"
+
+            try:
+                prediction, latency = get_openai_prediction_with_latency(
+                    model_info,
+                    user_prompt,
+                    system_prompt,
+                    config["temperature"],
+                    config["max_tokens"],
                 )
                 latencies.append(latency)
 
-                predicted_concerns = parse_model_output(prediction)
-                ground_truth_concerns = set(sample.get("concerns", []))
+                # Check if prediction is an error message
+                if prediction.startswith("An ") and "error occurred" in prediction:
+                    print(f"API Error for sample {idx} with {model_name}: {prediction}")
+                    predicted_concerns = set()
+                else:
+                    # Parse structured JSON output to extract concern types
+                    output_json = json.loads(prediction)
+                    predicted_concerns = set(output_json["types"])
 
-                model_results.append(
-                    {
-                        "sample_id": idx,
-                        "model": model_name,
-                        "context_length": context_length,
-                        "predictions": predicted_concerns,
-                        "ground_truth": ground_truth_concerns,
-                        "latency": latency,
-                        "raw_output": prediction,
-                    }
+            except json.JSONDecodeError as e:
+                print(
+                    f"JSON decode error processing sample {idx} with {model_name}: {e}"
                 )
+                print(f"Raw prediction: {prediction}")
+                predicted_concerns = set()
+                latencies.append(0.0)  # Add placeholder latency
+            except Exception as e:
+                print(f"Error processing sample {idx} with {model_name}: {e}")
+                predicted_concerns = set()
+                latencies.append(0.0)  # Add placeholder latency
 
-                if (idx + 1) % 10 == 0:
-                    print(f"Processed {idx + 1}/{len(df)} samples")
+            # Parse ground truth concerns
+            ground_truth_concerns = set(json.loads(sample["types"]))
 
-            # Calculate latency statistics
+            model_results.append(
+                {
+                    "sample_id": idx,
+                    "model": model_name,
+                    "context_length": context_length,
+                    "predictions": predicted_concerns,
+                    "ground_truth": ground_truth_concerns,
+                    "latency": latency if "latency" in locals() else 0.0,
+                    "raw_output": prediction,
+                }
+            )
+
+            print(
+                f"Sample {idx} with {model_name} (context {context_length}) - Latency: {latency:.3f}s"
+            )
+            print(f"Predicted concerns: {predicted_concerns}")
+            print(f"Ground truth concerns: {ground_truth_concerns}")
+
+            if (idx + 1) % 10 == 0:
+                print(f"Processed {idx + 1}/{len(df)} samples")
+
+        # Calculate latency statistics
+        if latencies:
             avg_latency = sum(latencies) / len(latencies)
             min_latency = min(latencies)
             max_latency = max(latencies)
@@ -95,7 +148,7 @@ def main():
                 f"Min: {min_latency:.3f}s, Max: {max_latency:.3f}s"
             )
 
-            results.extend(model_results)
+        results.extend(model_results)
 
     results_df = pd.DataFrame(results)
     latency_df = pd.DataFrame(latency_data)
@@ -104,27 +157,31 @@ def main():
     latency_metrics = {}
     for context_length in config["context_lengths"]:
         length_df = results_df[results_df["context_length"] == context_length]
-        latency_metrics[f"context_{context_length}"] = {
-            "avg_latency": length_df["latency"].mean(),
-            "std_latency": length_df["latency"].std(),
-            "min_latency": length_df["latency"].min(),
-            "max_latency": length_df["latency"].max(),
-        }
+        if len(length_df) > 0:
+            latency_metrics[f"context_{context_length}"] = {
+                "avg_latency": length_df["latency"].mean(),
+                "std_latency": length_df["latency"].std(),
+                "min_latency": length_df["latency"].min(),
+                "max_latency": length_df["latency"].max(),
+            }
 
     save_results(results_df, latency_metrics, config["output_dir"])
 
-    plot_graph(
-        latency_df,
-        "context_length",
-        "avg_latency",
-        f"{config['output_dir']}/latency_vs_length.png",
-        title="Latency vs Context Length",
-        xlabel="Context Length (tokens)",
-        ylabel="Average Latency (seconds)",
-    )
+    # Create latency vs length plot if we have data
+    if len(latency_df) > 0:
+        plot_graph(
+            latency_df,
+            "context_length",
+            "avg_latency",
+            f"{config['output_dir']}/latency_vs_length.png",
+            title="Latency vs Context Length",
+            xlabel="Context Length (tokens)",
+            ylabel="Average Latency (seconds)",
+        )
 
     print(f"Results saved to {config['output_dir']}")
-    print(f"Plot saved to {config['output_dir']}/latency_vs_length.png")
+    if len(latency_df) > 0:
+        print(f"Plot saved to {config['output_dir']}/latency_vs_length.png")
 
 
 if __name__ == "__main__":
