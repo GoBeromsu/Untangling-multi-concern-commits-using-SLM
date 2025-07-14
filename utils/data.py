@@ -7,7 +7,7 @@ from datasets import load_dataset
 import pandas as pd
 
 
-def load_dataset_from_hf(
+def load_dataset(
     name: str, split: str, config_name: Optional[str] = None
 ) -> pd.DataFrame:
     """
@@ -23,7 +23,6 @@ def load_dataset_from_hf(
     """
     dataset = load_dataset(name, config_name, split=split)
     return pd.DataFrame(dataset)
-
 
 def create_prompt(
     sample: Dict[str, Any],

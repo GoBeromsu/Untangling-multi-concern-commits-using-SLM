@@ -11,7 +11,7 @@ from pathlib import Path
 # Add utils to path
 sys.path.append(str(Path(__file__).parent.parent))
 from utils import (
-    load_dataset_from_hf,
+    load_dataset,
     create_prompt,
     load_model_and_tokenizer,
     get_prediction,
@@ -37,7 +37,7 @@ def main():
         print(f"\nProcessing context length: {context_length}")
 
         # Load dataset with specific context length configuration
-        df = load_dataset_from_hf(
+        df = load_dataset(
             config["dataset_name"],
             config["dataset_split"],
             config_name=str(context_length),  # Use context length as config name

@@ -11,7 +11,7 @@ from pathlib import Path
 # Add utils to path
 sys.path.append(str(Path(__file__).parent.parent))
 from utils import (
-    load_dataset_from_hf,
+    load_dataset,
     create_prompt,
     load_model_and_tokenizer,
     get_prediction,
@@ -30,7 +30,7 @@ def main():
 
     # Load dataset
     print("Loading dataset...")
-    df = load_dataset_from_hf(config["dataset_name"], config["dataset_split"])
+    df = load_dataset(config["dataset_name"], config["dataset_split"])
 
     results = []
 
