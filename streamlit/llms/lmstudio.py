@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Tuple
 
 from llms.constant import (
     LMSTUDIO_STRUCTURED_OUTPUT_FORMAT,
-    DEFAULT_LMSTUDIO_URL,
+    DEFAULT_LMSTUDIO_URL,ㅈ
     DEFAULT_TEMPERATURE,
     DEFAULT_MAX_TOKENS,
     CONNECTION_TIMEOUT_SECONDS,

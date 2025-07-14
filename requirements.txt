@@ -1,13 +1,28 @@
-# Core dependencies
+# Core ML/Data Libraries
+torch
+transformers
 datasets>=2.15.0
+scikit-learn
 pandas>=2.1.0
+numpy
+
+# Hugging Face & API Clients
+huggingface_hub>=0.19.0
+openai>=1.0.0
+
+# Configuration & Utilities
+pyyaml
+python-dotenv>=1.0.0
 tqdm>=4.66.0
 requests>=2.31.0
-python-dotenv>=1.0.0
-openai>=1.0.0
 tiktoken>=0.4.0
+
+# Visualization
+matplotlib
+seaborn
+
+# Streamlit (existing)
 streamlit>=1.28.0
-huggingface_hub>=0.19.0
 
 # Development
 pytest>=7.4.0

@@ -1,0 +1,8 @@
+experiment_name: "RQ1_Context_Ablation"
+dataset_name: "your-hf-org/your-dataset"
+dataset_split: "test"
+models:
+  - "microsoft/Phi-3-mini-instruct" # GPT-4 excluded for cost efficiency
+prompt_template: "Given the commit diff, untangle the concerns and list them separately. Format your response as a JSON list of concern descriptions.\n\n{few_shot_examples}{content}\n\nConcerns:"
+include_message: false # Key difference from RQ0
+output_dir: "../results/rq1"

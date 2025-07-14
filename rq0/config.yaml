@@ -1,0 +1,9 @@
+experiment_name: "RQ0_Performance_Gap"
+dataset_name: "your-hf-org/your-dataset"
+dataset_split: "test"
+models:
+  - "gpt-4-turbo"
+  - "microsoft/Phi-3-mini-instruct"
+prompt_template: "Given the commit diff and message, untangle the concerns and list them separately. Format your response as a JSON list of concern descriptions.\n\n{few_shot_examples}{content}\n\nConcerns:"
+include_message: true
+output_dir: "../results/rq0"
