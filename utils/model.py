@@ -26,9 +26,6 @@ def load_model_and_tokenizer(model_id: str) -> Dict[str, Any]:
         model_id, torch_dtype=torch.float16, device_map="auto"
     )
 
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
     return {
         "type": "huggingface",
         "model": model,
@@ -62,7 +59,6 @@ def get_prediction(model_info: Dict[str, Any], prompt: str) -> Tuple[str, float]
                 inputs,
                 max_new_tokens=1000,
                 temperature=0.1,
-                pad_token_id=tokenizer.eos_token_id,
                 do_sample=True,
             )
 

@@ -2,7 +2,7 @@ experiment_name: "RQ2_Accuracy_vs_Context_Length"
 dataset_name: "your-hf-org/your-dataset"
 dataset_split: "test"
 models:
-  - "microsoft/Phi-3-mini-instruct"
+  - "microsoft/phi-4"
 prompt_template: "Given the commit diff and message, untangle the concerns and list them separately. Format your response as a JSON list of concern descriptions.\n\n{few_shot_examples}{content}\n\nConcerns:"
 include_message: true
 context_lengths: [256, 512, 1024, 2048, 4096]

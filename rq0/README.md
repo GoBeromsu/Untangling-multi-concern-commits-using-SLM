@@ -4,7 +4,7 @@ This experiment analyzes the performance gap between different models on the com
 
 ## Description
 
-Compares the performance of GPT-4-turbo and microsoft/Phi-3-mini-instruct models on untangling tangled commits into separate concerns.
+Compares the performance of GPT-4-turbo and microsoft/phi-4 models on untangling tangled commits into separate concerns.
 
 ## Execution
 
