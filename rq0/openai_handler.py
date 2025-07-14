@@ -40,21 +40,26 @@ def load_openai_client(model_name: str) -> Dict[str, Any]:
 
 
 def get_openai_prediction(
-    model_info: Dict[str, Any], prompt: str, temperature: float, max_tokens: int
+    api_key: str,
+    user_prompt: str,
+    system_prompt: str,
+    model: str,
+    temperature: float,
 ) -> str:
-    """Get prediction from OpenAI API."""
+    client = openai.OpenAI(api_key=api_key)
+
     try:
-        response = model_info["client"].chat.completions.create(
-            model=model_info["model_name"],
-            messages=[{"role": "user", "content": prompt}],
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
             temperature=temperature,
-            max_tokens=max_tokens,
             response_format=OPENAI_STRUCTURED_OUTPUT_FORMAT,
         )
-        prediction = response.choices[0].message.content or "No response from API."
+        return response.choices[0].message.content or "No response from API."
     except openai.APIError as e:
-        prediction = f"An OpenAI API error occurred: {e}"
+        return f"An OpenAI API error occurred: {e}"
     except Exception as e:
-        prediction = f"An unexpected error occurred: {e}"
-
-    return prediction
+        return f"An unexpected error occurred: {e}"

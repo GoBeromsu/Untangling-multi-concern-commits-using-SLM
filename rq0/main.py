@@ -3,130 +3,107 @@
 import yaml
 import sys
 import pandas as pd
+import json
 from pathlib import Path
-from typing import List, Dict, Any, Callable, Tuple
+from datasets import load_dataset
 
 sys.path.append(str(Path(__file__).parent.parent))
 from utils import (
-    load_dataset,
-    create_prompt,
     load_model_and_tokenizer,
     get_prediction,
     parse_model_output,
     calculate_metrics,
-    save_results,
+    save_metric_csvs,
 )
 from utils.prompt import get_system_prompt_with_message
 from openai_handler import load_openai_client, get_openai_prediction
 
 
-def get_model_handlers(is_llm: bool) -> Tuple[Callable, Callable]:
-    """Get both model loader and prediction functions based on model type.
-
-    Returns:
-        Tuple[Callable, Callable]: (model_loader_func, prediction_func)
-    """
-    if is_llm:
-        return load_openai_client, get_openai_prediction
-    else:
-        return load_model_and_tokenizer, get_prediction
-
-
-def process_sample(
-    sample: pd.Series,
-    include_message: bool,
-    model_info: Any,
-    model_name: str,
-    temperature: float,
-    max_tokens: int,
-    idx: int,
-    prediction_func: Callable,
-) -> Dict[str, Any]:
-    """Process a single sample with the given model."""
-    prompt_template = get_system_prompt_with_message()
-    prompt = create_prompt(
-        sample.to_dict(),
-        prompt_template,
-        with_message=include_message,
-    )
-
-    prediction = prediction_func(model_info, prompt, temperature, max_tokens)
-    predicted_concerns = parse_model_output(prediction)
-    ground_truth_concerns = set(sample.get("concerns", []))
-
-    return {
-        "sample_id": idx,
-        "model": model_name,
-        "predictions": predicted_concerns,
-        "ground_truth": ground_truth_concerns,
-        "raw_output": prediction,
-    }
-
-
-def process_model_type(
-    model_names: List[str],
-    df: pd.DataFrame,
-    config: Dict[str, Any],
-    is_llm: bool = False,
-) -> List[Dict[str, Any]]:
-    """Process all models of a specific type (SLM or LLM)."""
-    results = []
-    model_loader_func, prediction_func = get_model_handlers(is_llm)
-
-    for model_name in model_names:
-        print(f"Processing model: {model_name}")
-        model_info = model_loader_func(model_name)
-        model_results = []
-
-        for idx, sample in df.iterrows():
-            result = process_sample(
-                sample=sample,
-                include_message=config["include_message"],
-                model_info=model_info,
-                model_name=model_name,
-                temperature=config["temperature"],
-                max_tokens=config["max_tokens"],
-                idx=idx,
-                prediction_func=prediction_func,
-            )
-            model_results.append(result)
-
-            if (idx + 1) % 10 == 0:
-                print(f"Processed {idx + 1}/{len(df)} samples")
-
-        results.extend(model_results)
-
-    return results
+def create_user_prompt(description: str, diff: str) -> str:
+    """Create user prompt from commit message and diff."""
+    return f"<commit_message>{description}</commit_message>\n<commit_diff>{diff}</commit_diff>"
 
 
 def main():
     with open("config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
-    print(f"Running {config['experiment_name']}")
+    dataset_name = config["dataset_name"]
+    dataset_split = config["dataset_split"]
+    slm_models = config["models"].get("slm", [])
+    llm_models = config["models"].get("llm", [])
+    output_dir = config["output_dir"]
+    temperature = config["temperature"]
+    max_tokens = config["max_tokens"]
 
-    df = load_dataset(config["dataset_name"], config["dataset_split"])
+    df = load_dataset(dataset_name, dataset_split)
+    system_prompt = get_system_prompt_with_message()
     results = []
 
-    # Process SLM models
-    if "slm" in config["models"]:
-        slm_results = process_model_type(
-            model_names=config["models"]["slm"], df=df, config=config, is_llm=False
-        )
-        results.extend(slm_results)
+    # Process all models
+    all_models = [(model, False) for model in slm_models] + [
+        (model, True) for model in llm_models
+    ]
 
-    # Process LLM models
-    if "llm" in config["models"]:
-        llm_results = process_model_type(
-            model_names=config["models"]["llm"], df=df, config=config, is_llm=True
-        )
-        results.extend(llm_results)
+    for model_name, is_llm in all_models:
+        model_type = "LLM" if is_llm else "SLM"
+        print(f"Processing {model_type} model: {model_name}")
+
+        # Load model based on type
+        if is_llm:
+            model_info = load_openai_client(model_name)
+        else:
+            model_info = load_model_and_tokenizer(model_name)
+
+        for idx, sample in df.iterrows():
+            # Create user prompt from description and diff
+            description = sample.get("description", "")
+            diff = sample.get("diff", "")
+            user_prompt = create_user_prompt(description, diff)
+
+            if is_llm:
+                prediction = get_openai_prediction(
+                    model_info, user_prompt, system_prompt, temperature, max_tokens
+                )
+            else:
+                # For SLM, combine system and user prompts
+                full_prompt = f"{system_prompt}\n\n{user_prompt}"
+                prediction, _ = get_prediction(
+                    model_info, full_prompt, temperature, max_tokens
+                )
+
+            predicted_concerns = parse_model_output(prediction)
+
+            # Extract ground truth from types column (assuming it's a JSON string or list)
+            ground_truth_raw = sample.get("types", "[]")
+            if isinstance(ground_truth_raw, str):
+                try:
+                    ground_truth_concerns = set(json.loads(ground_truth_raw))
+                except:
+                    ground_truth_concerns = set()
+            elif isinstance(ground_truth_raw, list):
+                ground_truth_concerns = set(ground_truth_raw)
+            else:
+                ground_truth_concerns = set()
+
+            results.append(
+                {
+                    "sample_id": idx,
+                    "model": model_name,
+                    "predictions": predicted_concerns,
+                    "ground_truth": ground_truth_concerns,
+                    "raw_output": prediction,
+                }
+            )
+
+            if (idx + 1) % 10 == 0:
+                print(f"Processed {idx + 1}/{len(df)} samples")
 
     results_df = pd.DataFrame(results)
 
     # Calculate metrics for each model
     all_metrics = {}
-    all_model_names = config["models"].get("slm", []) + config["models"].get("llm", [])
+    all_model_names = slm_models + llm_models
 
     for model_name in all_model_names:
         model_df = results_df[results_df["model"] == model_name]
@@ -138,8 +115,20 @@ def main():
             f"Recall: {metrics['recall']:.3f}"
         )
 
-    save_results(results_df, all_metrics, config["output_dir"])
-    print(f"Results saved to {config['output_dir']}")
+    # Save results as 3 separate CSV files
+    save_metric_csvs(all_metrics, output_dir)
+
+    # Also save detailed results for debugging
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    results_df.to_csv(output_path / "detailed_predictions.csv", index=False)
+
+    print(f"Results saved to {output_dir}")
+    print("Files created:")
+    print("- macro_f1.csv")
+    print("- macro_precision.csv")
+    print("- macro_recall.csv")
+    print("- detailed_predictions.csv")
 
 
 if __name__ == "__main__":

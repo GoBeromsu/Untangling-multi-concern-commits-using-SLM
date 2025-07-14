@@ -72,6 +72,31 @@ def calculate_metrics(df: pd.DataFrame) -> Dict[str, float]:
     }
 
 
+def save_metric_csvs(all_metrics: Dict[str, Dict[str, float]], output_dir: str) -> None:
+    """Save three separate CSV files for F1, Precision, and Recall metrics."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # Extract model names
+    model_names = list(all_metrics.keys())
+
+    # Create single-row DataFrames with models as columns
+    f1_df = pd.DataFrame(
+        {model: [all_metrics[model]["f1_score"]] for model in model_names}
+    )
+    precision_df = pd.DataFrame(
+        {model: [all_metrics[model]["precision"]] for model in model_names}
+    )
+    recall_df = pd.DataFrame(
+        {model: [all_metrics[model]["recall"]] for model in model_names}
+    )
+
+    # Save CSV files
+    f1_df.to_csv(output_path / "macro_f1.csv", index=False)
+    precision_df.to_csv(output_path / "macro_precision.csv", index=False)
+    recall_df.to_csv(output_path / "macro_recall.csv", index=False)
+
+
 def save_results(df: pd.DataFrame, metrics: Dict[str, float], output_dir: str) -> None:
     """Save DataFrame as predictions.csv and metrics as metrics.json."""
     output_path = Path(output_dir)
