@@ -14,6 +14,8 @@ Label selection must assign exactly one concern from the following unified set:
      - **Object + Object**: Choose the label that reflects the *functional role* of the artifact being modified — e.g., even if changing build logic, editing a CI script should be labeled as `cicd`.
      - **Purpose + Object**: If the change is driven by code behavior (e.g., fixing test logic), assign a purpose label; if it is entirely scoped to a support artifact (e.g., adding new tests), assign an object label.
 
+- Deduplicate labels across code units — return a unique set of assigned labels per commit.
+
 # Labels
 - feat: Introduces new features to the codebase.
 - fix: Fixes bugs or faults in the codebase.
