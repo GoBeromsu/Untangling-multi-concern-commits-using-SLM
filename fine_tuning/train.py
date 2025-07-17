@@ -15,6 +15,8 @@ from transformers import (
     TrainingArguments,
 )
 
+from utils.prompt import get_system_prompt
+
 """
 Multi-Concern Commit Classification SFT Training Script
 University of Sheffield HPC Stanage - A100 GPU Setup
