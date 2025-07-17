@@ -42,7 +42,6 @@ Setup Steps:
 3. Run with SLURM:
     sbatch fine_tuning/prepare.sh
 
-Note: Using PyTorch SDPA instead of flash-attn for HPC compatibility
 """
 
 logger = logging.getLogger(__name__)
@@ -126,7 +125,7 @@ checkpoint_path = "microsoft/phi-4"
 model_kwargs = dict(
     use_cache=False,
     trust_remote_code=True,
-    attn_implementation="sdpa",  # PyTorch native Scaled Dot Product Attention
+    attn_implementation="flash_attention_2",
     torch_dtype=torch.bfloat16,
     device_map=None,
 )
