@@ -19958,316 +19958,6 @@ index 8fe84b3..647afa1 100644
        - ""5601:5601""
      expose:
 ",b7beb4d8cf19bbb7b72997a8276300a786e4fb5e
-test,reject deploy signal process for tenant,"diff --git a/engine/src/test/java/io/camunda/zeebe/engine/processing/multitenancy/TenantAwareSignalEventTest.java b/engine/src/test/java/io/camunda/zeebe/engine/processing/multitenancy/TenantAwareSignalEventTest.java
-new file mode 100644
-index 0000000..125b292
---- /dev/null
-+++ b/engine/src/test/java/io/camunda/zeebe/engine/processing/multitenancy/TenantAwareSignalEventTest.java
-@@ -0,0 +1,303 @@
-+/*
-+ * Copyright Camunda Services GmbH and/or licensed to Camunda Services GmbH under
-+ * one or more contributor license agreements. See the NOTICE file distributed
-+ * with this work for additional information regarding copyright ownership.
-+ * Licensed under the Zeebe Community License 1.1. You may not use this file
-+ * except in compliance with the Zeebe Community License 1.1.
-+ */
-+package io.camunda.zeebe.engine.processing.multitenancy;
-+
-+import static io.camunda.zeebe.protocol.record.Assertions.assertThat;
-+
-+import io.camunda.zeebe.engine.util.EngineRule;
-+import io.camunda.zeebe.model.bpmn.Bpmn;
-+import io.camunda.zeebe.protocol.record.RejectionType;
-+import io.camunda.zeebe.protocol.record.intent.ProcessInstanceIntent;
-+import io.camunda.zeebe.protocol.record.intent.SignalIntent;
-+import io.camunda.zeebe.protocol.record.value.TenantOwned;
-+import io.camunda.zeebe.test.util.Strings;
-+import io.camunda.zeebe.test.util.record.RecordingExporter;
-+import io.camunda.zeebe.test.util.record.RecordingExporterTestWatcher;
-+import java.time.Duration;
-+import org.junit.Before;
-+import org.junit.ClassRule;
-+import org.junit.Rule;
-+import org.junit.Test;
-+import org.junit.rules.TestWatcher;
-+
-+public class TenantAwareSignalEventTest {
-+
-+  @ClassRule public static final EngineRule ENGINE = EngineRule.singlePartition();
-+
-+  @Rule public final TestWatcher testWatcher = new RecordingExporterTestWatcher();
-+  private String processId;
-+  private String signalName;
-+
-+  @Before
-+  public void setup() {
-+    processId = Strings.newRandomValidBpmnId();
-+    signalName = ""signal-%s"".formatted(processId);
-+  }
-+
-+  @Test
-+  public void shouldBroadcastSignalForDefaultTenant() {
-+    // given
-+    ENGINE
-+        .deployment()
-+        .withXmlResource(
-+            Bpmn.createExecutableProcess(processId)
-+                .startEvent(""signal-start"")
-+                .signal(signalName)
-+                .endEvent()
-+                .done())
-+        .withTenantId(TenantOwned.DEFAULT_TENANT_IDENTIFIER)
-+        .deploy();
-+
-+    // when
-+    final var broadcasted = ENGINE.signal().withSignalName(signalName).broadcast();
-+
-+    // then
-+    assertThat(broadcasted)
-+        .describedAs(""Expect that signal was broadcasted successful"")
-+        .hasIntent(SignalIntent.BROADCASTED);
-+
-+    assertThat(
-+            RecordingExporter.processInstanceRecords(ProcessInstanceIntent.ELEMENT_ACTIVATED)
-+                .withBpmnProcessId(processId)
-+                .withElementId(""signal-start"")
-+                .getFirst())
-+        .describedAs(""Expect that process instance was created"")
-+        .isNotNull();
-+  }
-+
-+  @Test
-+  public void shouldRejectDeployProcessWithSignalForSpecificTenant() {
-+    // when
-+    final var rejection =
-+        ENGINE
-+            .deployment()
-+            .withXmlResource(
-+                Bpmn.createExecutableProcess(processId)
-+                    .startEvent(""signal-start"")
-+                    .signal(signalName)
-+                    .endEvent()
-+                    .done())
-+            .withTenantId(""custom-tenant"")
-+            .expectRejection()
-+            .deploy();
-+
-+    // then
-+    assertThat(rejection)
-+        .hasRejectionType(RejectionType.INVALID_ARGUMENT)
-+        .hasRejectionReason(
-+            """"""
-+            Expected to deploy new resources, but encountered the following errors:
-+            `process.xml`: - Process: %s
-+                - ERROR: Processes belonging to custom tenants are not allowed to contain elements \
-+            unsupported with multi-tenancy. Only the default tenant '<default>' supports these \
-+            elements currently: ['signal-start' of type 'SIGNAL' 'START_EVENT']. \
-+            See https://github.com/camunda/zeebe/issues/12653 for more details.
-+            """"""
-+                .formatted(processId));
-+  }
-+
-+  @Test
-+  public void shouldRejectDeployProcessWithSignalCatchEventForSpecificTenant() {
-+    // when
-+    final var rejection =
-+        ENGINE
-+            .deployment()
-+            .withXmlResource(
-+                Bpmn.createExecutableProcess(processId)
-+                    .startEvent()
-+                    .intermediateCatchEvent(""signal-catch"")
-+                    .signal(signalName)
-+                    .endEvent()
-+                    .done())
-+            .withTenantId(""custom-tenant"")
-+            .expectRejection()
-+            .deploy();
-+
-+    // then
-+    assertThat(rejection)
-+        .hasRejectionType(RejectionType.INVALID_ARGUMENT)
-+        .hasRejectionReason(
-+            """"""
-+            Expected to deploy new resources, but encountered the following errors:
-+            `process.xml`: - Process: %s
-+                - ERROR: Processes belonging to custom tenants are not allowed to contain elements \
-+            unsupported with multi-tenancy. Only the default tenant '<default>' supports these \
-+            elements currently: ['signal-catch' of type 'SIGNAL' 'INTERMEDIATE_CATCH_EVENT']. \
-+            See https://github.com/camunda/zeebe/issues/12653 for more details.
-+            """"""
-+                .formatted(processId));
-+  }
-+
-+  @Test
-+  public void
-+      shouldRejectDeployProcessWithSignalCatchEventAttachedToEventBasedGatewayForSpecificTenant() {
-+    // when
-+    final var rejection =
-+        ENGINE
-+            .deployment()
-+            .withXmlResource(
-+                Bpmn.createExecutableProcess(processId)
-+                    .startEvent()
-+                    .eventBasedGateway()
-+                    .intermediateCatchEvent(""signal-catch-attached"")
-+                    .signal(signalName)
-+                    .endEvent()
-+                    .moveToLastGateway()
-+                    .intermediateCatchEvent()
-+                    .timerWithDuration(Duration.ofMinutes(10))
-+                    .endEvent()
-+                    .done())
-+            .withTenantId(""custom-tenant"")
-+            .expectRejection()
-+            .deploy();
-+
-+    // then
-+    assertThat(rejection)
-+        .hasRejectionType(RejectionType.INVALID_ARGUMENT)
-+        .hasRejectionReason(
-+            """"""
-+            Expected to deploy new resources, but encountered the following errors:
-+            `process.xml`: - Process: %s
-+                - ERROR: Processes belonging to custom tenants are not allowed to contain elements \
-+            unsupported with multi-tenancy. Only the default tenant '<default>' supports these \
-+            elements currently: ['signal-catch-attached' of type 'SIGNAL' 'INTERMEDIATE_CATCH_EVENT']. \
-+            See https://github.com/camunda/zeebe/issues/12653 for more details.
-+            """"""
-+                .formatted(processId));
-+  }
-+
-+  @Test
-+  public void shouldRejectDeployProcessWithSignalEventSubProcessEventForSpecificTenant() {
-+    // when
-+    final var rejection =
-+        ENGINE
-+            .deployment()
-+            .withXmlResource(
-+                Bpmn.createExecutableProcess(processId)
-+                    .eventSubProcess(
-+                        ""signal-sub"",
-+                        sub ->
-+                            sub.startEvent(""signal-start-event-sub"").signal(signalName).endEvent())
-+                    .startEvent()
-+                    .endEvent()
-+                    .done())
-+            .withTenantId(""custom-tenant"")
-+            .expectRejection()
-+            .deploy();
-+
-+    // then
-+    assertThat(rejection)
-+        .hasRejectionType(RejectionType.INVALID_ARGUMENT)
-+        .hasRejectionReason(
-+            """"""
-+            Expected to deploy new resources, but encountered the following errors:
-+            `process.xml`: - Process: %s
-+                - ERROR: Processes belonging to custom tenants are not allowed to contain elements \
-+            unsupported with multi-tenancy. Only the default tenant '<default>' supports these \
-+            elements currently: ['signal-start-event-sub' of type 'SIGNAL' 'START_EVENT']. \
-+            See https://github.com/camunda/zeebe/issues/12653 for more details.
-+            """"""
-+                .formatted(processId));
-+  }
-+
-+  @Test
-+  public void shouldRejectDeployProcessWithSignalBoundaryEventForSpecificTenant() {
-+    // when
-+    final var rejection =
-+        ENGINE
-+            .deployment()
-+            .withXmlResource(
-+                Bpmn.createExecutableProcess(processId)
-+                    .startEvent()
-+                    .manualTask()
-+                    .boundaryEvent(""signal-boundary"")
-+                    .signal(signalName)
-+                    .endEvent()
-+                    .done())
-+            .withTenantId(""custom-tenant"")
-+            .expectRejection()
-+            .deploy();
-+
-+    // then
-+    assertThat(rejection)
-+        .hasRejectionType(RejectionType.INVALID_ARGUMENT)
-+        .hasRejectionReason(
-+            """"""
-+            Expected to deploy new resources, but encountered the following errors:
-+            `process.xml`: - Process: %s
-+                - ERROR: Processes belonging to custom tenants are not allowed to contain elements \
-+            unsupported with multi-tenancy. Only the default tenant '<default>' supports these \
-+            elements currently: ['signal-boundary' of type 'SIGNAL' 'BOUNDARY_EVENT']. \
-+            See https://github.com/camunda/zeebe/issues/12653 for more details.
-+            """"""
-+                .formatted(processId));
-+  }
-+
-+  @Test
-+  public void shouldRejectDeployProcessWithSignalThrowEventForSpecificTenant() {
-+    // when
-+    final var rejection =
-+        ENGINE
-+            .deployment()
-+            .withXmlResource(
-+                Bpmn.createExecutableProcess(processId)
-+                    .startEvent()
-+                    .intermediateThrowEvent(""signal-throw"")
-+                    .signal(signalName)
-+                    .endEvent()
-+                    .done())
-+            .withTenantId(""custom-tenant"")
-+            .expectRejection()
-+            .deploy();
-+
-+    // then
-+    assertThat(rejection)
-+        .hasRejectionType(RejectionType.INVALID_ARGUMENT)
-+        .hasRejectionReason(
-+            """"""
-+            Expected to deploy new resources, but encountered the following errors:
-+            `process.xml`: - Process: %s
-+                - ERROR: Processes belonging to custom tenants are not allowed to contain elements \
-+            unsupported with multi-tenancy. Only the default tenant '<default>' supports these \
-+            elements currently: ['signal-throw' of type 'SIGNAL' 'INTERMEDIATE_THROW_EVENT']. \
-+            See https://github.com/camunda/zeebe/issues/12653 for more details.
-+            """"""
-+                .formatted(processId));
-+  }
-+
-+  @Test
-+  public void shouldRejectDeployProcessWithSignalEndEventForSpecificTenant() {
-+    // when
-+    final var rejection =
-+        ENGINE
-+            .deployment()
-+            .withXmlResource(
-+                Bpmn.createExecutableProcess(processId)
-+                    .startEvent()
-+                    .endEvent(""signal-end"")
-+                    .signal(signalName)
-+                    .done())
-+            .withTenantId(""custom-tenant"")
-+            .expectRejection()
-+            .deploy();
-+
-+    // then
-+    assertThat(rejection)
-+        .hasRejectionType(RejectionType.INVALID_ARGUMENT)
-+        .hasRejectionReason(
-+            """"""
-+            Expected to deploy new resources, but encountered the following errors:
-+            `process.xml`: - Process: %s
-+                - ERROR: Processes belonging to custom tenants are not allowed to contain elements \
-+            unsupported with multi-tenancy. Only the default tenant '<default>' supports these \
-+            elements currently: ['signal-end' of type 'SIGNAL' 'END_EVENT']. \
-+            See https://github.com/camunda/zeebe/issues/12653 for more details.
-+            """"""
-+                .formatted(processId));
-+  }
-+}
-",ca346bb77e7f1fb041a2d64a28ed925ed2625101
 build,add prewatch script to core,"diff --git a/.gitignore b/.gitignore
 index 3445558..72257cb 100644
 --- a/.gitignore
@@ -30453,51 +30143,6 @@ index 53ad550..68e0a3d 100644
  import { SelectionInfo, getDefaultSelectionInfo } from '@/_helpers/selection'
  import { Mutable } from '@/typings/helpers'
 ",a50b51999015e210918d9c8e95fd4cac347353be
-refactor,switch to throwing errors,"diff --git a/src/background/sync-manager/services/shanbay/index.ts b/src/background/sync-manager/services/shanbay/index.ts
-index 651fd1b..de17a45 100644
---- a/src/background/sync-manager/services/shanbay/index.ts
-+++ b/src/background/sync-manager/services/shanbay/index.ts
-@@ -24,7 +24,7 @@ export class Service extends SyncService<SyncConfig> {
- 
-   async init() {
-     if (!(await this.isLogin())) {
--      return Promise.reject('login')
-+      throw new Error('login')
-     }
- 
-     await setSyncConfig<SyncConfig>(Service.id, this.config)
-@@ -85,11 +85,11 @@ export class Service extends SyncService<SyncConfig> {
-         encodeURIComponent(text)
-       var resSearch = await fetch(url).then(r => r.json())
-     } catch (e) {
--      return Promise.reject('network')
-+      throw new Error('network')
-     }
- 
-     if (!resSearch || !resSearch.data) {
--      return Promise.reject('word')
-+      throw new Error('word')
-     }
- 
-     try {
-@@ -104,11 +104,14 @@ export class Service extends SyncService<SyncConfig> {
-         }
-       ).then(r => r.json())
-     } catch (e) {
--      return Promise.reject('network')
-+      if (process.env.DEBUG) {
-+        console.error(e)
-+      }
-+      throw new Error('network')
-     }
- 
-     if (!resLearning || resLearning.status_code !== 0) {
--      return Promise.reject('word')
-+      throw new Error('word')
-     }
-   }
- 
-",c527037074641064d267f46c1350bb2afc48320e
 refactor,switch to callback ref,"diff --git a/src/notebook/components/transforms/html.js b/src/notebook/components/transforms/html.js
 index 83fc1fb..021cc65 100644
 --- a/src/notebook/components/transforms/html.js
@@ -32381,3 +32026,577 @@ index 52bf3ed..74fe785 100644
        - 'kibbeh/src/**'
    pull_request:
 ",02f9e79a755a1dd95e661c674d6966837f378442
+cicd,"increase timeout of multiregion failover test
+
+Due to the nature of the test, restarts and failovers can take long. If the recovery takes longer than 15m, then the test will fail unnecessarily. Since we are not really testing for how was it can recover, it is ok to increase the maxInstanceDuration.","diff --git a/.github/workflows/e2e-testbench.yaml b/.github/workflows/e2e-testbench.yaml
+index 708f97f..fd0b918 100644
+--- a/.github/workflows/e2e-testbench.yaml
++++ b/.github/workflows/e2e-testbench.yaml
+@@ -31,6 +31,11 @@ on:
+         default: null
+         required: false
+         type: string
++      maxInstanceDuration:
++        description: 'If an instance takes longer than the given duration to complete, test will fail.'
++        default: '15m'
++        required: false
++        type: string
+ 
+   workflow_call:
+     inputs:
+@@ -59,6 +64,11 @@ on:
+         default: null
+         required: false
+         type: string
++      maxInstanceDuration:
++        description: 'If an instance takes longer than the given duration to complete, test will fail.'
++        default: '15m'
++        required: false
++        type: string
+ 
+ jobs:
+   e2e:
+@@ -81,7 +91,7 @@ jobs:
+         {
+         \""maxTestDuration\"": \""${{ inputs.maxTestDuration || 'P5D' }}\"",
+         \""starter\"": [ {\""rate\"": 50, \""processId\"": \""one-task-one-timer\"" } ],
+-        \""verifier\"" : { \""maxInstanceDuration\"" : \""15m\"" },
++        \""verifier\"" : { \""maxInstanceDuration\"" : \""${{ inputs.maxInstanceDuration }}\"" },
+         \""fault\"": ${{ inputs.fault || 'null' }}
+         }
+         }
+diff --git a/.github/workflows/weekly-e2e.yml b/.github/workflows/weekly-e2e.yml
+index 93aaeb5..4bd0afd 100644
+--- a/.github/workflows/weekly-e2e.yml
++++ b/.github/workflows/weekly-e2e.yml
+@@ -31,4 +31,5 @@ jobs:
+       maxTestDuration: P1D
+       clusterPlan: Multiregion test simulation
+       fault: \""2-region-dataloss-failover\""
++      maxInstanceDuration: 40m
+     secrets: inherit
+",ee824ddd71cbc4ccc26f7c6876d379c4927b79e6
+fix,Handle different events.,"diff --git a/src/notebook/epics/kernel-launch.js b/src/notebook/epics/kernel-launch.js
+index 9075d7c..9f16e67 100644
+--- a/src/notebook/epics/kernel-launch.js
++++ b/src/notebook/epics/kernel-launch.js
+@@ -113,6 +113,12 @@ export function newKernelObservable(kernelSpec: KernelInfo, cwd: string) {
+           observer.error({ type: 'ERROR', payload: error, err: true });
+           observer.complete();
+         });
++        spawn.on('exit', () => {
++          observer.complete();
++        });
++        spawn.on('disconnect', () => {
++          observer.complete();
++        });
+       });
+   });
+ }
+",a280a52c8309465276c3509848ddcddbe19732b6
+refactor,refactor generate_completion,"diff --git a/src/lib.rs b/src/lib.rs
+index dfd8014..15850f7 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,11 +1,106 @@
+ //! Generates [Nushell](https://github.com/nushell/nushell) completions for [`clap`](https://github.com/clap-rs/clap) based CLIs
+ 
+-use clap::Command;
++use clap::{Arg, Command};
+ use clap_complete::Generator;
+ 
+ /// Generate Nushell complete file
+ pub struct Nushell;
+ 
++enum Argument {
++    Short(char),
++    Long(String),
++    ShortAndLong(char, String),
++    Positional(String, bool),
++}
++
++struct ArgumentLine {
++    arg: Argument,
++    takes_values: bool,
++    help: Option<String>,
++}
++
++impl From<&Arg> for ArgumentLine {
++    fn from(arg: &Arg) -> Self {
++        let takes_values = arg
++            .get_num_args()
++            .map(|v| v.takes_values())
++            .unwrap_or(false);
++
++        let help = arg.get_help().map(|s| s.to_string());
++
++        if arg.is_positional() {
++            let id = arg.get_id().to_string();
++            let required = arg.is_required_set();
++            let arg = Argument::Positional(id, required);
++
++            return Self {
++                arg,
++                takes_values,
++                help,
++            };
++        }
++
++        let short = arg.get_short();
++        let long = arg.get_long();
++
++        match short {
++            Some(short) => match long {
++                Some(long) => Self {
++                    arg: Argument::ShortAndLong(short, long.into()),
++                    takes_values,
++                    help,
++                },
++                None => Self {
++                    arg: Argument::Short(short),
++                    takes_values,
++                    help,
++                },
++            },
++            None => match long {
++                Some(long) => Self {
++                    arg: Argument::Long(long.into()),
++                    takes_values,
++                    help,
++                },
++                None => unreachable!(""No short or long option found""),
++            },
++        }
++    }
++}
++
++impl ToString for ArgumentLine {
++    fn to_string(&self) -> String {
++        let mut s = String::new();
++
++        match &self.arg {
++            Argument::Short(short) => s.push_str(format!(""    -{}"", short).as_str()),
++            Argument::Long(long) => s.push_str(format!(""    --{}"", long).as_str()),
++            Argument::ShortAndLong(short, long) => {
++                s.push_str(format!(""    --{}(-{})"", long, short).as_str())
++            }
++            Argument::Positional(positional, required) => {
++                s.push_str(format!(""    {}"", positional).as_str());
++
++                if !*required {
++                    s.push('?');
++                }
++            }
++        }
++
++        if self.takes_values {
++            s.push_str("": string"");
++        }
++
++        if let Some(help) = &self.help {
++            s.push_str(format!(""\t# {}"", help).as_str());
++        }
++
++        s.push('\n');
++
++        s
++    }
++}
++
+ impl Generator for Nushell {
+     fn file_name(&self, name: &str) -> String {
+         format!(""{}.nu"", name)
+@@ -37,51 +132,18 @@ fn generate_completion(completions: &mut String, cmd: &Command, is_subcommand: b
+ 
+     let bin_name = cmd.get_bin_name().expect(""Failed to get bin name"");
+ 
+-    if is_subcommand {
+-        completions.push_str(format!(""  export extern \""{}\"" [\n"", bin_name).as_str());
++    let name = if is_subcommand {
++        format!(r#""""{}""""#, bin_name)
+     } else {
+-        completions.push_str(format!(""  export extern {} [\n"", bin_name).as_str());
+-    }
++        bin_name.into()
++    };
+ 
+-    let mut s = String::new();
+-    for arg in cmd.get_arguments() {
+-        if arg.is_positional() {
+-            s.push_str(format!(""    {}"", arg.get_id()).as_str());
+-            if !arg.is_required_set() {
+-                s.push('?');
+-            }
+-        }
+-
+-        let long = arg.get_long();
+-        if let Some(opt) = long {
+-            s.push_str(format!(""    --{}"", opt).as_str());
+-        }
++    completions.push_str(format!(""  export extern {} [\n"", name).as_str());
+ 
+-        let short = arg.get_short();
+-        if let Some(opt) = short {
+-            if long.is_some() {
+-                s.push_str(format!(""(-{})"", opt).as_str());
+-            } else {
+-                s.push_str(format!(""    -{}"", opt).as_str());
+-            }
+-        }
+-
+-        if let Some(v) = arg.get_num_args() {
+-            if v.takes_values() {
+-                // TODO: add more types?
+-                // TODO: add possible values?
+-                s.push_str("": string"");
+-            }
+-        }
+-
+-        if let Some(msg) = arg.get_help() {
+-            if arg.is_positional() || long.is_some() || short.is_some() {
+-                s.push_str(format!(""\t# {}"", msg).as_str());
+-            }
+-        }
+-
+-        s.push('\n');
+-    }
++    let s: String = cmd
++        .get_arguments()
++        .map(|arg| ArgumentLine::from(arg).to_string())
++        .collect();
+ 
+     completions.push_str(&s);
+     completions.push_str(""  ]\n\n"");
+",f1bc5a554af4e617c7d7508f7f16f8fd25c78c91
+refactor,reorder startup steps,"diff --git a/broker/src/main/java/io/camunda/zeebe/broker/bootstrap/BrokerStartupProcess.java b/broker/src/main/java/io/camunda/zeebe/broker/bootstrap/BrokerStartupProcess.java
+index 52fa3a9..d81c27a 100644
+--- a/broker/src/main/java/io/camunda/zeebe/broker/bootstrap/BrokerStartupProcess.java
++++ b/broker/src/main/java/io/camunda/zeebe/broker/bootstrap/BrokerStartupProcess.java
+@@ -50,21 +50,20 @@ public final class BrokerStartupProcess {
+       // must be executed before any disk space usage listeners are registered
+       result.add(new DiskSpaceUsageMonitorStep());
+     }
+-
+     result.add(new MonitoringServerStep());
+     result.add(new BrokerAdminServiceStep());
++
+     result.add(new ClusterServicesCreationStep());
++    result.add(new ClusterServicesStep());
+ 
+     result.add(new CommandApiServiceStep());
+     result.add(new SubscriptionApiStep());
+-
+-    result.add(new ClusterServicesStep());
++    result.add(new LeaderManagementRequestHandlerStep());
+ 
+     if (config.getGateway().isEnable()) {
+       result.add(new EmbeddedGatewayServiceStep());
+     }
+ 
+-    result.add(new LeaderManagementRequestHandlerStep());
+     result.add(new PartitionManagerStep());
+ 
+     return result;
+",3e0c4cbf91fe5efc9b93baba93e4df93ef4ab5cd
+test,"verify process can start at supported element types
+
+Verifies a PI can be started at specific element types. The test will deploy the process, start an instance at the desired start element and verify that it has been activated succesfully.","diff --git a/engine/src/test/java/io/camunda/zeebe/engine/processing/processinstance/CreateProcessInstanceSupportedElementTest.java b/engine/src/test/java/io/camunda/zeebe/engine/processing/processinstance/CreateProcessInstanceSupportedElementTest.java
+new file mode 100644
+index 0000000..a505307
+--- /dev/null
++++ b/engine/src/test/java/io/camunda/zeebe/engine/processing/processinstance/CreateProcessInstanceSupportedElementTest.java
+@@ -0,0 +1,233 @@
++/*
++ * Copyright Camunda Services GmbH and/or licensed to Camunda Services GmbH under
++ * one or more contributor license agreements. See the NOTICE file distributed
++ * with this work for additional information regarding copyright ownership.
++ * Licensed under the Zeebe Community License 1.1. You may not use this file
++ * except in compliance with the Zeebe Community License 1.1.
++ */
++package io.camunda.zeebe.engine.processing.processinstance;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.groups.Tuple.tuple;
++
++import io.camunda.zeebe.engine.util.EngineRule;
++import io.camunda.zeebe.model.bpmn.Bpmn;
++import io.camunda.zeebe.model.bpmn.BpmnModelInstance;
++import io.camunda.zeebe.protocol.record.Record;
++import io.camunda.zeebe.protocol.record.intent.ProcessInstanceIntent;
++import io.camunda.zeebe.protocol.record.value.BpmnElementType;
++import io.camunda.zeebe.test.util.record.RecordingExporter;
++import io.camunda.zeebe.test.util.record.RecordingExporterTestWatcher;
++import java.util.Collection;
++import java.util.Collections;
++import java.util.List;
++import java.util.Map;
++import org.junit.ClassRule;
++import org.junit.Rule;
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.junit.runners.Parameterized;
++import org.junit.runners.Parameterized.Parameters;
++
++@RunWith(Parameterized.class)
++public class CreateProcessInstanceSupportedElementTest {
++
++  @ClassRule public static final EngineRule ENGINE = EngineRule.singlePartition();
++  private static final String PROCESS_ID = ""processId"";
++  private static final String CHILD_PROCESS_ID = ""childProcessId"";
++  private static final String START_ELEMENT_ID = ""startElement"";
++  private static final String MESSAGE = ""message"";
++  private static final String JOBTYPE = ""jobtype"";
++
++  @Rule
++  public final RecordingExporterTestWatcher recordingExporterTestWatcher =
++      new RecordingExporterTestWatcher();
++
++  private final Scenario scenario;
++
++  public CreateProcessInstanceSupportedElementTest(final Scenario scenario) {
++    this.scenario = scenario;
++  }
++
++  @Parameters(name = ""{0}"")
++  public static Collection<Object> scenarios() {
++    return List.of(
++        new Scenario(
++            BpmnElementType.SUB_PROCESS,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .subProcess(START_ELEMENT_ID)
++                .embeddedSubProcess()
++                .startEvent()
++                .subProcessDone()
++                .done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.EVENT_SUB_PROCESS,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .eventSubProcess(
++                    START_ELEMENT_ID, e -> e.startEvent().timerWithDuration(""PT1H"").endEvent())
++                .startEvent()
++                .endEvent()
++                .done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.INTERMEDIATE_CATCH_EVENT,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .intermediateCatchEvent(START_ELEMENT_ID)
++                .message(b -> b.name(MESSAGE).zeebeCorrelationKeyExpression(""correlationKey""))
++                .done(),
++            Map.of(""correlationKey"", ""value"")),
++        new Scenario(
++            BpmnElementType.INTERMEDIATE_THROW_EVENT,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .intermediateThrowEvent(START_ELEMENT_ID)
++                .endEvent()
++                .done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.END_EVENT,
++            Bpmn.createExecutableProcess(PROCESS_ID).startEvent().endEvent(START_ELEMENT_ID).done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.SERVICE_TASK,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .serviceTask(START_ELEMENT_ID, b -> b.zeebeJobType(JOBTYPE))
++                .done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.RECEIVE_TASK,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .receiveTask(START_ELEMENT_ID)
++                .message(b -> b.name(MESSAGE).zeebeCorrelationKeyExpression(""correlationKey""))
++                .done(),
++            Map.of(""correlationKey"", ""value"")),
++        new Scenario(
++            BpmnElementType.USER_TASK,
++            Bpmn.createExecutableProcess(PROCESS_ID).startEvent().userTask(START_ELEMENT_ID).done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.MANUAL_TASK,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .manualTask(START_ELEMENT_ID)
++                .endEvent()
++                .done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.EXCLUSIVE_GATEWAY,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .exclusiveGateway(START_ELEMENT_ID)
++                .defaultFlow()
++                .endEvent()
++                .done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.PARALLEL_GATEWAY,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .parallelGateway(START_ELEMENT_ID)
++                .endEvent()
++                .done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.EVENT_BASED_GATEWAY,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .eventBasedGateway(START_ELEMENT_ID)
++                .intermediateCatchEvent()
++                .message(b -> b.name(MESSAGE).zeebeCorrelationKeyExpression(""correlationKey""))
++                .moveToLastGateway()
++                .intermediateCatchEvent()
++                .timerWithDuration(""PT1H"")
++                .done(),
++            Map.of(""correlationKey"", ""value"")),
++        new Scenario(
++            BpmnElementType.MULTI_INSTANCE_BODY,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .serviceTask(
++                    START_ELEMENT_ID,
++                    t ->
++                        t.zeebeJobType(JOBTYPE)
++                            .multiInstance(m -> m.parallel().zeebeInputCollectionExpression(""[1]"")))
++                .endEvent()
++                .done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.CALL_ACTIVITY,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .callActivity(START_ELEMENT_ID, c -> c.zeebeProcessId(CHILD_PROCESS_ID))
++                .endEvent()
++                .done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.BUSINESS_RULE_TASK,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .businessRuleTask(START_ELEMENT_ID, b -> b.zeebeJobType(JOBTYPE))
++                .done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.SCRIPT_TASK,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .scriptTask(START_ELEMENT_ID, b -> b.zeebeJobType(JOBTYPE))
++                .done(),
++            Collections.emptyMap()),
++        new Scenario(
++            BpmnElementType.SEND_TASK,
++            Bpmn.createExecutableProcess(PROCESS_ID)
++                .startEvent()
++                .sendTask(START_ELEMENT_ID, b -> b.zeebeJobType(JOBTYPE))
++                .done(),
++            Collections.emptyMap()));
++  }
++
++  @Test
++  public void testProcessInstanceCanStartAtElementType() {
++    // given
++    ENGINE.deployment().withXmlResource(scenario.modelInstance).deploy();
++    if (scenario.type == BpmnElementType.CALL_ACTIVITY) {
++      ENGINE.deployment().withXmlResource(getChildProcess()).deploy();
++    }
++
++    // when
++    final long instanceKey =
++        ENGINE
++            .processInstance()
++            .ofBpmnProcessId(PROCESS_ID)
++            .withStartInstruction(START_ELEMENT_ID)
++            .withVariables(scenario.variables)
++            .create();
++
++    // then
++    assertThat(
++            RecordingExporter.processInstanceRecords()
++                .withProcessInstanceKey(instanceKey)
++                .onlyEvents()
++                .limit(
++                    r ->
++                        r.getValue().getBpmnElementType() == scenario.type
++                            && r.getIntent() == ProcessInstanceIntent.ELEMENT_ACTIVATED))
++        .extracting(record -> record.getValue().getBpmnElementType(), Record::getIntent)
++        .containsSequence(
++            tuple(BpmnElementType.PROCESS, ProcessInstanceIntent.ELEMENT_ACTIVATING),
++            tuple(BpmnElementType.PROCESS, ProcessInstanceIntent.ELEMENT_ACTIVATED),
++            tuple(scenario.type, ProcessInstanceIntent.ELEMENT_ACTIVATING),
++            tuple(scenario.type, ProcessInstanceIntent.ELEMENT_ACTIVATED));
++  }
++
++  private BpmnModelInstance getChildProcess() {
++    return Bpmn.createExecutableProcess(CHILD_PROCESS_ID).startEvent().endEvent().done();
++  }
++
++  record Scenario(
++      BpmnElementType type, BpmnModelInstance modelInstance, Map<String, Object> variables) {}
++}
+",a5ecfdf49b0d4c43fbbbf7947be7c0327ccb3415
+test,await job creation to ensure asserted event sequence,"diff --git a/engine/src/test/java/io/zeebe/engine/processor/workflow/boundary/BoundaryEventTest.java b/engine/src/test/java/io/zeebe/engine/processor/workflow/boundary/BoundaryEventTest.java
+index 9ffa1fa..4333db0 100644
+--- a/engine/src/test/java/io/zeebe/engine/processor/workflow/boundary/BoundaryEventTest.java
++++ b/engine/src/test/java/io/zeebe/engine/processor/workflow/boundary/BoundaryEventTest.java
+@@ -114,12 +114,18 @@ public class BoundaryEventTest {
+     ENGINE.deployment().withXmlResource(MULTIPLE_SEQUENCE_FLOWS).deploy();
+     final long workflowInstanceKey = ENGINE.workflowInstance().ofBpmnProcessId(PROCESS_ID).create();
+ 
+-    // when
+     RecordingExporter.timerRecords()
+         .withHandlerNodeId(""timer"")
+         .withIntent(TimerIntent.CREATED)
+         .withWorkflowInstanceKey(workflowInstanceKey)
+         .getFirst();
++
++    RecordingExporter.jobRecords(JobIntent.CREATED)
++        .withType(""type"")
++        .withWorkflowInstanceKey(workflowInstanceKey)
++        .getFirst();
++
++    // when
+     ENGINE.increaseTime(Duration.ofMinutes(1));
+ 
+     // then
+",a8d1a60fd48d3fbd76d4271987a1b0f538d498f1
+fix,#972 External links open in the same tab,"diff --git a/kofta/src/app/components/Footer.tsx b/kofta/src/app/components/Footer.tsx
+index c55fae9..940f7ac 100644
+--- a/kofta/src/app/components/Footer.tsx
++++ b/kofta/src/app/components/Footer.tsx
+@@ -13,14 +13,14 @@ export const Footer: React.FC<FooterProps> = ({ isLogin }) => {
+   return (
+     <div className={`justify-between flex text-center`}>
+       {isLogin ? (
+-        <RegularAnchor href=""https://www.youtube.com/watch?v=hy-EhJ_tTQo"">
++        <RegularAnchor href=""https://www.youtube.com/watch?v=hy-EhJ_tTQo"" target=""_blank"">
+           {t(""footer.link_1"")}
+         </RegularAnchor>
+       ) : null}
+-      <RegularAnchor href=""https://discord.gg/wCbKBZF9cV"">
++      <RegularAnchor href=""https://discord.gg/wCbKBZF9cV"" target=""_blank"">
+         {t(""footer.link_2"")}
+       </RegularAnchor>
+-      <RegularAnchor href=""https://github.com/benawad/dogehouse/issues"">
++      <RegularAnchor href=""https://github.com/benawad/dogehouse/issues"" target=""_blank"">
+         {t(""footer.link_3"")}
+       </RegularAnchor>
+       {/* cramps footer on mobile @todo think about how to incorporate this without cramping footer and making the footer really tall */}
+diff --git a/kofta/src/app/pages/Login.tsx b/kofta/src/app/pages/Login.tsx
+index 3854b5d..1f06220 100644
+--- a/kofta/src/app/pages/Login.tsx
++++ b/kofta/src/app/pages/Login.tsx
+@@ -46,6 +46,7 @@ export const Login: React.FC<LoginProps> = () => {
+               <a
+                 href=""https://github.com/benawad/dogehouse""
+                 className={`p-0 text-blue-400`}
++                target=""_blank""
+               >
+                 {t(""pages.login.featureText_4"")}
+               </a>
+",07452180fee89e98f05e1aeca68f9923d4c7ab63
