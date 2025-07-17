@@ -144,7 +144,7 @@ index d0ee4f3..c2ab83c 100644
 2.  These changes restructure the existing test code without altering its external behavior, which aligns perfectly with the definition of `refactor`.
 3.  The modifications are not fixing a bug (`fix`) or introducing a new capability (`feat`), but are solely focused on improving the internal quality and structure of the code.
 4.  Therefore, after evaluating all code units, the single, most appropriate label for the entire commit is `refactor`. 
-<reasoning>
+</reasoning>
 <label id="example-1">refactor</label>
 """
 
