@@ -23,35 +23,50 @@ echo "GPU: $CUDA_VISIBLE_DEVICES"
 # Create logs directory
 mkdir -p logs
 
-# Load required HPC modules (minimal setup)
+# Load required HPC modules (Sheffield HPC Stanage standard modules)
 module load CUDA/12.4.0  
 module load Anaconda3/2022.05
 
-# Setup conda environment using environment.yml (HPC standard approach)
 if conda env list | grep -q "phi4_env"; then
     echo "🗑️ Removing existing phi4_env..."
     conda remove -n phi4_env --all -y
 fi
 
-echo "🏗️ Creating conda environment from environment.yml..."
-conda env create -f models/environment.yml
-source activate phi4_env
+echo "🏗️ Step 1: Creating conda environment (system dependencies)..."
+conda env create -f fine_tuning/environment.yml
 
-echo "📦 All dependencies installed via conda environment.yml"
+echo "🔧 Step 2: Activating phi4_env..."
+conda activate phi4_env
 
-# Note: flash-attn removed due to glibc compatibility - using PyTorch SDPA fallback
-# Set environment variables for optimal GPU performance
+echo "📦 Step 3: Installing ML-specific dependencies via pip..."
+pip install -r fine_tuning/requirements-hpc.txt
+
+echo "✅ MECE dependencies installation completed!"
+echo "   - Conda: Python, PyTorch, CUDA, basic libraries" 
+echo "   - Pip: HuggingFace, fine-tuning, flash-attn"
+
+# Note: flash-attn included for A100/H100 optimization on Sheffield HPC
+echo "⚙️ Setting environment variables for optimal GPU performance..."
 export CUDA_VISIBLE_DEVICES=0
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 export TOKENIZERS_PARALLELISM=false
 
+# Verify CUDA and PyTorch installation
+echo "🔍 Verifying CUDA and PyTorch installation..."
+python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA version: {torch.version.cuda}')"
+
+# Verify flash-attn installation
+echo "🔍 Verifying flash-attn installation..."
+python -c "try: import flash_attn; print('✅ flash-attn available'); except ImportError: print('⚠️ flash-attn not available - using PyTorch SDPA fallback')"
+
 # Start GPU monitoring in background
+echo "📊 Starting GPU monitoring..."
 nvidia-smi --query-gpu=index,timestamp,utilization.gpu,memory.total,memory.used,memory.free --format=csv -l 2 > gpu_stats_${SLURM_JOB_ID}.log &
 GPU_MONITOR_PID=$!
 
 # Run training script
 echo "🔥 Starting LoRA fine-tuning at $(date)"
-python models/train.py
+python fine_tuning/train.py
 
 # Stop GPU monitoring
 kill $GPU_MONITOR_PID 2>/dev/null || true
@@ -67,4 +82,5 @@ echo "To view GPU stats: head -5 gpu_stats_${SLURM_JOB_ID}.log"
 echo "For efficiency report: seff ${SLURM_JOB_ID}"
 
 # Clean up conda environment
-source deactivate
+echo "🧹 Cleaning up environment..."
+conda deactivate

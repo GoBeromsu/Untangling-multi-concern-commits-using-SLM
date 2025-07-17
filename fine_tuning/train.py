@@ -24,25 +24,23 @@ Dataset: Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models
 Input: commit_message (commit message), types, reason
 Target: Learning to predict reasoning for commit classification
 
-HPC Setup Requirements:
-- GPU: A100 80GB, 4x per node, requires SLURM job submission
-- Memory: 256GB RAM per node, use --mem flag for allocation
-- Modules: module load PyTorch/1.13.1-foss-2022a-CUDA-11.7.0
+HPC Stanage Setup Requirements:
+- GPU: A100 40/80GB, requires SLURM job submission
+- Memory: 128GB RAM recommended for single A100
+- Modules: module load CUDA/12.4.0 && module load Anaconda3/2022.05
 
 Setup Steps:
-1. Install dependencies:
-    conda install -c conda-forge accelerate=1.3.0
-    pip3 install -i https://pypi.org/simple/ bitsandbytes
-    pip3 install peft==0.14.0
-    pip3 install transformers==4.48.1
-    pip3 install trl datasets
-    pip3 install deepspeed
+1. Create conda environment:
+    conda env create -f fine_tuning/environment.yml
+    conda activate phi4_env
 
-2. Setup accelerate config for A100:
-    accelerate config
+2. Verify installation:
+    python -c "import torch; print(torch.cuda.is_available())"
 
-3. Run with accelerate:
-    accelerate launch train.py
+3. Run with SLURM:
+    sbatch fine_tuning/prepare.sh
+
+Note: Using PyTorch SDPA instead of flash-attn for HPC compatibility
 """
 
 logger = logging.getLogger(__name__)

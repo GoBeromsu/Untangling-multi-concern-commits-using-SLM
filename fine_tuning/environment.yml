@@ -1,0 +1,19 @@
+name: phi4_env
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  # Python Base - HPC Stanage compatible
+  - python=3.10
+
+  # PyTorch Ecosystem - CUDA 12.4.0 compatible
+  - pytorch=2.6 # Latest stable with CUDA 12.4.0 support
+  - torchvision # Latest compatible version
+  - torchaudio # Latest compatible version
+  - pytorch-cuda=12.4 # Exact match for HPC CUDA 12.4.0
+
+  # Package Management
+  - pip
