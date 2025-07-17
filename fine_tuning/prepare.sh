@@ -23,12 +23,10 @@ echo "Allocated CPUs: $SLURM_CPUS_PER_TASK, Memory: $SLURM_MEM_PER_NODE MB"
 # Create logs directory
 mkdir -p logs
 
-# Load required HPC modules (Sheffield HPC Stanage standard modules)
-module load CUDA/12.4.0  
+module purge
+module load GCCcore/12.3.0
+module load CUDA/12.1.1
 module load Anaconda3/2022.05
-
-# Load cuDNN for GPU deep learning optimization (CUDA 12.4.0 compatible)
-# Note: Check available cuDNN versions with 'module avail cuDNN'
 module load cuDNN/8.9.2.26-CUDA-12.1.1
 
 # Remove existing environment if exists
