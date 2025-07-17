@@ -3,7 +3,7 @@ import json
 import glob
 import streamlit as st
 import pandas as pd
-from typing import List, Dict, Any, Tuple
+from typing import Dict, Any
 from collections import Counter
 from dotenv import load_dotenv
 from utils.prompt import get_system_prompt
@@ -25,12 +25,10 @@ from visual_eval.ui.validation import (
 from visual_eval.ui.components import (
     render_evaluation_metrics,
     render_results_table,
-    render_dataset_metadata,
     create_column_config,
 )
 from visual_eval.ui.patterns import (
     parse_model_response,
-    extract_test_case_data,
 )
 
 
@@ -58,46 +56,21 @@ def get_model_response(diff: str, system_prompt: str) -> str:
         raise ValueError(f"Unsupported API provider: {selected_api}")
 
 
-def load_concern_test_dataset(
-    file_path: str,
-) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """Load concern classification test dataset from JSON file."""
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data["cases"], data.get("metadata", {})
-    except Exception as e:
-        st.error(f"Error loading concern test dataset: {str(e)}")
-        return [], {}
-
-
-def load_concern_test_dataset_csv(
-    file_path: str,
-) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """Load concern classification test dataset from CSV file."""
+def load_dataset(file_path: str) -> pd.DataFrame:
+    """Load concern classification test dataset from CSV file as DataFrame."""
     try:
         df = pd.read_csv(file_path)
-        cases = []
 
-        for _, row in df.iterrows():
-            # Parse types column as JSON list
-            types_str = row["types"]
-            concern_types = json.loads(types_str) if types_str else []
-
-            # Build atomic changes structure compatible with existing logic
-            atomic_changes = [{"label": concern_type} for concern_type in concern_types]
-
-            # Create case dict with expected structure
-            case = {"tangleChange": row["diff"], "atomicChanges": atomic_changes}
-            cases.append(case)
-
-        # No metadata available for CSV format
-        metadata = {}
-        return cases, metadata
+        # Parse JSON columns upfront for efficiency
+        df["types_parsed"] = df["types"].apply(lambda x: json.loads(x) if x else [])
+        df["shas_parsed"] = df.get("shas", pd.Series(dtype=str)).apply(
+            lambda x: json.loads(x) if x else []
+        )
+        return df
 
     except Exception as e:
         st.error(f"Error loading CSV concern test dataset: {str(e)}")
-        return [], {}
+        return pd.DataFrame(), {}
 
 
 def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
@@ -134,10 +107,12 @@ def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
-def execute_batch_concern_evaluation(
-    test_dataset: List[Dict[str, Any]], system_prompt: str
-) -> None:
-    """Execute batch evaluation of concern classification with real-time updates."""
+def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> None:
+    """Execute batch evaluation of concern classification with real-time updates using DataFrame."""
+
+    if df.empty:
+        st.error("No test data available for evaluation")
+        return
 
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -157,13 +132,19 @@ def execute_batch_concern_evaluation(
             "Case_Recall",
             "Case_F1",
             "Model_Reasoning",
+            "SHAs",
         ]
     )
 
-    for test_index, test_case in enumerate(test_dataset):
-        status_text.text(f"Evaluating case {test_index+1}/{len(test_dataset)}...")
+    total_cases = len(df)
 
-        diff, actual_concern_types = extract_test_case_data(test_case)
+    for test_index, row in df.iterrows():
+        status_text.text(f"Evaluating case {test_index+1}/{total_cases}...")
+
+        # Extract data directly from DataFrame row
+        diff = row["diff"]
+        actual_concern_types = row["types_parsed"]
+        shas = row["shas_parsed"]
 
         # Get model prediction
         model_response = get_model_response(diff, system_prompt)
@@ -183,8 +164,6 @@ def execute_batch_concern_evaluation(
         concern_count_match = predicted_concern_count == actual_concern_count
 
         # STRICT MULTISET MATCHING: Calculate TP, FP, FN with exact count requirements
-        # Example: if actual=['feat'] but predicted=['feat','feat'], then TP=1, FP=1, FN=0
-        # This means: feat→feat,feat is WRONG (over-prediction causes FP)
         all_types = set(predicted_counter.keys()) | set(actual_counter.keys())
         tp = sum(
             min(predicted_counter[t], actual_counter[t]) for t in all_types
@@ -209,6 +188,9 @@ def execute_batch_concern_evaluation(
         types_status_icon = "✅" if concern_types_match else "❌"
         count_status_icon = "✅" if concern_count_match else "❌"
         evaluation_status = f"{types_status_icon}T {count_status_icon}C"
+
+        # Format SHA information as comma-separated string
+        formatted_shas = ", ".join(shas) if shas else "None"
 
         # Add result to DataFrame with case metrics for internal calculation
         new_evaluation_result = pd.DataFrame(
@@ -235,18 +217,19 @@ def execute_batch_concern_evaluation(
                 "Case_Precision": [case_precision],
                 "Case_Recall": [case_recall],
                 "Case_F1": [case_f1],
+                "SHAs": [formatted_shas],
             }
         )
 
         evaluation_results_df = pd.concat(
             [evaluation_results_df, new_evaluation_result], ignore_index=True
         )
-        progress_bar.progress((test_index + 1) / len(test_dataset))
+        progress_bar.progress((test_index + 1) / total_cases)
 
         # Update evaluation summary
         metrics = calculate_evaluation_metrics(evaluation_results_df)
         with summary_container.container():
-            render_evaluation_metrics(metrics, len(test_dataset))
+            render_evaluation_metrics(metrics, total_cases)
 
         # Update results table (exclude case metrics from display)
         with table_container.container():
@@ -321,9 +304,7 @@ def render_batch_evaluation_interface() -> None:
     """Render UI interface for batch evaluation from test dataset files."""
     available_dataset_files = []
     for search_pattern in [
-        "datasets/**/*.json",
         "datasets/**/*.csv",
-        "../datasets/**/*.json",
         "../datasets/**/*.csv",
     ]:
         matched_files = glob.glob(search_pattern, recursive=True)
@@ -333,38 +314,24 @@ def render_batch_evaluation_interface() -> None:
     available_dataset_files.sort()
 
     if not available_dataset_files:
-        st.error("No test dataset files found in datasets directory")
+        st.error("No CSV test dataset files found in datasets directory")
         st.stop()
 
-    selected_dataset_file = st.selectbox(
+    selected_dataset = st.selectbox(
         "Select concern classification test dataset:",
         available_dataset_files,
         format_func=lambda x: f"{os.path.basename(x)} ({os.path.dirname(x)})",
     )
 
-    if selected_dataset_file:
-        # Load dataset based on file extension
-        if selected_dataset_file.endswith(".csv"):
-            test_dataset, dataset_metadata = load_concern_test_dataset_csv(
-                selected_dataset_file
-            )
-        else:
-            test_dataset, dataset_metadata = load_concern_test_dataset(
-                selected_dataset_file
-            )
-
-        if test_dataset:
+    test_dataset = pd.DataFrame()
+    if selected_dataset:
+        test_dataset = load_dataset(selected_dataset)
+        if not test_dataset.empty:
             st.success(
-                f"📊 Loaded **{len(test_dataset)}** test cases from `{selected_dataset_file}`"
+                f"📊 Loaded **{len(test_dataset)}** test cases from `{selected_dataset}`"
             )
-            # Only render metadata if it exists (JSON files)
-            if dataset_metadata:
-                render_dataset_metadata(dataset_metadata)
         else:
             st.error("❌ Failed to load test dataset")
-            test_dataset = []
-    else:
-        test_dataset = []
 
     st.subheader("Concern Analysis Prompt Template")
     system_prompt = st.text_area(
@@ -375,7 +342,7 @@ def render_batch_evaluation_interface() -> None:
     )
 
     if st.button("Run Batch Evaluation", type="primary", use_container_width=True):
-        if not test_dataset:
+        if test_dataset.empty:
             st.error("Please select a valid test dataset file first.")
         else:
             st.divider()
@@ -397,53 +364,52 @@ def main() -> None:
         help="Choose between OpenAI API or local LM Studio",
     )
 
+    # Handle OpenAI API setup
     if api_provider == "OpenAI":
-        if is_openai_api_key_available():
-            st.success("✅ OpenAI API Key detected")
-        else:
-            st.error(
-                "❌ No OpenAI API Key found. Please set OPENAI_API_KEY in .env file"
-            )
+        if not is_openai_api_key_available():
+            st.error("❌ No OpenAI API Key found. Please set OPENAI_API_KEY in .env file")
             st.stop()
-
-        st.session_state.selected_api = "openai"
-        st.session_state.selected_model = None
-
-    elif api_provider == "LM Studio":
+        
+        st.success("✅ OpenAI API Key detected")
+        st.session_state.update({
+            "selected_api": "openai",
+            "selected_model": None
+        })
+        
+    # Handle LM Studio setup
+    else:  # api_provider == "LM Studio"
         lmstudio_url = st.text_input(
             "LM Studio URL:",
             value=DEFAULT_LMSTUDIO_URL,
-            help="Base URL for LM Studio API",
+            help="Base URL for LM Studio API"
         )
 
-        # Automatically check connection when LM Studio is selected
+        # Validate LM Studio connection and load models
         with st.spinner("Checking LM Studio connection..."):
-            is_connected = check_lmstudio_connection(lmstudio_url)
-
-            if is_connected:
-                st.success("✅ LM Studio connection successful")
-
-                # Load available models
-                with st.spinner("Loading available models..."):
-                    models, error_msg = get_lmstudio_models(lmstudio_url)
-
-                    if models:
-                        selected_model = st.selectbox(
-                            "Select Model:",
-                            models,
-                            help="Choose a model loaded in LM Studio",
-                        )
-                        st.session_state.selected_api = "lmstudio"
-                        st.session_state.selected_model = selected_model
-                        st.session_state.lmstudio_url = lmstudio_url
-                    else:
-                        st.error(f"❌ No models available: {error_msg}")
-                        st.stop()
-            else:
-                st.error(
-                    "❌ Cannot connect to LM Studio. Please ensure LM Studio is running."
-                )
+            if not check_lmstudio_connection(lmstudio_url):
+                st.error("❌ Cannot connect to LM Studio. Please ensure LM Studio is running.")
                 st.stop()
+                
+            st.success("✅ LM Studio connection successful")
+            
+            # Load available models
+            with st.spinner("Loading available models..."):
+                models, error_msg = get_lmstudio_models(lmstudio_url)
+                if not models:
+                    st.error(f"❌ No models available: {error_msg}")
+                    st.stop()
+                    
+                selected_model = st.selectbox(
+                    "Select Model:",
+                    models,
+                    help="Choose a model loaded in LM Studio"
+                )
+                
+                st.session_state.update({
+                    "selected_api": "lmstudio",
+                    "selected_model": selected_model,
+                    "lmstudio_url": lmstudio_url
+                })
 
     st.divider()
 

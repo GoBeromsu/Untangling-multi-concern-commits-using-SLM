@@ -65,6 +65,7 @@ def create_column_config(columns: List[str]) -> Dict[str, Any]:
         "Predicted_Concern_Types": st.column_config.TextColumn(
             "Predicted Concern Types", width="medium"
         ),
+        "SHAs": st.column_config.TextColumn("SHAs", width="medium"),
     }
     return {col: config_map[col] for col in columns if col in config_map}
 
@@ -80,6 +81,7 @@ def render_results_table(evaluation_results_df: pd.DataFrame) -> None:
         "Predicted_Count",
         "Actual_Count",
         "Status",
+        "SHAs",
         "Model_Reasoning",
     ]
 
@@ -105,11 +107,13 @@ def render_results_table(evaluation_results_df: pd.DataFrame) -> None:
         # Prepare full dataset for download (remove internal calculation columns)
         download_df = evaluation_results_df.copy()
         columns_to_exclude = ["Case_Precision", "Case_Recall", "Case_F1"]
-        download_columns = [col for col in download_df.columns if col not in columns_to_exclude]
+        download_columns = [
+            col for col in download_df.columns if col not in columns_to_exclude
+        ]
         download_df = download_df[download_columns]
-        
+
         csv_data = download_df.to_csv(index=False)
-        
+
         st.download_button(
             label="📥 Download Full Results as CSV",
             data=csv_data,
@@ -137,6 +141,3 @@ def render_dataset_metadata(metadata: Dict[str, Any]) -> None:
             else "same types allowed"
         )
         st.caption(f"🔀 {types_constraint}")
-
-
-
