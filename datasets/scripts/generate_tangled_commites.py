@@ -129,7 +129,7 @@ def generate_cases_for_concern_count(
         shas = [change["sha"] for change in atomic_changes]
         types = [change["type"] for change in atomic_changes]
 
-        commit_message = "\n".join(messages)
+        commit_message = "".join(messages)
         diff = "\n".join(diffs)
 
         # Check diff token count using tiktoken - skip if exceeds limit
