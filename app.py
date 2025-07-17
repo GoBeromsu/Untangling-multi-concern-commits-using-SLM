@@ -18,10 +18,6 @@ from visual_eval.llms.constant import (
     CODE_DIFF_INPUT_HEIGHT,
     SYSTEM_PROMPT_INPUT_HEIGHT,
 )
-from visual_eval.ui.validation import (
-    is_openai_api_key_available,
-    is_valid_dataset_file,
-)
 from visual_eval.ui.components import (
     render_evaluation_metrics,
     render_results_table,
@@ -30,6 +26,39 @@ from visual_eval.ui.components import (
 from visual_eval.ui.patterns import (
     parse_model_response,
 )
+
+# Dataset column constants
+DIFF_COLUMN: str = "diff"
+TYPES_COLUMN: str = "types"
+SHAS_COLUMN: str = "shas"
+
+# File search patterns
+CSV_SEARCH_PATTERNS = [
+    "datasets/**/*.csv",
+    "../datasets/**/*.csv",
+]
+
+# Direct analysis result columns
+ANALYSIS_RESULT_COLUMNS = [
+    "Predicted_Concern_Types",
+    "Predicted_Count",
+    "Model_Reasoning",
+]
+
+# Evaluation result columns
+EVALUATION_RESULT_COLUMNS = [
+    "Test_Index",
+    "Predicted_Types",
+    "Actual_Types",
+    "Predicted_Count",
+    "Actual_Count",
+    "Status",
+    "Case_Precision",
+    "Case_Recall",
+    "Case_F1",
+    "Model_Reasoning",
+    "SHAs",
+]
 
 
 def get_model_response(diff: str, system_prompt: str) -> str:
@@ -61,16 +90,18 @@ def load_dataset(file_path: str) -> pd.DataFrame:
     try:
         df = pd.read_csv(file_path)
 
-        # Parse JSON columns upfront for efficiency
-        df["types_parsed"] = df["types"].apply(lambda x: json.loads(x) if x else [])
-        df["shas_parsed"] = df.get("shas", pd.Series(dtype=str)).apply(
-            lambda x: json.loads(x) if x else []
-        )
+        # Validate required columns exist
+        required_columns = [DIFF_COLUMN, TYPES_COLUMN, SHAS_COLUMN]
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            st.error(f"Missing required columns: {missing_columns}")
+            return pd.DataFrame()
+
         return df
 
     except Exception as e:
         st.error(f"Error loading CSV concern test dataset: {str(e)}")
-        return pd.DataFrame(), {}
+        return pd.DataFrame()
 
 
 def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
@@ -119,32 +150,22 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
     summary_container = st.empty()
     table_container = st.empty()
 
-    # Initialize evaluation results DataFrame
-    evaluation_results_df = pd.DataFrame(
-        columns=[
-            "Test_Index",
-            "Predicted_Types",
-            "Actual_Types",
-            "Predicted_Count",
-            "Actual_Count",
-            "Status",
-            "Case_Precision",
-            "Case_Recall",
-            "Case_F1",
-            "Model_Reasoning",
-            "SHAs",
-        ]
-    )
+    # Initialize evaluation results DataFrame using constants
+    evaluation_results_df = pd.DataFrame(columns=EVALUATION_RESULT_COLUMNS)
 
     total_cases = len(df)
 
     for test_index, row in df.iterrows():
         status_text.text(f"Evaluating case {test_index+1}/{total_cases}...")
 
-        # Extract data directly from DataFrame row
-        diff = row["diff"]
-        actual_concern_types = row["types_parsed"]
-        shas = row["shas_parsed"]
+        # Extract data directly from DataFrame row using constants
+        diff = row[DIFF_COLUMN]
+
+        # Parse JSON strings to get actual lists
+        actual_concern_types = (
+            json.loads(row[TYPES_COLUMN]) if row[TYPES_COLUMN] else []
+        )
+        shas = json.loads(row[SHAS_COLUMN]) if row[SHAS_COLUMN] else []
 
         # Get model prediction
         model_response = get_model_response(diff, system_prompt)
@@ -239,7 +260,7 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
     st.session_state.final_evaluation_results = evaluation_results_df
 
 
-def render_direct_input_interface() -> None:
+def show_direct_input() -> None:
     """Render UI interface for direct code diff input and concern analysis."""
     diff = st.text_area(
         "Enter your code diff:",
@@ -285,12 +306,7 @@ def render_direct_input_interface() -> None:
                         "Model_Reasoning": [model_reasoning],
                     }
                 )
-                analysis_columns = [
-                    "Predicted_Concern_Types",
-                    "Predicted_Count",
-                    "Model_Reasoning",
-                ]
-                column_config = create_column_config(analysis_columns)
+                column_config = create_column_config(ANALYSIS_RESULT_COLUMNS)
 
                 st.dataframe(
                     analysis_results_df,
@@ -300,17 +316,12 @@ def render_direct_input_interface() -> None:
                 )
 
 
-def render_batch_evaluation_interface() -> None:
+def show_csv_input() -> None:
     """Render UI interface for batch evaluation from test dataset files."""
     available_dataset_files = []
-    for search_pattern in [
-        "datasets/**/*.csv",
-        "../datasets/**/*.csv",
-    ]:
+    for search_pattern in CSV_SEARCH_PATTERNS:
         matched_files = glob.glob(search_pattern, recursive=True)
-        available_dataset_files.extend(
-            [f for f in matched_files if is_valid_dataset_file(f)]
-        )
+        available_dataset_files.extend([f for f in matched_files])
     available_dataset_files.sort()
 
     if not available_dataset_files:
@@ -366,50 +377,52 @@ def main() -> None:
 
     # Handle OpenAI API setup
     if api_provider == "OpenAI":
-        if not is_openai_api_key_available():
-            st.error("❌ No OpenAI API Key found. Please set OPENAI_API_KEY in .env file")
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key is None:
+            st.error(
+                "❌ No OpenAI API Key found. Please set OPENAI_API_KEY in .env file"
+            )
             st.stop()
-        
+
         st.success("✅ OpenAI API Key detected")
-        st.session_state.update({
-            "selected_api": "openai",
-            "selected_model": None
-        })
-        
+        st.session_state.update({"selected_api": "openai", "selected_model": None})
+
     # Handle LM Studio setup
     else:  # api_provider == "LM Studio"
         lmstudio_url = st.text_input(
             "LM Studio URL:",
             value=DEFAULT_LMSTUDIO_URL,
-            help="Base URL for LM Studio API"
+            help="Base URL for LM Studio API",
         )
 
         # Validate LM Studio connection and load models
         with st.spinner("Checking LM Studio connection..."):
             if not check_lmstudio_connection(lmstudio_url):
-                st.error("❌ Cannot connect to LM Studio. Please ensure LM Studio is running.")
+                st.error(
+                    "❌ Cannot connect to LM Studio. Please ensure LM Studio is running."
+                )
                 st.stop()
-                
+
             st.success("✅ LM Studio connection successful")
-            
+
             # Load available models
             with st.spinner("Loading available models..."):
                 models, error_msg = get_lmstudio_models(lmstudio_url)
                 if not models:
                     st.error(f"❌ No models available: {error_msg}")
                     st.stop()
-                    
+
                 selected_model = st.selectbox(
-                    "Select Model:",
-                    models,
-                    help="Choose a model loaded in LM Studio"
+                    "Select Model:", models, help="Choose a model loaded in LM Studio"
                 )
-                
-                st.session_state.update({
-                    "selected_api": "lmstudio",
-                    "selected_model": selected_model,
-                    "lmstudio_url": lmstudio_url
-                })
+
+                st.session_state.update(
+                    {
+                        "selected_api": "lmstudio",
+                        "selected_model": selected_model,
+                        "lmstudio_url": lmstudio_url,
+                    }
+                )
 
     st.divider()
 
@@ -419,9 +432,9 @@ def main() -> None:
     )
 
     with direct_input_tab:
-        render_direct_input_interface()
+        show_direct_input()
     with batch_evaluation_tab:
-        render_batch_evaluation_interface()
+        show_csv_input()
 
 
 if __name__ == "__main__":
