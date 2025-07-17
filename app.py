@@ -6,29 +6,29 @@ import pandas as pd
 from typing import List, Dict, Any, Tuple
 from collections import Counter
 from dotenv import load_dotenv
-from prompts.type import get_system_prompt
-from llms.openai import openai_api_call
-from llms.lmstudio import (
+from utils.prompt import get_system_prompt
+from visual_eval.llms.openai import openai_api_call
+from visual_eval.llms.lmstudio import (
     check_lmstudio_connection,
     get_lmstudio_models,
     lmstudio_api_call,
 )
-from llms.constant import (
+from visual_eval.llms.constant import (
     DEFAULT_LMSTUDIO_URL,
     CODE_DIFF_INPUT_HEIGHT,
     SYSTEM_PROMPT_INPUT_HEIGHT,
 )
-from ui.validation import (
+from visual_eval.ui.validation import (
     is_openai_api_key_available,
     is_valid_dataset_file,
 )
-from ui.components import (
+from visual_eval.ui.components import (
     render_evaluation_metrics,
     render_results_table,
     render_dataset_metadata,
     create_column_config,
 )
-from ui.patterns import (
+from visual_eval.ui.patterns import (
     parse_model_response,
     extract_test_case_data,
 )
@@ -78,26 +78,23 @@ def load_concern_test_dataset_csv(
     try:
         df = pd.read_csv(file_path)
         cases = []
-        
+
         for _, row in df.iterrows():
             # Parse types column as JSON list
             types_str = row["types"]
             concern_types = json.loads(types_str) if types_str else []
-            
+
             # Build atomic changes structure compatible with existing logic
             atomic_changes = [{"label": concern_type} for concern_type in concern_types]
-            
+
             # Create case dict with expected structure
-            case = {
-                "tangleChange": row["diff"],
-                "atomicChanges": atomic_changes
-            }
+            case = {"tangleChange": row["diff"], "atomicChanges": atomic_changes}
             cases.append(case)
-        
+
         # No metadata available for CSV format
         metadata = {}
         return cases, metadata
-        
+
     except Exception as e:
         st.error(f"Error loading CSV concern test dataset: {str(e)}")
         return [], {}
@@ -323,7 +320,12 @@ def render_direct_input_interface() -> None:
 def render_batch_evaluation_interface() -> None:
     """Render UI interface for batch evaluation from test dataset files."""
     available_dataset_files = []
-    for search_pattern in ["datasets/**/*.json", "datasets/**/*.csv", "../datasets/**/*.json", "../datasets/**/*.csv"]:
+    for search_pattern in [
+        "datasets/**/*.json",
+        "datasets/**/*.csv",
+        "../datasets/**/*.json",
+        "../datasets/**/*.csv",
+    ]:
         matched_files = glob.glob(search_pattern, recursive=True)
         available_dataset_files.extend(
             [f for f in matched_files if is_valid_dataset_file(f)]
@@ -350,7 +352,7 @@ def render_batch_evaluation_interface() -> None:
             test_dataset, dataset_metadata = load_concern_test_dataset(
                 selected_dataset_file
             )
-            
+
         if test_dataset:
             st.success(
                 f"📊 Loaded **{len(test_dataset)}** test cases from `{selected_dataset_file}`"

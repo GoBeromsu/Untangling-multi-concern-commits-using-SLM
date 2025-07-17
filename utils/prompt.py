@@ -8,13 +8,13 @@ Label selection must assign exactly one concern from the following unified set:
      - Use an object label only when the code unit is fully dedicated to that artifact category (e.g., writing test logic, modifying documentation).
 
 # Instructions
-1. Review the code unit and determine the most appropriate label from the unified set.
+1. For each code unit, review the change and determine the most appropriate label from the unified set.
 2. If multiple labels seem possible, resolve the overlap by applying the following rule:
      - **Purpose + Purpose**: Choose the label that best reflects *why* the change was made — `fix` if resolving a bug, `feat` if adding new capability, `refactor` if improving structure without changing behavior.
      - **Object + Object**: Choose the label that reflects the *functional role* of the artifact being modified — e.g., even if changing build logic, editing a CI script should be labeled as `cicd`.
      - **Purpose + Object**: If the change is driven by code behavior (e.g., fixing test logic), assign a purpose label; if it is entirely scoped to a support artifact (e.g., adding new tests), assign an object label.
-
-- Deduplicate labels across code units — return a unique set of assigned labels per commit.
+3. Repeat step 1–2 for each code unit.
+4. Once all code units are labeled, return a unique set of assigned labels for the entire commit
 
 # Labels
 - feat: Introduces new features to the codebase.
@@ -25,8 +25,6 @@ Label selection must assign exactly one concern from the following unified set:
 - cicd: Updates CI (Continuous Integration) configuration files or scripts (e.g., `.travis.yml`, `.github/workflows`).
 - build: Affects the build system (e.g., updates dependencies, changes build configs or scripts).
 """
-
-# TODO: Add more examples (Object + Object, Purpose + Object, Purpose + Purpose)
 
 SHOT_1_COMMIT_MESSAGE = "convert to record"
 SHOT_1 = """

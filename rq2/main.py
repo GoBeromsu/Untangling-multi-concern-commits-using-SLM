@@ -13,7 +13,6 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from utils import (
     load_dataset,
-    parse_model_output,
     calculate_metrics,
     save_results,
     plot_graph,

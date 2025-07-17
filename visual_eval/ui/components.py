@@ -5,7 +5,7 @@ Reusable UI components for Streamlit interface.
 import streamlit as st
 import pandas as pd
 from typing import List, Dict, Any
-from llms.constant import RECENT_RESULTS_DISPLAY_LIMIT
+from ..llms.constant import RECENT_RESULTS_DISPLAY_LIMIT
 
 
 def render_evaluation_metrics(metrics: Dict[str, Any], dataset_size: int) -> None:
@@ -99,6 +99,24 @@ def render_results_table(evaluation_results_df: pd.DataFrame) -> None:
         hide_index=True,
         column_config=column_config,
     )
+
+    # Add CSV download button for complete results
+    if not evaluation_results_df.empty:
+        # Prepare full dataset for download (remove internal calculation columns)
+        download_df = evaluation_results_df.copy()
+        columns_to_exclude = ["Case_Precision", "Case_Recall", "Case_F1"]
+        download_columns = [col for col in download_df.columns if col not in columns_to_exclude]
+        download_df = download_df[download_columns]
+        
+        csv_data = download_df.to_csv(index=False)
+        
+        st.download_button(
+            label="📥 Download Full Results as CSV",
+            data=csv_data,
+            file_name=f"concern_evaluation_results_{len(download_df)}_cases.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
 
 
 def render_dataset_metadata(metadata: Dict[str, Any]) -> None:

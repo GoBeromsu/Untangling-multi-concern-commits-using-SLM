@@ -25,32 +25,6 @@ def load_dataset(dataset_split: str) -> pd.DataFrame:
     print(f"Loaded {len(df)} samples from {csv_path}")
     return df
 
-
-def parse_model_output(output_str: str) -> Set[str]:
-    """Parse model output text to extract concerns as a set."""
-    concerns = set()
-
-    # Try to find JSON-like structures first
-    json_pattern = r"\[([^\]]+)\]"
-    matches = re.findall(json_pattern, output_str)
-
-    if matches:
-        for match in matches:
-            items = [item.strip().strip("\"'") for item in match.split(",")]
-            concerns.update(item for item in items if item)
-    else:
-        # Fallback: look for numbered lists or bullet points
-        lines = output_str.split("\n")
-        for line in lines:
-            line = line.strip()
-            if re.match(r"^[\d\-\*\•]\s*\.?\s*", line):
-                concern = re.sub(r"^[\d\-\*\•]\s*\.?\s*", "", line).strip()
-                if concern:
-                    concerns.add(concern)
-
-    return concerns
-
-
 def calculate_metrics(df: pd.DataFrame) -> Dict[str, float]:
     """Calculate F1, Precision, Recall metrics from predictions DataFrame."""
     # Convert sets to binary vectors for each unique concern

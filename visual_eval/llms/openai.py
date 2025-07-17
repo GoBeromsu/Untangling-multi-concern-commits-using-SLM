@@ -1,7 +1,7 @@
 import openai
 from typing import Any, Dict
 
-from llms.constant import OPENAI_STRUCTURED_OUTPUT_FORMAT, DEFAULT_TEMPERATURE
+from .constant import OPENAI_STRUCTURED_OUTPUT_FORMAT, DEFAULT_TEMPERATURE
 
 
 def openai_api_call(

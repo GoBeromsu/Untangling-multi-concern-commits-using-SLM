@@ -2,9 +2,9 @@ import requests
 import json
 from typing import Any, Dict, List, Tuple
 
-from llms.constant import (
+from .constant import (
     LMSTUDIO_STRUCTURED_OUTPUT_FORMAT,
-    DEFAULT_LMSTUDIO_URL,ㅈ
+    DEFAULT_LMSTUDIO_URL,
     DEFAULT_TEMPERATURE,
     DEFAULT_MAX_TOKENS,
     CONNECTION_TIMEOUT_SECONDS,
