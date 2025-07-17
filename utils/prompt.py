@@ -26,39 +26,125 @@ Label selection must assign exactly one concern from the following unified set:
 - build: Affects the build system (e.g., updates dependencies, changes build configs or scripts).
 """
 
-SHOT_1_COMMIT_MESSAGE = "convert to record"
+SHOT_1_COMMIT_MESSAGE = """reintroduce timeout for assertion
+
+The timeout had been removed by a previous commit. Without the timeout the test might be flaky.
+Also removed obsolete code"""
 SHOT_1 = """
 <commit_diff id="example-1">
-diff --git a/broker/src/test/java/io/camunda/zeebe/broker/exporter/stream/ExporterDirectorDistributionTest.java b/broker/src/test/java/io/camunda/zeebe/broker/exporter/stream/ExporterDirectorDistributionTest.java
-index cc998c6..65c8550 100755
---- a/broker/src/test/java/io/camunda/zeebe/broker/exporter/stream/ExporterDirectorDistributionTest.java
-+++ b/broker/src/test/java/io/camunda/zeebe/broker/exporter/stream/ExporterDirectorDistributionTest.java
-@@ -167,13 +167,8 @@ public final class ExporterDirectorDistributionTest {
-    * <p>This makes sure that even if we miss one export position event, we distribute the event
-    * later again, which makes tests less flaky.
-    */
--  private static final class ClockShifter implements ConditionEvaluationListener<Void> {
--
--    private final ControlledActorClock clock;
--
--    public ClockShifter(final ControlledActorClock clock) {
--      this.clock = clock;
--    }
-+  private record ClockShifter(ControlledActorClock clock)
-+      implements ConditionEvaluationListener<Void> {
+diff --git a/engine/src/test/java/io/camunda/zeebe/engine/processing/streamprocessor/StreamProcessorReplayModeTest.java b/engine/src/test/java/io/camunda/zeebe/engine/processing/streamprocessor/StreamProcessorReplayModeTest.java
+index d0ee4f3..c2ab83c 100644
+--- a/engine/src/test/java/io/camunda/zeebe/engine/processing/streamprocessor/StreamProcessorReplayModeTest.java
++++ b/engine/src/test/java/io/camunda/zeebe/engine/processing/streamprocessor/StreamProcessorReplayModeTest.java
+@@ -13,6 +13,7 @@ import static io.camunda.zeebe.protocol.record.intent.ProcessInstanceIntent.ACTI
+ import static io.camunda.zeebe.protocol.record.intent.ProcessInstanceIntent.ELEMENT_ACTIVATING;
+ import static java.util.function.Predicate.isEqual;
+ import static org.assertj.core.api.Assertions.assertThat;
++import static org.awaitility.Awaitility.await;
+ import static org.mockito.ArgumentMatchers.any;
+ import static org.mockito.ArgumentMatchers.anyLong;
+ import static org.mockito.ArgumentMatchers.eq;
+@@ -30,7 +31,6 @@ import io.camunda.zeebe.protocol.record.intent.ProcessInstanceIntent;
+ import io.camunda.zeebe.streamprocessor.StreamProcessor;
+ import io.camunda.zeebe.streamprocessor.StreamProcessor.Phase;
+ import io.camunda.zeebe.streamprocessor.StreamProcessorMode;
+-import org.awaitility.Awaitility;
+ import org.junit.Rule;
+ import org.junit.Test;
+ import org.mockito.InOrder;
+@@ -71,7 +71,7 @@ public final class StreamProcessorReplayModeTest {
+     // when
+     startStreamProcessor(replayUntilEnd);
  
-     @Override
-     public void conditionEvaluated(final EvaluatedCondition<Void> condition) {
-</commit_diff>
+-    Awaitility.await()
++    await()
+         .untilAsserted(
+             () -> assertThat(getCurrentPhase(replayUntilEnd)).isEqualTo(Phase.PROCESSING));
+ 
+@@ -163,7 +163,7 @@ public final class StreamProcessorReplayModeTest {
+         command().processInstance(ACTIVATE_ELEMENT, RECORD),
+         event().processInstance(ELEMENT_ACTIVATING, RECORD).causedBy(0));
+ 
+-    Awaitility.await("should have replayed first events")
++    await("should have replayed first events")
+         .until(replayContinuously::getLastSuccessfulProcessedRecordPosition, (pos) -> pos > 0);
+ 
+     // when
+@@ -210,7 +210,7 @@ public final class StreamProcessorReplayModeTest {
+         command().processInstance(ACTIVATE_ELEMENT, RECORD),
+         event().processInstance(ELEMENT_ACTIVATING, RECORD).causedBy(0));
+ 
+-    Awaitility.await("should have replayed first events")
++    await("should have replayed first events")
+         .until(replayContinuously::getLastSuccessfulProcessedRecordPosition, (pos) -> pos > 0);
+     streamProcessor.pauseProcessing().join();
+     replayContinuously.writeBatch(
+@@ -244,7 +244,7 @@ public final class StreamProcessorReplayModeTest {
+     // then
+     verify(eventApplier, TIMEOUT).applyState(anyLong(), eq(ELEMENT_ACTIVATING), any());
+ 
+-    Awaitility.await()
++    await()
+         .untilAsserted(
+             () -> {
+               final var lastProcessedPosition = getLastProcessedPosition(replayContinuously);
+@@ -273,8 +273,7 @@ public final class StreamProcessorReplayModeTest {
+ 
+     verify(eventApplier, TIMEOUT).applyState(anyLong(), eq(ELEMENT_ACTIVATING), any());
+ 
+-    Awaitility.await()
+-        .until(() -> getLastProcessedPosition(replayContinuously), isEqual(commandPosition));
++    await().until(() -> getLastProcessedPosition(replayContinuously), isEqual(commandPosition));
+ 
+     // then
+     assertThat(replayContinuously.getLastSuccessfulProcessedRecordPosition())
+@@ -285,7 +284,6 @@ public final class StreamProcessorReplayModeTest {
+   @Test
+   public void shouldNotSetLastProcessedPositionIfLessThanSnapshotPosition() {
+     // given
+-    final var commandPositionBeforeSnapshot = 1L;
+     final var snapshotPosition = 2L;
+ 
+     startStreamProcessor(replayContinuously);
+@@ -298,23 +296,20 @@ public final class StreamProcessorReplayModeTest {
+     // when
+     startStreamProcessor(replayContinuously);
+ 
+-    Awaitility.await()
++    await()
+         .untilAsserted(
+             () -> assertThat(getCurrentPhase(replayContinuously)).isEqualTo(Phase.REPLAY));
+ 
+-    final var eventPosition =
+-        replayContinuously.writeEvent(
+-            ELEMENT_ACTIVATING,
+-            RECORD,
+-            writer -> writer.sourceRecordPosition(commandPositionBeforeSnapshot));
+-
+     // then
+     final var lastProcessedPositionState = replayContinuously.getLastProcessedPositionState();
+ 
+-    assertThat(lastProcessedPositionState.getLastSuccessfulProcessedRecordPosition())
+-        .describedAs(
+-            "Expected that the last processed position is not less than the snapshot position")
+-        .isEqualTo(snapshotPosition);
++    await()
++        .untilAsserted(
++            () ->
++                assertThat(lastProcessedPositionState.getLastSuccessfulProcessedRecordPosition())
++                    .describedAs(
++                        "Expected that the last processed position is not less than the snapshot position")
++                    .isEqualTo(snapshotPosition));
+   }
+ 
+   private StreamProcessor startStreamProcessor(final StreamProcessorRule streamProcessorRule) {</commit_diff>
 
 <reasoning id="example-1">
-Step 1: Code Change Analysis
-- The diff modifies the test class ExporterDirectorDistributionTest by changing the inner class ClockShifter from a static final class with a field and constructor to a Java record with a single field. No behavioral logic is changed—only the structure and syntax of the data carrier are updated.
-- The scope is limited to simplifying the data structure used in a test utility, with no modification to test logic or behavior, and no changes to documentation or configuration files.
-
-Step 2: Label Classification Justification
-- According to the rules, when a change restructures code for conciseness or clarity without altering external behavior, it is classified as refactor. Although the file is a test, the modification is not about adding or changing test logic but improving code structure; thus, refactor is chosen over test.
-- No bug is being fixed, no feature added, and it's not a doc or config update. The refactor label most accurately represents the motivation and nature of this change.</reasoning>
+1.  Each code unit was reviewed and identified as either improving code readability (static imports) or enhancing test robustness by removing unused code and using asynchronous assertions.
+2.  These changes restructure the existing test code without altering its external behavior, which aligns perfectly with the definition of `refactor`.
+3.  The modifications are not fixing a bug (`fix`) or introducing a new capability (`feat`), but are solely focused on improving the internal quality and structure of the code.
+4.  Therefore, after evaluating all code units, the single, most appropriate label for the entire commit is `refactor`. 
+<reasoning>
 <label id="example-1">refactor</label>
 """
 
