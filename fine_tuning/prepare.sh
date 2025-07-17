@@ -4,8 +4,8 @@
 #SBATCH --partition=gpu
 #SBATCH --qos=gpu
 #SBATCH --gres=gpu:a100:1
-#SBATCH --cpus-per-task=32 
-#SBATCH --mem=256G
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=128G
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --output=logs/phi4_training_%j.out
