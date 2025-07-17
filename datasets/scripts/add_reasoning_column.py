@@ -4,11 +4,11 @@ Add reasoning column to tangled_ccs_dataset.csv using OpenAI API.
 Follows established patterns from openai.py with structured output and proper error handling.
 """
 
+import asyncio
 import json
 import logging
 import os
 import sys
-import time
 from pathlib import Path
 from typing import Dict, Any
 
@@ -20,12 +20,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuration constants
-DATASET_FILE_PATH: Path = Path("data/tangled_ccs_dataset_train.csv")
-OUTPUT_FILE_PATH: Path = Path("data/tangled_ccs_dataset_train_with_reasoning.csv")
+DATASET_FILE_PATH: Path = Path("data/tangled_ccs_dataset.csv")
+OUTPUT_FILE_PATH: Path = Path("data/tangled_ccs_dataset_with_reasoning.csv")
 OPENAI_MODEL: str = "gpt-4.1-2025-04-14"
-REASONING_TEMPERATURE: float = 0.7
+REASONING_TEMPERATURE: float = 0.5
 REQUEST_DELAY_SECONDS: float = 0.5
 BATCH_SIZE: int = 10
+CONCURRENT_BATCH_SIZE: int = 10
 
 # Reasoning response schema for structured output
 REASONING_RESPONSE_SCHEMA: Dict[str, Any] = {
@@ -33,7 +34,7 @@ REASONING_RESPONSE_SCHEMA: Dict[str, Any] = {
     "properties": {
         "reasoning": {
             "type": "string",
-            "commit_message": "Detailed reasoning explaining the classification process and decision-making steps",
+            "description": "Detailed reasoning explaining the classification process and decision-making steps",
         }
     },
     "required": ["reasoning"],
@@ -51,12 +52,12 @@ REASONING_STRUCTURED_OUTPUT_FORMAT: Dict[str, Any] = {
 }
 
 # System prompt for reasoning generation
-SYSTEM_PROMPT: str = """You are a software engineer classifying individual code units extracted from a tangled commit.
-Each change unit (e.g., function, method, class, or code block) represents a reviewable atomic change, and must be assigned exactly one label.
+SYSTEM_PROMPT: str = """You are a software engineer providing detailed reasoning and justification for pre-assigned labels on code changes from tangled commits.
+Your task is to analyze the given code changes and explain why the assigned labels are appropriate based on the classification instructions.
 
-Label selection must assign exactly one concern from the following unified set:
-- Purpose labels : the motivation behind making a code change (feat, fix, refactor)
-- Object labels : the essence of the code changes that have been made(docs, test, cicd, build)
+Label definitions for reference:
+- Purpose labels: the motivation behind making a code change (feat, fix, refactor)
+- Object labels: the essence of the code changes that have been made (docs, test, cicd, build)
      - Use an object label only when the code unit is fully dedicated to that artifact category (e.g., writing test logic, modifying documentation).
 
 # Instructions
@@ -68,46 +69,34 @@ Label selection must assign exactly one concern from the following unified set:
 3. Repeat step 1–2 for each code unit.
 4. Once all code units are labeled, return a unique set of assigned labels for the entire commit
 
-# Labels
+# Reasoning Format
+Your reasoning must follow exactly this numbered format:
+
+1. [Analyze the code changes and identify what was modified or added - keep to 1-2 concise sentences]
+2. [Explain how these changes align with the pre-assigned labels and their definitions - focus on direct connections]
+3. [Justify why the assigned labels are appropriate and rule out alternative labels - be specific but brief]
+4. [Provide final justification with clear reasoning for the label assignments - summarize in 1 sentence]
+
+**Writing Guidelines:**
+- Keep each numbered point to 1-2 sentences maximum
+- Use direct, specific language - avoid unnecessary descriptive words
+- Focus on the essential reasoning - eliminate redundant explanations
+- Follow the instructions precisely without adding extra context
+
+## Example
+1. Added conditional check that skips queue pausing when NC_WORKER_CONTAINER='false'.
+2. This prevents unwanted queue behavior - aligns with 'fix' label definition for resolving bugs.
+3. 'fix' is correct because it resolves incorrect behavior, not 'feat' (no new functionality) or 'refactor' (changes behavior).
+4. The 'fix' label correctly captures resolving a deployment-specific bug through a conditional safeguard.
+
+# Labels Reference
 - feat: Introduces new features to the codebase.
 - fix: Fixes bugs or faults in the codebase.
 - refactor: Restructures existing code without changing external behavior (e.g., improves readability, simplifies complexity, removes unused code).
 - docs: Modifies documentation or text (e.g., fixes typos, updates comments or docs).
 - test: Modifies test files (e.g., adds or updates tests).
 - cicd: Updates CI (Continuous Integration) configuration files or scripts (e.g., `.travis.yml`, `.github/workflows`).
-- build: Affects the build system (e.g., updates dependencies, changes build configs or scripts).
-
-# 4-Step Reasoning Instructions
-
-**Step 1: Analyze Code Changes**
-- Examine each file modification, addition, or deletion in the diff
-- Identify the type of code being changed (business logic, tests, docs, config, build files, etc.)
-- Assess the nature and scope of changes (new functionality, bug fixes, structural improvements, maintenance)
-
-**Step 2: Apply Labeling Rules**
-- For each code unit, determine which category it belongs to using the classification instructions
-- Apply conflict resolution rules for overlapping categories:
-  - Purpose + Purpose: Choose based on primary motivation (fix > feat > refactor)
-  - Object + Object: Choose based on functional role of the artifact
-  - Purpose + Object: Choose purpose if driven by code behavior, object if scoped to support artifacts
-
-**Step 3: Validate Assigned Labels**
-- Compare the assigned types with your analysis from Steps 1-2
-- Verify that each assigned label aligns with the observed changes
-- Check if the label set represents the primary concerns of the commit
-
-**Step 4: Generate Justification**
-- Explain what types of changes you observed in the diff
-- Justify why each assigned label correctly represents the changes
-- Address why alternative labels were not appropriate
-- Confirm that the assigned labels capture the primary concerns of this tangled commit
-
-# Reasoning Example
-1.  Each code unit was reviewed and identified as either improving code readability (static imports) or enhancing test robustness by removing unused code and using asynchronous assertions.
-2.  These changes restructure the existing test code without altering its external behavior, which aligns perfectly with the definition of `refactor`.
-3.  The modifications are not fixing a bug (`fix`) or introducing a new capability (`feat`), but are solely focused on improving the internal quality and structure of the code.
-4.  Therefore, after evaluating all code units, the single, most appropriate label for the entire commit is `refactor`. 
-"""
+- build: Affects the build system (e.g., updates dependencies, changes build configs or scripts)."""
 
 
 def load_dataset_from_path(file_path: Path) -> pd.DataFrame:
@@ -124,13 +113,13 @@ def load_dataset_from_path(file_path: Path) -> pd.DataFrame:
         raise
 
 
-def authenticate_openai_client() -> openai.OpenAI:
-    """Authenticate with OpenAI API and return client."""
+def authenticate_openai_client() -> openai.AsyncOpenAI:
+    """Authenticate with OpenAI API and return async client."""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY not found in environment variables")
 
-    return openai.OpenAI(api_key=api_key)
+    return openai.AsyncOpenAI(api_key=api_key)
 
 
 def create_reasoning_prompt(commit_message: str, diff: str, types: str) -> str:
@@ -151,14 +140,18 @@ Git Diff:
 Please generate detailed reasoning explaining how you would apply the classification instructions to analyze this tangled commit."""
 
 
-def generate_reasoning_with_openai(
-    client: openai.OpenAI, commit_message: str, diff: str, types: str, row_index: int
+async def generate_reasoning_with_openai(
+    client: openai.AsyncOpenAI,
+    commit_message: str,
+    diff: str,
+    types: str,
+    row_index: int,
 ) -> str:
     """Generate reasoning using OpenAI API with structured output."""
     try:
         user_prompt = create_reasoning_prompt(commit_message, diff, types)
 
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -191,44 +184,76 @@ def generate_reasoning_with_openai(
         return f"Error: {e}"
 
 
-def add_reasoning_column_to_dataset(
-    df: pd.DataFrame, client: openai.OpenAI, output_path: Path
+async def process_single_row_with_index(
+    client: openai.AsyncOpenAI,
+    idx: int,
+    row: pd.Series,
+) -> tuple[int, str]:
+    """Process a single row and return index with result."""
+    commit_message = str(row["commit_message"])
+    diff = str(row["diff"])
+    types = str(row["types"])
+
+    reasoning = await generate_reasoning_with_openai(
+        client, commit_message, diff, types, idx + 1
+    )
+
+    return idx, reasoning
+
+
+async def process_batch_concurrently(
+    client: openai.AsyncOpenAI,
+    batch_rows: list,
+    df: pd.DataFrame,
+    output_path: Path,
+) -> None:
+    """Process a batch of rows concurrently with safe index matching."""
+    # Create tasks with index tracking
+    tasks = [process_single_row_with_index(client, idx, row) for idx, row in batch_rows]
+
+    # Execute batch concurrently - results maintain order due to asyncio.gather
+    results = await asyncio.gather(*tasks)
+
+    # Assign results back to DataFrame using returned indices
+    for idx, reasoning in results:
+        df.at[idx, "reason"] = reasoning
+        logging.info(f"Assigned reasoning to index {idx}: {reasoning[:50]}...")
+
+    # Save progress after batch
+    save_dataset_to_path(df, output_path)
+
+
+async def add_reasoning_column_to_dataset(
+    df: pd.DataFrame, client: openai.AsyncOpenAI, output_path: Path
 ) -> pd.DataFrame:
-    """Add reasoning column to dataset using OpenAI API with real-time saving."""
+    """Add reasoning column to dataset using OpenAI API with batch concurrent processing."""
     total_rows = len(df)
 
     # Initialize reason column with empty values
     df["reason"] = ""
 
     logging.info(f"Starting reasoning generation for {total_rows} rows...")
+    logging.info(f"Concurrent batch size: {CONCURRENT_BATCH_SIZE}")
 
+    # Process in batches for concurrent execution
+    batch_rows = []
     for idx, row in df.iterrows():
-        commit_message = str(row["commit_message"])
-        diff = str(row["diff"])
-        types = str(row["types"])
+        batch_rows.append((idx, row))
 
-        logging.info(f"Processing row {idx + 1}/{total_rows} (index: {idx})")
+        # Process batch when it reaches the concurrent batch size
+        if len(batch_rows) >= CONCURRENT_BATCH_SIZE:
+            logging.info(f"Processing batch of {len(batch_rows)} rows concurrently...")
+            await process_batch_concurrently(client, batch_rows, df, output_path)
+            logging.info(f"Completed batch, saved progress")
 
-        reasoning = generate_reasoning_with_openai(
-            client, commit_message, diff, types, idx + 1
-        )
+            # Rate limiting delay between batches
+            await asyncio.sleep(REQUEST_DELAY_SECONDS)
+            batch_rows = []
 
-        # Assign reasoning directly to the specific index to prevent mismatch
-        df.at[idx, "reason"] = reasoning
-
-        # Log assignment confirmation
-        logging.info(f"Assigned reasoning to index {idx}: {reasoning[:50]}...")
-
-        # Save progress immediately after each row
-        save_dataset_to_path(df, output_path)
-        logging.info(f"Saved progress after row {idx + 1}")
-
-        # Rate limiting delay
-        time.sleep(REQUEST_DELAY_SECONDS)
-
-        # Progress reporting
-        if (idx + 1) % BATCH_SIZE == 0:
-            logging.info(f"Completed {idx + 1}/{total_rows} rows")
+    # Process remaining rows if any
+    if batch_rows:
+        logging.info(f"Processing final batch of {len(batch_rows)} rows...")
+        await process_batch_concurrently(client, batch_rows, df, output_path)
 
     logging.info("Successfully added reasoning column to dataset")
     return df
@@ -271,7 +296,7 @@ def configure_logging() -> None:
     )
 
 
-def process_reasoning_generation(
+async def process_reasoning_generation(
     input_file_path: Path, output_file_path: Path, test_mode: bool = False
 ) -> None:
     """Process reasoning generation for dataset."""
@@ -291,11 +316,12 @@ def process_reasoning_generation(
                 return
             df = df.drop("reason", axis=1)
 
-    # Authenticate OpenAI client
-    client = authenticate_openai_client()
-
-    # Generate reasoning with real-time saving
-    df_with_reasoning = add_reasoning_column_to_dataset(df, client, output_file_path)
+    # Use AsyncOpenAI client with context manager (recommended by OpenAI docs)
+    async with authenticate_openai_client() as client:
+        # Generate reasoning with real-time saving
+        df_with_reasoning = await add_reasoning_column_to_dataset(
+            df, client, output_file_path
+        )
 
     # Final save (already saved during processing, but ensure final state)
     save_dataset_to_path(df_with_reasoning, output_file_path)
@@ -328,7 +354,9 @@ def main() -> None:
         logging.info(f"Model: {OPENAI_MODEL}")
         logging.info(f"Temperature: {REASONING_TEMPERATURE}")
 
-        process_reasoning_generation(DATASET_FILE_PATH, output_path, test_mode)
+        asyncio.run(
+            process_reasoning_generation(DATASET_FILE_PATH, output_path, test_mode)
+        )
 
         logging.info("Reasoning column addition completed successfully!")
 
