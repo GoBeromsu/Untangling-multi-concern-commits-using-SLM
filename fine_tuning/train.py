@@ -21,7 +21,7 @@ University of Sheffield HPC Stanage - A100 GPU Setup
 
 This script fine-tunes a language model to classify multi-concern commits using SFTTrainer.
 Dataset: Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models
-Input: description (commit message), types, reason
+Input: commit_message (commit message), types, reason
 Target: Learning to predict reasoning for commit classification
 
 HPC Setup Requirements:
@@ -172,7 +172,7 @@ def apply_chat_template(example, tokenizer) -> Dict[str, Any]:
     """Apply chat template for multi-concern commit classification."""
     # Create structured prompt for commit analysis
     user_content = f"""# Commit Message
-{example['description']}
+{example['commit_message']}
 # Diff
 {example['diff']}
 """

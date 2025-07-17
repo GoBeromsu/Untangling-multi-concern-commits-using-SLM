@@ -10,7 +10,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 import openai
 import pandas as pd
@@ -33,7 +33,7 @@ REASONING_RESPONSE_SCHEMA: Dict[str, Any] = {
     "properties": {
         "reasoning": {
             "type": "string",
-            "description": "Detailed reasoning explaining the classification process and decision-making steps",
+            "commit_message": "Detailed reasoning explaining the classification process and decision-making steps",
         }
     },
     "required": ["reasoning"],
@@ -51,13 +51,22 @@ REASONING_STRUCTURED_OUTPUT_FORMAT: Dict[str, Any] = {
 }
 
 # System prompt for reasoning generation
-SYSTEM_PROMPT: str = """You are a software engineer analyzing individual code units extracted from a tangled commit.
+SYSTEM_PROMPT: str = """You are a software engineer classifying individual code units extracted from a tangled commit.
 Each change unit (e.g., function, method, class, or code block) represents a reviewable atomic change, and must be assigned exactly one label.
 
 Label selection must assign exactly one concern from the following unified set:
-- Purpose labels: the motivation behind making a code change (feat, fix, refactor)
-- Object labels: the essence of the code changes that have been made (docs, test, cicd, build)
-  - Use an object label only when the code unit is fully dedicated to that artifact category (e.g., writing test logic, modifying documentation).
+- Purpose labels : the motivation behind making a code change (feat, fix, refactor)
+- Object labels : the essence of the code changes that have been made(docs, test, cicd, build)
+     - Use an object label only when the code unit is fully dedicated to that artifact category (e.g., writing test logic, modifying documentation).
+
+# Instructions
+1. For each code unit, review the change and determine the most appropriate label from the unified set.
+2. If multiple labels seem possible, resolve the overlap by applying the following rule:
+     - **Purpose + Purpose**: Choose the label that best reflects *why* the change was made — `fix` if resolving a bug, `feat` if adding new capability, `refactor` if improving structure without changing behavior.
+     - **Object + Object**: Choose the label that reflects the *functional role* of the artifact being modified — e.g., even if changing build logic, editing a CI script should be labeled as `cicd`.
+     - **Purpose + Object**: If the change is driven by code behavior (e.g., fixing test logic), assign a purpose label; if it is entirely scoped to a support artifact (e.g., adding new tests), assign an object label.
+3. Repeat step 1–2 for each code unit.
+4. Once all code units are labeled, return a unique set of assigned labels for the entire commit
 
 # Labels
 - feat: Introduces new features to the codebase.
@@ -68,24 +77,37 @@ Label selection must assign exactly one concern from the following unified set:
 - cicd: Updates CI (Continuous Integration) configuration files or scripts (e.g., `.travis.yml`, `.github/workflows`).
 - build: Affects the build system (e.g., updates dependencies, changes build configs or scripts).
 
-# 2-Step Justification Instructions
-For each assigned type, provide justification following this exact 2-step process:
+# 4-Step Reasoning Instructions
 
-**Step 1: Code Change Analysis**
-- Analyze the specific code changes in the diff
-- Identify what files, functions, or components are being modified
-- Determine the scope and nature of the changes
-- Consider the context provided by the commit message
+**Step 1: Analyze Code Changes**
+- Examine each file modification, addition, or deletion in the diff
+- Identify the type of code being changed (business logic, tests, docs, config, build files, etc.)
+- Assess the nature and scope of changes (new functionality, bug fixes, structural improvements, maintenance)
 
-**Step 2: Label Classification Justification**
-- Apply the classification rules to determine the appropriate label
-- Explain why this specific label was chosen over alternatives
-- Address any potential conflicts between Purpose and Object labels using these rules:
-  - **Purpose + Purpose**: Choose the label that best reflects *why* the change was made — `fix` if resolving a bug, `feat` if adding new capability, `refactor` if improving structure without changing behavior.
-  - **Object + Object**: Choose the label that reflects the *functional role* of the artifact being modified — e.g., even if changing build logic, editing a CI script should be labeled as `cicd`.
-  - **Purpose + Object**: If the change is driven by code behavior (e.g., fixing test logic), assign a purpose label; if it is entirely scoped to a support artifact (e.g., adding new tests), assign an object label.
+**Step 2: Apply Labeling Rules**
+- For each code unit, determine which category it belongs to using the classification instructions
+- Apply conflict resolution rules for overlapping categories:
+  - Purpose + Purpose: Choose based on primary motivation (fix > feat > refactor)
+  - Object + Object: Choose based on functional role of the artifact
+  - Purpose + Object: Choose purpose if driven by code behavior, object if scoped to support artifacts
 
-Generate detailed reasoning that follows this 2-step process to justify why each assigned type is correct for the corresponding code unit in this tangled commit in 3 lines for each step"""
+**Step 3: Validate Assigned Labels**
+- Compare the assigned types with your analysis from Steps 1-2
+- Verify that each assigned label aligns with the observed changes
+- Check if the label set represents the primary concerns of the commit
+
+**Step 4: Generate Justification**
+- Explain what types of changes you observed in the diff
+- Justify why each assigned label correctly represents the changes
+- Address why alternative labels were not appropriate
+- Confirm that the assigned labels capture the primary concerns of this tangled commit
+
+# Reasoning Example
+1.  Each code unit was reviewed and identified as either improving code readability (static imports) or enhancing test robustness by removing unused code and using asynchronous assertions.
+2.  These changes restructure the existing test code without altering its external behavior, which aligns perfectly with the definition of `refactor`.
+3.  The modifications are not fixing a bug (`fix`) or introducing a new capability (`feat`), but are solely focused on improving the internal quality and structure of the code.
+4.  Therefore, after evaluating all code units, the single, most appropriate label for the entire commit is `refactor`. 
+"""
 
 
 def load_dataset_from_path(file_path: Path) -> pd.DataFrame:
@@ -111,7 +133,7 @@ def authenticate_openai_client() -> openai.OpenAI:
     return openai.OpenAI(api_key=api_key)
 
 
-def create_reasoning_prompt(description: str, diff: str, types: str) -> str:
+def create_reasoning_prompt(commit_message: str, diff: str, types: str) -> str:
     """Create user prompt for reasoning generation."""
     try:
         types_list = json.loads(types)
@@ -119,7 +141,7 @@ def create_reasoning_prompt(description: str, diff: str, types: str) -> str:
     except json.JSONDecodeError:
         types_formatted = types
 
-    return f"""Commit Message: {description}
+    return f"""Commit Message: {commit_message}
 
 Assigned Types: {types_formatted}
 
@@ -130,11 +152,11 @@ Please generate detailed reasoning explaining how you would apply the classifica
 
 
 def generate_reasoning_with_openai(
-    client: openai.OpenAI, description: str, diff: str, types: str, row_index: int
+    client: openai.OpenAI, commit_message: str, diff: str, types: str, row_index: int
 ) -> str:
     """Generate reasoning using OpenAI API with structured output."""
     try:
-        user_prompt = create_reasoning_prompt(description, diff, types)
+        user_prompt = create_reasoning_prompt(commit_message, diff, types)
 
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
@@ -181,14 +203,14 @@ def add_reasoning_column_to_dataset(
     logging.info(f"Starting reasoning generation for {total_rows} rows...")
 
     for idx, row in df.iterrows():
-        description = str(row["description"])
+        commit_message = str(row["commit_message"])
         diff = str(row["diff"])
         types = str(row["types"])
 
         logging.info(f"Processing row {idx + 1}/{total_rows} (index: {idx})")
 
         reasoning = generate_reasoning_with_openai(
-            client, description, diff, types, idx + 1
+            client, commit_message, diff, types, idx + 1
         )
 
         # Assign reasoning directly to the specific index to prevent mismatch

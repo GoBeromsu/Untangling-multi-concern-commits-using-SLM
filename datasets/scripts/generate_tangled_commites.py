@@ -11,7 +11,7 @@ import tiktoken
 DATASET_PATH = Path("data/sampled_ccs_dataset.csv")
 CASES_PER_CONCERN_COUNT = 350
 CONCERN_COUNTS = [1, 2, 3]
-TOTAL_CASES = CASES_PER_CONCERN_COUNT * len(CONCERN_COUNTS)  # 334 * 3 = 1002
+TOTAL_CASES = CASES_PER_CONCERN_COUNT * len(CONCERN_COUNTS)
 SEED = 42
 OUTPUT_PATH = Path("data/tangled_ccs_dataset.csv")
 
@@ -22,7 +22,7 @@ MAX_DIFF_TOKENS = 12288
 CONCERN_TYPES = ["feat", "fix", "refactor", "test", "docs", "build", "cicd"]
 
 # CSV schema columns
-OUTPUT_COLUMNS = ["description", "diff", "concern_count", "shas", "types"]
+OUTPUT_COLUMNS = ["commit_message", "diff", "concern_count", "shas", "types"]
 
 # Column mapping for preprocessing
 COLUMN_MAPPING = {
@@ -129,7 +129,7 @@ def generate_cases_for_concern_count(
         shas = [change["sha"] for change in atomic_changes]
         types = [change["type"] for change in atomic_changes]
 
-        description = " | ".join(messages)
+        commit_message = "\n".join(messages)
         diff = "\n".join(diffs)
 
         # Check diff token count using tiktoken - skip if exceeds limit
@@ -143,7 +143,7 @@ def generate_cases_for_concern_count(
             seen_sha_combinations.add(sha_combination)
             cases.append(
                 {
-                    "description": description,
+                    "commit_message": commit_message,
                     "diff": diff,
                     "concern_count": concern_count,
                     "shas": json.dumps(shas),

@@ -3,7 +3,7 @@ configs:
     data_files:
       - data/tangled_ccs_dataset_train.csv
     features:
-      - name: description
+      - name: commit_message
         dtype: string
       - name: diff
         dtype: string
@@ -18,7 +18,7 @@ configs:
     data_files:
       - data/tangled_ccs_dataset_test.csv
     features:
-      - name: description
+      - name: commit_message
         dtype: string
       - name: diff
         dtype: string
