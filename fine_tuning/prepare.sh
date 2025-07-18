@@ -37,7 +37,10 @@ fi
 
 # Create conda environment
 echo "🏗️ Creating conda environment..."
-conda env create -f environment.yml
+if ! conda env create -f environment.yml; then
+    echo "❌ Failed to create conda environment. Exiting..."
+    exit 1
+fi
 
 # Activate environment using 'source activate' instead of 'conda activate'
 # Sheffield HPC requirement: Due to Anaconda being installed as a module,
