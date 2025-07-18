@@ -8,7 +8,7 @@ import torch
 # 'load_dataset' is a function from the 'datasets' library by Hugging Face which allows you to load a dataset.
 from datasets import load_dataset
 
-# 'LoraConfig' and 'prepare_model_for_kbit_training' are from the 'peft' library. 
+# 'LoraConfig' and 'prepare_model_for_kbit_training' are from the 'peft' library.
 # 'LoraConfig' is used to configure the LoRA (Learning from Random Architecture) model.
 # 'prepare_model_for_kbit_training' is a function that prepares a model for k-bit training.
 # 'TaskType' contains differenct types of tasks supported by PEFT
@@ -27,12 +27,13 @@ from transformers import (
     AutoTokenizer,
     TrainingArguments,
     set_seed,
-    pipeline
+    pipeline,
 )
+
 # 'SFTTrainer' is a class from the 'trl' library that provides a trainer for soft fine-tuning.
 from trl import SFTTrainer
 
-from utils.prompt import get_system_prompt_with_message
+from utils.prompt import get_system_prompt, get_system_prompt_with_message
 
 """
 Multi-Concern Commit Classification SFT Training Script
@@ -65,14 +66,15 @@ logger = logging.getLogger(__name__)
 
 # Model and dataset configuration
 MODEL_ID: str = "microsoft/phi-4"
-
-DATASET_NAME: str = "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models"
-DATASET_SPLIT: str = "train"
+MODEL_NAME: str = "microsoft/phi-4"
+DATASET_NAME: str = (
+    "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models"
+)
 
 NEW_MODEL: str = "Untangling-Multi-Concern-Commits-with-Small-Language-Models"
 HF_MODEL_REPO: str = "Berom0227/" + NEW_MODEL
 
-DEVICE_MAP: str = "auto" 
+DEVICE_MAP: str = "auto"
 
 # 'lora_r' is the dimension of the LoRA attention.
 LORA_RANK: int = 16
@@ -84,57 +86,44 @@ LORA_ALPHA: int = 16
 LORA_DROPOUT: float = 0.05
 
 # 'target_modules' is a list of the modules in the model that will be replaced with LoRA layers.
-TARGET_MODULES: list[str] = ['k_proj', 'q_proj', 'v_proj', 'o_proj', "gate_proj", "down_proj", "up_proj"]
+TARGET_MODULES: list[str] = [
+    "k_proj",
+    "q_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "down_proj",
+    "up_proj",
+]
+
+# Training configuration
+MAX_SEQ_LENGTH: int = 16_384
+NUM_WORKERS: int = 4
 
 set_seed(1234)
 
+## Dataset Loading
+train_dataset = load_dataset(
+    DATASET_NAME,
+    split="train",
+)
 
-# Training constants
-DEFAULT_BATCH_SIZE: int = 4
-NUM_WORKERS: int = 4
-MAX_SEQ_LENGTH: int = 16_384
-LORA_RANK: int = 16
-LEARNING_RATE: float = 5.0e-06
+test_dataset = load_dataset(
+    DATASET_NAME,
+    split="test",
+)
 
-###################
-# Hyper-parameters
-###################
-training_config = {
-    "bf16": True,
-    "do_eval": False,
-    "learning_rate": LEARNING_RATE,
-    "log_level": "info",
-    "logging_steps": 20,
-    "logging_strategy": "steps",
-    "lr_scheduler_type": "cosine",
-    "num_train_epochs": 1,
-    "max_steps": -1,
-    "output_dir": "./checkpoint_dir",
-    "overwrite_output_dir": True,
-    "per_device_eval_batch_size": DEFAULT_BATCH_SIZE,
-    "per_device_train_batch_size": DEFAULT_BATCH_SIZE,
-    "remove_unused_columns": True,
-    "save_steps": 100,
-    "save_total_limit": 1,
-    "seed": 0,
-    "gradient_checkpointing": True,
-    "gradient_checkpointing_kwargs": {"use_reentrant": False},
-    "gradient_accumulation_steps": 1,
-    "warmup_ratio": 0.2,
-}
+# Load tokenizer to prepare the dataset
+tokenizer_id = MODEL_ID
 
-peft_config = {
-    "r": LORA_RANK,
-    "lora_alpha": LORA_ALPHA,
-    "lora_dropout": 0.05,
-    "bias": "none",
-    "task_type": "CAUSAL_LM",
-    "target_modules": "all-linear",
-    "modules_to_save": None,
-}
+# 'AutoTokenizer.from_pretrained' is a method that loads a tokenizer from the Hugging Face Model Hub.
+# 'tokenizer_id' is passed as an argument to specify which tokenizer to load.
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
 
-train_conf = TrainingArguments(**training_config)
-peft_conf = LoraConfig(**peft_config)
+# 'tokenizer.padding_side' is a property that specifies which side to pad when the input sequence is shorter than the maximum sequence length.
+# Setting it to 'right' means that padding tokens will be added to the right (end) of the sequence.
+# This is done to prevent warnings that can occur when the padding side is not explicitly set.
+tokenizer.padding_side = "right"
 
 ###############
 # Setup logging
@@ -144,126 +133,192 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
-log_level = train_conf.get_process_log_level()
-logger.setLevel(log_level)
-
-# Log on each process a small summary
-logger.warning(
-    f"Process rank: {train_conf.local_rank}, device: {train_conf.device}, n_gpu: {train_conf.n_gpu}"
-    + f" distributed training: {bool(train_conf.local_rank != -1)}, 16-bits training: {train_conf.fp16}"
-)
-logger.info(f"Training/evaluation parameters {train_conf}")
-logger.info(f"PEFT parameters {peft_conf}")
-
-################
-# Model Loading
-################
-checkpoint_path = "microsoft/phi-4"
-model_kwargs = dict(
-    use_cache=False,
-    trust_remote_code=True,
-    attn_implementation="flash_attention_2",
-    torch_dtype=torch.bfloat16,
-    device_map=None,
-)
-model = AutoModelForCausalLM.from_pretrained(checkpoint_path, **model_kwargs)
-tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
-tokenizer.model_max_length = MAX_SEQ_LENGTH
-tokenizer.pad_token = (
-    tokenizer.unk_token
-)  # use unk rather than eos token to prevent endless generation
-tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
-tokenizer.padding_side = "right"
 
 
 ##################
 # Data Processing
 ##################
-def apply_chat_template(example, tokenizer) -> Dict[str, Any]:
-    """Apply chat template for multi-concern commit classification."""
+def create_message_column(row) -> Dict[str, Any]:
+    """Create messages column for multi-concern commit classification."""
     # Create structured prompt for commit analysis
-    user_content = f"""# Commit Message
-{example['commit_message']}
-# Diff
-{example['diff']}
-"""
-    assistant_content = f"""# Reasoning
-{example['reason']}
-# Result types
-{example['types']}
-"""
+    user_content = f"# Commit Message\n{row['commit_message']}\n\n# Diff\n```diff\n{row['diff']}\n```\n"
+    assistant_content = (
+        f"# Reasoning\n{row['reason']}\n# Result types\n{row['types']}\n"
+    )
 
     messages = [
-        {"role": "system", "content": get_system_prompt_with_message()},
+        {"role": "system", "content": get_system_prompt()},
         {"role": "user", "content": user_content},
         {"role": "assistant", "content": assistant_content},
     ]
 
-    example["text"] = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=False
-    )
-    return example
+    return {"messages": messages}
 
 
-train_dataset = load_dataset(
-    "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models",
-    split="train",
-)
+# 'format_dataset_chatml' is a function that takes a row from the dataset and returns a dictionary
+# with a 'text' key and a string of formatted chat messages as its value.
+def format_dataset_chatml(row) -> Dict[str, Any]:
+    """Format dataset with chat template for multi-concern commit classification."""
+    return {
+        "text": tokenizer.apply_chat_template(
+            row["messages"], tokenize=False, add_generation_prompt=False
+        )
+    }
 
-test_dataset = load_dataset(
-    "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models",
-    split="test",
-)
 
 column_names = list(train_dataset.features)
 
-processed_train_dataset = train_dataset.map(
-    apply_chat_template,
-    fn_kwargs={"tokenizer": tokenizer},
+# Step 1: Create messages column
+train_dataset_with_messages = train_dataset.map(
+    create_message_column,
+    num_proc=NUM_WORKERS,
+    desc="Creating messages column for multi-concern commit train data",
+)
+
+# Step 2: Format with chat template
+processed_train_dataset = train_dataset_with_messages.map(
+    format_dataset_chatml,
     num_proc=NUM_WORKERS,
     remove_columns=column_names,
     desc="Applying chat template to multi-concern commit train data",
 )
 
-# processed_test_dataset = test_dataset.map(
-#     apply_chat_template,
-#     fn_kwargs={"tokenizer": tokenizer},
-#     num_proc=NUM_WORKERS,
-#     remove_columns=column_names,
-#     desc="Applying chat template to multi-concern commit test data",
-# )
+# Process test dataset
+test_dataset_with_messages = test_dataset.map(
+    create_message_column,
+    num_proc=NUM_WORKERS,
+    desc="Creating messages column for multi-concern commit test data",
+)
+
+processed_test_dataset = test_dataset_with_messages.map(
+    format_dataset_chatml,
+    num_proc=NUM_WORKERS,
+    remove_columns=column_names,
+    desc="Applying chat template to multi-concern commit test data",
+)
 
 ###########
 # Training
 ###########
-trainer = SFTTrainer(
-    model=model,
-    args=train_conf,
-    peft_config=peft_conf,
-    train_dataset=processed_train_dataset,
-    # eval_dataset=processed_test_dataset,
-    max_seq_length=MAX_SEQ_LENGTH,
-    dataset_text_field="text",
-    tokenizer=tokenizer,
-    packing=True,
+
+if torch.cuda.is_bf16_supported():
+    compute_dtype = torch.bfloat16
+    attn_implementation = "flash_attention_2"
+else:
+    compute_dtype = torch.float16
+    attn_implementation = "sdpa"
+
+
+# 'AutoTokenizer.from_pretrained' is a method that loads a tokenizer from the Hugging Face Model Hub.
+# 'model_id' is passed as an argument to specify which tokenizer to load.
+# 'trust_remote_code' is set to True to trust the remote code in the tokenizer files.
+# 'add_eos_token' is set to True to add an end-of-sentence token to the tokenizer.
+# 'use_fast' is set to True to use the fast version of the tokenizer.
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True, add_eos_token=True, use_fast=True)
+
+# The padding token is set to the unknown token.
+tokenizer.pad_token = tokenizer.unk_token
+tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
+# The padding side is set to 'left', meaning that padding tokens will be added to the left (start) of the sequence.
+tokenizer.padding_side = 'left'
+
+# 'AutoModelForCausalLM.from_pretrained' is a method that loads a pre-trained model for causal language modeling from the Hugging Face Model Hub.
+# 'model_id' is passed as an argument to specify which model to load.
+# 'torch_dtype' is set to the compute data type determined earlier.
+# 'trust_remote_code' is set to True to trust the remote code in the model files.
+# 'device_map' is passed as an argument to specify the device mapping for distributed training.
+# 'attn_implementation' is set to the attention implementation determined earlier.
+model = AutoModelForCausalLM.from_pretrained(
+          MODEL_ID, torch_dtype=compute_dtype, trust_remote_code=True, device_map=DEVICE_MAP,
+          attn_implementation=attn_implementation
 )
 
-train_result = trainer.train()
-metrics = train_result.metrics
-trainer.log_metrics("train", metrics)
-trainer.save_metrics("train", metrics)
-trainer.save_state()
 
-#############
-# Evaluation
-#############
-# tokenizer.padding_side = "left"
-# metrics = trainer.evaluate()
-# metrics["eval_samples"] = len(processed_test_dataset)
-# trainer.log_metrics("eval", metrics)
-# trainer.save_metrics("eval", metrics)
+# This code block is used to define the training arguments for the model.
 
-############
-# Save model
-############
-trainer.save_model(train_conf.output_dir)
+# 'TrainingArguments' is a class that holds the arguments for training a model.
+# 'output_dir' is the directory where the model and its checkpoints will be saved.
+# 'evaluation_strategy' is set to "steps", meaning that evaluation will be performed after a certain number of training steps.
+# 'do_eval' is set to True, meaning that evaluation will be performed.
+# 'optim' is set to "adamw_torch", meaning that the AdamW optimizer from PyTorch will be used.
+# 'per_device_train_batch_size' and 'per_device_eval_batch_size' are set to 8, meaning that the batch size for training and evaluation will be 8 per device.
+# 'gradient_accumulation_steps' is set to 4, meaning that gradients will be accumulated over 4 steps before performing a backward/update pass.
+# 'log_level' is set to "debug", meaning that all log messages will be printed.
+# 'save_strategy' is set to "epoch", meaning that the model will be saved after each epoch.
+# 'logging_steps' is set to 100, meaning that log messages will be printed every 100 steps.
+# 'learning_rate' is set to 1e-4, which is the learning rate for the optimizer.
+# 'fp16' is set to the opposite of whether bfloat16 is supported on the current CUDA device.
+# 'bf16' is set to whether bfloat16 is supported on the current CUDA device.
+# 'eval_steps' is set to 100, meaning that evaluation will be performed every 100 steps.
+# 'num_train_epochs' is set to 3, meaning that the model will be trained for 3 epochs.
+# 'warmup_ratio' is set to 0.1, meaning that 10% of the total training steps will be used for the warmup phase.
+# 'lr_scheduler_type' is set to "linear", meaning that a linear learning rate scheduler will be used.
+# 'report_to' is set to "wandb", meaning that training and evaluation metrics will be reported to Weights & Biases.
+# 'seed' is set to 42, which is the seed for the random number generator.
+
+# LoraConfig object is created with the following parameters:
+# 'r' (rank of the low-rank approximation) is set to 16,
+# 'lora_alpha' (scaling factor) is set to 16,
+# 'lora_dropout' dropout probability for Lora layers is set to 0.05,
+# 'task_type' (set to TaskType.CAUSAL_LM indicating the task type),
+# 'target_modules' (the modules to which LoRA is applied) choosing linear layers except the output layer..
+
+
+args = TrainingArguments(
+        output_dir=MODEL_NAME+'-LoRA',
+        evaluation_strategy="steps",
+        do_eval=True,
+        optim="adamw_torch",
+        per_device_train_batch_size=8,
+        gradient_accumulation_steps=4,
+        per_device_eval_batch_size=8,
+        log_level="debug",
+        save_strategy="epoch",
+        logging_steps=100,
+        learning_rate=1e-4,
+        fp16 = not torch.cuda.is_bf16_supported(),
+        bf16 = torch.cuda.is_bf16_supported(),
+        eval_steps=100,
+        num_train_epochs=3,
+        warmup_ratio=0.1,
+        lr_scheduler_type="linear",
+        report_to="wandb",
+        seed=42,
+)
+
+peft_config = LoraConfig(
+        r=LORA_RANK,
+        lora_alpha=LORA_ALPHA,
+        lora_dropout=LORA_DROPOUT,
+        task_type=TaskType.CAUSAL_LM,
+        target_modules=TARGET_MODULES,
+)
+
+# 'model' is the model that will be trained.
+# 'train_dataset' and 'eval_dataset' are the datasets that will be used for training and evaluation, respectively.
+# 'peft_config' is the configuration for peft, which is used for instruction tuning.
+# 'dataset_text_field' is set to "text", meaning that the 'text' field of the dataset will be used as the input for the model.
+# 'max_seq_length' is set to 512, meaning that the maximum length of the sequences that will be fed to the model is 512 tokens.
+# 'tokenizer' is the tokenizer that will be used to tokenize the input text.
+# 'args' are the training arguments that were defined earlier.
+
+trainer = SFTTrainer(
+        model=model,
+        train_dataset=processed_train_dataset,
+        eval_dataset=processed_test_dataset,
+        peft_config=peft_config,
+        dataset_text_field="text",
+        max_seq_length=512,
+        tokenizer=tokenizer,
+        args=args,
+)
+
+# 'trainer.train()' is a method that starts the training of the model.
+# It uses the training dataset, evaluation dataset, and training arguments that were provided when the trainer was initialized.
+trainer.train()
+
+# 'trainer.save_model()' is a method that saves the trained model locally.
+# The model will be saved in the directory specified by 'output_dir' in the training arguments.
+trainer.save_model()
+
+trainer.push_to_hub(HF_MODEL_REPO)
