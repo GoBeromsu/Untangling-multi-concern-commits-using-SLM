@@ -13,7 +13,7 @@ from datasets import load_dataset
 # 'prepare_model_for_kbit_training' is a function that prepares a model for k-bit training.
 # 'TaskType' contains differenct types of tasks supported by PEFT
 # 'PeftModel' base model class for specifying the base Transformer model and configuration to apply a PEFT method to.
-from peft import LoraConfig, prepare_model_for_kbit_training, TaskType, PeftModel
+from peft import LoraConfig, TaskType
 
 # Several classes and functions are imported from the 'transformers' library by Hugging Face.
 # 'AutoModelForCausalLM' is a class that provides a generic transformer model for causal language modeling.
@@ -27,13 +27,12 @@ from transformers import (
     AutoTokenizer,
     TrainingArguments,
     set_seed,
-    pipeline,
 )
 
 # 'SFTTrainer' is a class from the 'trl' library that provides a trainer for soft fine-tuning.
 from trl import SFTTrainer
 
-from utils.prompt import get_system_prompt, get_system_prompt_with_message
+from utils.prompt import get_system_prompt
 
 """
 Multi-Concern Commit Classification SFT Training Script
@@ -113,7 +112,7 @@ test_dataset = load_dataset(
     split="test",
 )
 
-# Load tokenizer to prepare the dataset
+# Load tokenizer to prepare the dataset (First tokenizer - for data formatting only)
 tokenizer_id = MODEL_ID
 
 # 'AutoTokenizer.from_pretrained' is a method that loads a tokenizer from the Hugging Face Model Hub.
@@ -157,6 +156,7 @@ def create_message_column(row) -> Dict[str, Any]:
 
 # 'format_dataset_chatml' is a function that takes a row from the dataset and returns a dictionary
 # with a 'text' key and a string of formatted chat messages as its value.
+# Uses the first tokenizer with tokenize=False to create formatted strings (not token IDs)
 def format_dataset_chatml(row) -> Dict[str, Any]:
     """Format dataset with chat template for multi-concern commit classification."""
     return {
@@ -209,18 +209,22 @@ else:
     attn_implementation = "sdpa"
 
 
+# Second tokenizer - for actual model training (different from data formatting tokenizer above)
 # 'AutoTokenizer.from_pretrained' is a method that loads a tokenizer from the Hugging Face Model Hub.
 # 'model_id' is passed as an argument to specify which tokenizer to load.
 # 'trust_remote_code' is set to True to trust the remote code in the tokenizer files.
 # 'add_eos_token' is set to True to add an end-of-sentence token to the tokenizer.
 # 'use_fast' is set to True to use the fast version of the tokenizer.
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True, add_eos_token=True, use_fast=True)
+tokenizer = AutoTokenizer.from_pretrained(
+    MODEL_ID, trust_remote_code=True, add_eos_token=True, use_fast=True
+)
 
 # The padding token is set to the unknown token.
 tokenizer.pad_token = tokenizer.unk_token
 tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
 # The padding side is set to 'left', meaning that padding tokens will be added to the left (start) of the sequence.
-tokenizer.padding_side = 'left'
+# Left padding is preferred for causal LM training (different from 'right' padding used in data formatting)
+tokenizer.padding_side = "left"
 
 # 'AutoModelForCausalLM.from_pretrained' is a method that loads a pre-trained model for causal language modeling from the Hugging Face Model Hub.
 # 'model_id' is passed as an argument to specify which model to load.
@@ -229,8 +233,11 @@ tokenizer.padding_side = 'left'
 # 'device_map' is passed as an argument to specify the device mapping for distributed training.
 # 'attn_implementation' is set to the attention implementation determined earlier.
 model = AutoModelForCausalLM.from_pretrained(
-          MODEL_ID, torch_dtype=compute_dtype, trust_remote_code=True, device_map=DEVICE_MAP,
-          attn_implementation=attn_implementation
+    MODEL_ID,
+    torch_dtype=compute_dtype,
+    trust_remote_code=True,
+    device_map=DEVICE_MAP,
+    attn_implementation=attn_implementation,
 )
 
 
@@ -265,33 +272,33 @@ model = AutoModelForCausalLM.from_pretrained(
 
 
 args = TrainingArguments(
-        output_dir=MODEL_NAME+'-LoRA',
-        evaluation_strategy="steps",
-        do_eval=True,
-        optim="adamw_torch",
-        per_device_train_batch_size=8,
-        gradient_accumulation_steps=4,
-        per_device_eval_batch_size=8,
-        log_level="debug",
-        save_strategy="epoch",
-        logging_steps=100,
-        learning_rate=1e-4,
-        fp16 = not torch.cuda.is_bf16_supported(),
-        bf16 = torch.cuda.is_bf16_supported(),
-        eval_steps=100,
-        num_train_epochs=3,
-        warmup_ratio=0.1,
-        lr_scheduler_type="linear",
-        report_to="wandb",
-        seed=42,
+    output_dir=MODEL_NAME + "-LoRA",
+    evaluation_strategy="steps",
+    do_eval=True,
+    optim="adamw_torch",
+    per_device_train_batch_size=8,
+    gradient_accumulation_steps=4,
+    per_device_eval_batch_size=8,
+    log_level="debug",
+    save_strategy="epoch",
+    logging_steps=100,
+    learning_rate=1e-4,
+    fp16=not torch.cuda.is_bf16_supported(),
+    bf16=torch.cuda.is_bf16_supported(),
+    eval_steps=100,
+    num_train_epochs=3,
+    warmup_ratio=0.1,
+    lr_scheduler_type="linear",
+    report_to="wandb",
+    seed=42,
 )
 
 peft_config = LoraConfig(
-        r=LORA_RANK,
-        lora_alpha=LORA_ALPHA,
-        lora_dropout=LORA_DROPOUT,
-        task_type=TaskType.CAUSAL_LM,
-        target_modules=TARGET_MODULES,
+    r=LORA_RANK,
+    lora_alpha=LORA_ALPHA,
+    lora_dropout=LORA_DROPOUT,
+    task_type=TaskType.CAUSAL_LM,
+    target_modules=TARGET_MODULES,
 )
 
 # 'model' is the model that will be trained.
@@ -300,17 +307,18 @@ peft_config = LoraConfig(
 # 'dataset_text_field' is set to "text", meaning that the 'text' field of the dataset will be used as the input for the model.
 # 'max_seq_length' is set to 512, meaning that the maximum length of the sequences that will be fed to the model is 512 tokens.
 # 'tokenizer' is the tokenizer that will be used to tokenize the input text.
+# This uses the second tokenizer (training tokenizer) to convert text strings to token IDs
 # 'args' are the training arguments that were defined earlier.
 
 trainer = SFTTrainer(
-        model=model,
-        train_dataset=processed_train_dataset,
-        eval_dataset=processed_test_dataset,
-        peft_config=peft_config,
-        dataset_text_field="text",
-        max_seq_length=512,
-        tokenizer=tokenizer,
-        args=args,
+    model=model,
+    train_dataset=processed_train_dataset,
+    eval_dataset=processed_test_dataset,
+    peft_config=peft_config,
+    dataset_text_field="text",
+    max_seq_length=512,
+    tokenizer=tokenizer,
+    args=args,
 )
 
 # 'trainer.train()' is a method that starts the training of the model.
