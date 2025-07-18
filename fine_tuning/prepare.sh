@@ -39,9 +39,12 @@ fi
 echo "🏗️ Creating conda environment..."
 conda env create -f environment.yml
 
-# Activate environment
+# Activate environment using 'source activate' instead of 'conda activate'
+# Sheffield HPC requirement: Due to Anaconda being installed as a module,
+# must use 'source' command instead of 'conda' when activating environments
+# Reference: https://docs.hpc.shef.ac.uk/en/latest/stanage/software/apps/python.html
 echo "🔧 Activating phi4_env..."
-conda activate phi4_env
+source activate phi4_env
 
 # Install pip dependencies
 echo "📦 Installing ML dependencies..."
@@ -51,10 +54,6 @@ pip install -r requirements.txt
 export CUDA_VISIBLE_DEVICES=0
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 export TOKENIZERS_PARALLELISM=false
-
-# Quick verification
-echo "🔍 Verifying setup..."
-python -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
 
 # Run training
 echo "🔥 Starting training at $(date)"
@@ -66,5 +65,4 @@ echo "✅ Training completed at $(date)"
 echo "📊 Job Summary:"
 sacct -j $SLURM_JOB_ID --format=JobID,JobName,Elapsed,State,ExitCode
 
-# Cleanup
-conda deactivate
+source deactivate
