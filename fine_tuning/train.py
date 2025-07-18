@@ -11,6 +11,7 @@ Usage: python train.py
 # Reference : https://github.com/microsoft/PhiCookBook/blob/main/code/03.Finetuning/Phi-3-finetune-lora-python.ipynb
 import sys
 import logging
+import os
 from typing import Dict, Any
 
 import torch
@@ -36,11 +37,12 @@ from peft import LoraConfig, TaskType
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    BitsAndBytesConfig,
     TrainingArguments,
     set_seed,
-    pipeline,
 )
+
+# Import utilities for checkpoint management following HF best practices
+from transformers.trainer_utils import get_last_checkpoint
 
 # 'SFTTrainer' is a class from the 'trl' library that provides a trainer for soft fine-tuning.
 from trl import SFTTrainer
@@ -96,7 +98,6 @@ set_seed(1234)
 ######################
 from huggingface_hub import login
 from dotenv import load_dotenv
-import os
 
 # Load environment variables from .env file
 load_dotenv()
@@ -336,7 +337,16 @@ trainer = SFTTrainer(
 
 # 'trainer.train()' is a method that starts the training of the model.
 # It uses the training dataset, evaluation dataset, and training arguments that were provided when the trainer was initialized.
-trainer.train()
+
+# trainer.train() 전에 체크포인트 확인
+last_checkpoint = None
+if os.path.isdir(args.output_dir):
+    last_checkpoint = get_last_checkpoint(args.output_dir)
+
+if last_checkpoint is not None:
+    trainer.train(resume_from_checkpoint=last_checkpoint)
+else:
+    trainer.train()
 
 # 'trainer.save_model()' is a method that saves the trained model locally.
 # The model will be saved in the directory specified by 'output_dir' in the training arguments.
