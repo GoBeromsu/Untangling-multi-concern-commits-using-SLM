@@ -36,8 +36,10 @@ from peft import LoraConfig, TaskType
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    BitsAndBytesConfig,
     TrainingArguments,
     set_seed,
+    pipeline,
 )
 
 # 'SFTTrainer' is a class from the 'trl' library that provides a trainer for soft fine-tuning.
@@ -88,6 +90,19 @@ MAX_SEQ_LENGTH: int = 16_384
 NUM_WORKERS: int = 4
 
 set_seed(1234)
+
+######################
+# Connect to Hugging Face Hub
+######################
+from huggingface_hub import login
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Login to Hugging Face Hub using token from environment
+login(token=os.getenv("HF_HUB_TOKEN"))
 
 ######################
 # Setup Experiment Tracking
@@ -324,4 +339,46 @@ trainer.train()
 # The model will be saved in the directory specified by 'output_dir' in the training arguments.
 trainer.save_model()
 
-trainer.push_to_hub(HF_MODEL_REPO)
+# Save the LoRA adapter to Hugging Face Hub
+trainer.push_to_hub(HF_MODEL_REPO + "-adapter")
+
+###############
+# Merge Model and Adapter
+###############
+# Free up GPU memory before merging
+del model
+del trainer
+
+import gc
+
+gc.collect()
+gc.collect()
+
+torch.cuda.empty_cache()
+gc.collect()
+
+# Import AutoPeftModelForCausalLM for merging
+from peft import AutoPeftModelForCausalLM
+
+# Load the trained adapter model
+new_model = AutoPeftModelForCausalLM.from_pretrained(
+    args.output_dir,
+    low_cpu_mem_usage=True,
+    return_dict=True,
+    torch_dtype=compute_dtype,
+    trust_remote_code=True,
+    device_map=DEVICE_MAP,
+)
+
+# Merge the model and adapter
+merged_model = new_model.merge_and_unload()
+
+# Save the merged model locally
+merged_model.save_pretrained(
+    "merged_model", trust_remote_code=True, safe_serialization=True
+)
+tokenizer.save_pretrained("merged_model")
+
+# Push the merged model to Hugging Face Hub
+merged_model.push_to_hub(HF_MODEL_REPO)
+tokenizer.push_to_hub(HF_MODEL_REPO)
