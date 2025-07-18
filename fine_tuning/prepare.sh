@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=phi4_commit_sft
-#SBATCH --time=2:00:00
+#SBATCH --time=24:00:00
 #SBATCH --partition=gpu
 #SBATCH --qos=gpu
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=8G
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=128G
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --output=logs/phi4_training_%j.out
