@@ -301,6 +301,9 @@ args = TrainingArguments(
     lr_scheduler_type="linear",
     report_to="wandb",
     seed=42,
+    push_to_hub=True,
+    hub_strategy="every_save",
+    hub_model_id=HF_MODEL_REPO + "-adapter",
 )
 
 peft_config = LoraConfig(
@@ -338,9 +341,6 @@ trainer.train()
 # 'trainer.save_model()' is a method that saves the trained model locally.
 # The model will be saved in the directory specified by 'output_dir' in the training arguments.
 trainer.save_model()
-
-# Save the LoRA adapter to Hugging Face Hub
-trainer.push_to_hub(HF_MODEL_REPO + "-adapter")
 
 ###############
 # Merge Model and Adapter
