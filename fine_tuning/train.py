@@ -1,9 +1,20 @@
+"""
+Fine-tuning Phi-4 for Untangling Multi-Concern Commits
+
+Dataset: Untangling Multi-Concern Commits with Small Language Models
+Task: Predict reasoning and concern types from commit messages and diffs
+Input: commit_message, diff → Output: reason, types
+
+Usage: python train.py
+"""
+
 # Reference : https://github.com/microsoft/PhiCookBook/blob/main/code/03.Finetuning/Phi-3-finetune-lora-python.ipynb
 import sys
 import logging
 from typing import Dict, Any
 
 import torch
+import wandb
 
 # 'load_dataset' is a function from the 'datasets' library by Hugging Face which allows you to load a dataset.
 from datasets import load_dataset
@@ -34,33 +45,6 @@ from trl import SFTTrainer
 
 from utils.prompt import get_system_prompt
 
-"""
-Multi-Concern Commit Classification SFT Training Script
-University of Sheffield HPC Stanage - A100 GPU Setup
-
-This script fine-tunes a language model to classify multi-concern commits using SFTTrainer.
-Dataset: Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models
-Input: commit_message (commit message), types, reason
-Target: Learning to predict reasoning for commit classification
-
-HPC Stanage Setup Requirements:
-- GPU: A100 40/80GB, requires SLURM job submission
-- Memory: 128GB RAM recommended for single A100
-- Modules: module load CUDA/12.4.0 && module load Anaconda3/2022.05
-
-Setup Steps:
-1. Create conda environment:
-    conda env create -f fine_tuning/environment.yml
-    conda activate phi4_env
-
-2. Verify installation:
-    python -c "import torch; print(torch.cuda.is_available())"
-
-3. Run with SLURM:
-    sbatch fine_tuning/prepare.sh
-
-"""
-
 logger = logging.getLogger(__name__)
 
 # Model and dataset configuration
@@ -72,6 +56,10 @@ DATASET_NAME: str = (
 
 NEW_MODEL: str = "Untangling-Multi-Concern-Commits-with-Small-Language-Models"
 HF_MODEL_REPO: str = "Berom0227/" + NEW_MODEL
+
+# Experiment tracking configuration
+WANDB_PROJECT: str = "Untangling-Multi-Concern-Commits-with-Small-Language-Models"
+EXPERIMENT_NAME: str = f"phi4-{NEW_MODEL.lower()}-lora"
 
 DEVICE_MAP: str = "auto"
 
@@ -100,6 +88,13 @@ MAX_SEQ_LENGTH: int = 16_384
 NUM_WORKERS: int = 4
 
 set_seed(1234)
+
+######################
+# Setup Experiment Tracking
+######################
+# Initialize Weights & Biases following reference notebook pattern
+wandb.login()
+wandb.init(project=WANDB_PROJECT, name=EXPERIMENT_NAME)
 
 ## Dataset Loading
 train_dataset = load_dataset(
@@ -316,7 +311,7 @@ trainer = SFTTrainer(
     eval_dataset=processed_test_dataset,
     peft_config=peft_config,
     dataset_text_field="text",
-    max_seq_length=512,
+    max_seq_length=MAX_SEQ_LENGTH,
     tokenizer=tokenizer,
     args=args,
 )
