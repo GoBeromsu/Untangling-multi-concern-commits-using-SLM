@@ -63,13 +63,37 @@ Setup Steps:
 
 logger = logging.getLogger(__name__)
 
+# Model and dataset configuration
+MODEL_ID: str = "microsoft/phi-4"
+
+DATASET_NAME: str = "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models"
+DATASET_SPLIT: str = "train"
+
+NEW_MODEL: str = "Untangling-Multi-Concern-Commits-with-Small-Language-Models"
+HF_MODEL_REPO: str = "Berom0227/" + NEW_MODEL
+
+DEVICE_MAP: str = "auto" 
+
+# 'lora_r' is the dimension of the LoRA attention.
+LORA_RANK: int = 16
+
+# 'lora_alpha' is the alpha parameter for LoRA scaling.
+LORA_ALPHA: int = 16
+
+# 'lora_dropout' is the dropout probability for LoRA layers.
+LORA_DROPOUT: float = 0.05
+
+# 'target_modules' is a list of the modules in the model that will be replaced with LoRA layers.
+TARGET_MODULES: list[str] = ['k_proj', 'q_proj', 'v_proj', 'o_proj', "gate_proj", "down_proj", "up_proj"]
+
+set_seed(1234)
+
 
 # Training constants
 DEFAULT_BATCH_SIZE: int = 4
 NUM_WORKERS: int = 4
 MAX_SEQ_LENGTH: int = 16_384
 LORA_RANK: int = 16
-LORA_ALPHA: int = 32
 LEARNING_RATE: float = 5.0e-06
 
 ###################
@@ -122,10 +146,6 @@ logging.basicConfig(
 )
 log_level = train_conf.get_process_log_level()
 logger.setLevel(log_level)
-datasets.utils.logging.set_verbosity(log_level)
-transformers.utils.logging.set_verbosity(log_level)
-transformers.utils.logging.enable_default_handler()
-transformers.utils.logging.enable_explicit_format()
 
 # Log on each process a small summary
 logger.warning(
