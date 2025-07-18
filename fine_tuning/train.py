@@ -1,21 +1,38 @@
-# -*- coding: utf-8 -*-
+# Reference : https://github.com/microsoft/PhiCookBook/blob/main/code/03.Finetuning/Phi-3-finetune-lora-python.ipynb
 import sys
 import logging
 from typing import Dict, Any
 
-import datasets
-from datasets import load_dataset
-from peft import LoraConfig
 import torch
-import transformers
-from trl import SFTTrainer
+
+# 'load_dataset' is a function from the 'datasets' library by Hugging Face which allows you to load a dataset.
+from datasets import load_dataset
+
+# 'LoraConfig' and 'prepare_model_for_kbit_training' are from the 'peft' library. 
+# 'LoraConfig' is used to configure the LoRA (Learning from Random Architecture) model.
+# 'prepare_model_for_kbit_training' is a function that prepares a model for k-bit training.
+# 'TaskType' contains differenct types of tasks supported by PEFT
+# 'PeftModel' base model class for specifying the base Transformer model and configuration to apply a PEFT method to.
+from peft import LoraConfig, prepare_model_for_kbit_training, TaskType, PeftModel
+
+# Several classes and functions are imported from the 'transformers' library by Hugging Face.
+# 'AutoModelForCausalLM' is a class that provides a generic transformer model for causal language modeling.
+# 'AutoTokenizer' is a class that provides a generic tokenizer class.
+# 'BitsAndBytesConfig' is a class for configuring the Bits and Bytes optimizer.
+# 'TrainingArguments' is a class that defines the arguments used for training a model.
+# 'set_seed' is a function that sets the seed for generating random numbers.
+# 'pipeline' is a function that creates a pipeline that can process data and make predictions.
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     TrainingArguments,
+    set_seed,
+    pipeline
 )
+# 'SFTTrainer' is a class from the 'trl' library that provides a trainer for soft fine-tuning.
+from trl import SFTTrainer
 
-from utils.prompt import get_system_prompt
+from utils.prompt import get_system_prompt_with_message
 
 """
 Multi-Concern Commit Classification SFT Training Script
@@ -157,7 +174,7 @@ def apply_chat_template(example, tokenizer) -> Dict[str, Any]:
 """
 
     messages = [
-        {"role": "system", "content": get_system_prompt()},
+        {"role": "system", "content": get_system_prompt_with_message()},
         {"role": "user", "content": user_content},
         {"role": "assistant", "content": assistant_content},
     ]
