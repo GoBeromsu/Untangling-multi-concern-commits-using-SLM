@@ -3,7 +3,6 @@
 import yaml
 import sys
 import pandas as pd
-import json
 import time
 from pathlib import Path
 
@@ -15,6 +14,8 @@ from utils import (
     plot_graph,
     load_openai_client,
     get_openai_prediction,
+    parse_prediction_to_set,
+    parse_ground_truth_to_set,
 )
 from utils.prompt import get_system_prompt_with_message
 
@@ -87,23 +88,15 @@ def main():
                     predicted_concerns = set()
                 else:
                     # Parse structured JSON output to extract concern types
-                    output_json = json.loads(prediction)
-                    predicted_concerns = set(output_json["types"])
+                    predicted_concerns = parse_prediction_to_set(prediction)
 
-            except json.JSONDecodeError as e:
-                print(
-                    f"JSON decode error processing sample {idx} with {model_name}: {e}"
-                )
-                print(f"Raw prediction: {prediction}")
-                predicted_concerns = set()
-                latencies.append(0.0)  # Add placeholder latency
             except Exception as e:
                 print(f"Error processing sample {idx} with {model_name}: {e}")
                 predicted_concerns = set()
                 latencies.append(0.0)  # Add placeholder latency
 
             # Parse ground truth concerns
-            ground_truth_concerns = set(json.loads(sample["types"]))
+            ground_truth_concerns = parse_ground_truth_to_set(sample["types"])
 
             model_results.append(
                 {

@@ -2,33 +2,14 @@
 Common patterns and utilities following frontend design principles.
 """
 
-import json
-import streamlit as st
-from typing import Dict, Any, Tuple, List, Optional
+# Wrapper for visual_eval compatibility - delegates to unified utils.llms module
+from utils.llms.response import parse_model_response as _parse_model_response
+from typing import Dict, Any, Tuple, List
 
 
 def parse_model_response(model_response: str) -> Tuple[List[str], str]:
-    """
-    Parse model response with consistent error handling.
-
-    Args:
-        model_response: JSON string from model API
-
-    Returns:
-        Tuple of (concern_types, reasoning)
-    """
-    try:
-        prediction_data = json.loads(model_response)
-        predicted_concern_types = prediction_data.get("types", [])
-        model_reasoning = prediction_data.get("reason", "No reasoning provided")
-        return predicted_concern_types, model_reasoning
-    except json.JSONDecodeError as e:
-        return (
-            [],
-            f"JSON Parse Error: {str(e)}. Raw response: {model_response[:200]}...",
-        )
-    except Exception as e:
-        return [], f"Parse Error: {str(e)}. Raw response: {model_response[:200]}..."
+    """Parse model response wrapper for visual_eval compatibility."""
+    return _parse_model_response(model_response)
 
 
 def extract_test_case_data(

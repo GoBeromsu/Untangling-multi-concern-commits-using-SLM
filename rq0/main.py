@@ -3,7 +3,6 @@
 import yaml
 import sys
 import pandas as pd
-import json
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
@@ -13,12 +12,35 @@ from utils import (
     save_metric_csvs,
     load_openai_client,
     get_openai_prediction,
+    parse_prediction_to_set,
+    parse_ground_truth_to_set,
 )
 from utils.prompt import get_system_prompt_with_message
-from lmstudio_handler import (
-    load_lmstudio_client,
-    get_lmstudio_prediction,
-)
+
+
+# Helper functions for RQ0 compatibility with unified llms module
+def load_lmstudio_client(model_name: str) -> dict:
+    """LM Studio client compatibility wrapper for RQ0."""
+    return {"type": "lmstudio", "model_name": model_name, "base_url": "localhost:1234"}
+
+
+def get_lmstudio_prediction(
+    model_info: dict,
+    user_prompt: str,
+    system_prompt: str,
+    temperature: float,
+    max_tokens: int,
+) -> str:
+    """LM Studio prediction compatibility wrapper for RQ0."""
+    from utils.llms import api_call
+
+    return api_call(
+        model_name=model_info["model_name"],
+        diff=user_prompt,
+        system_prompt=system_prompt,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
 
 
 def main():
@@ -62,7 +84,11 @@ def main():
             try:
                 if is_llm:
                     prediction = get_openai_prediction(
-                        model_info, user_prompt, system_prompt, temperature, max_tokens
+                        model_info,
+                        user_prompt,
+                        system_prompt,
+                        temperature,
+                        max_tokens,
                     )
                 else:
                     prediction = get_lmstudio_prediction(
@@ -75,21 +101,14 @@ def main():
                     predicted_concerns = set()
                 else:
                     # Parse structured JSON output to extract concern types
-                    output_json = json.loads(prediction)
-                    predicted_concerns = set(output_json["types"])
+                    predicted_concerns = parse_prediction_to_set(prediction)
 
-            except json.JSONDecodeError as e:
-                print(
-                    f"JSON decode error processing sample {idx} with {model_name}: {e}"
-                )
-                print(f"Raw prediction: {prediction}")
-                predicted_concerns = set()
             except Exception as e:
                 print(f"Error processing sample {idx} with {model_name}: {e}")
                 predicted_concerns = set()
 
             # Parse ground truth concerns
-            ground_truth_concerns = set(json.loads(sample["types"]))
+            ground_truth_concerns = parse_ground_truth_to_set(sample["types"])
 
             # Save result immediately after each API response
             results.append(
