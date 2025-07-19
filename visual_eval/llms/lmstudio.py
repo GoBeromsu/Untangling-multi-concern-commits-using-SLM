@@ -9,24 +9,8 @@ from .constant import (
     DEFAULT_LMSTUDIO_URL,
 )
 
-# Global state for LM Studio client and models
-client_initialized = False
+# Global state for loaded models
 loaded_models: Dict[str, Any] = {}
-
-
-def init_client() -> None:
-    """Initialize LM Studio client only once."""
-    global client_initialized
-    if not client_initialized:
-        try:
-            lms.configure_default_client(DEFAULT_LMSTUDIO_URL)
-            client_initialized = True
-        except Exception as e:
-            # Client might already be initialized elsewhere
-            if "already created" in str(e):
-                client_initialized = True
-            else:
-                raise e
 
 
 def get_models() -> Tuple[List[str], str]:
@@ -37,9 +21,6 @@ def get_models() -> Tuple[List[str], str]:
         Tuple of (model_names_list, error_message)
     """
     try:
-        # Ensure client is initialized
-        init_client()
-
         downloaded = lms.list_downloaded_models("llm")
         model_names = [model.model_key for model in downloaded]
         return model_names, ""
@@ -57,9 +38,6 @@ def load_model(model_name: str) -> Any:
     Returns:
         Loaded model instance
     """
-    # Ensure client is initialized
-    init_client()
-
     if model_name not in loaded_models:
         try:
             model = lms.llm(model_name, config=LMSTUDIO_MODEL_CONFIG)
@@ -94,17 +72,25 @@ def api_call(
         # Load model when actually needed
         model = load_model(model_name)
 
-        # Use model.respond() with proper message format
-        response = model.respond(
-            [
+        # Prepare messages in correct format for LM Studio
+        messages = {
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": diff},
-            ],
+            ]
+        }
+
+        # Use model.respond() with proper message format and configuration
+        response = model.respond(
+            messages,
             config={
                 "temperature": temperature,
                 "maxTokens": max_tokens,
+                "structured": {
+                    "type": "json",
+                    "jsonSchema": RESPONSE_SCHEMA,
+                },
             },
-            response_format=RESPONSE_SCHEMA,
         )
 
         # Handle response based on LM Studio SDK format

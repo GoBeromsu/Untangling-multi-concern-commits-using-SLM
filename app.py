@@ -14,7 +14,6 @@ from visual_eval.llms.lmstudio import (
     load_model,
 )
 from visual_eval.llms.constant import (
-    DEFAULT_LMSTUDIO_URL,
     CODE_DIFF_INPUT_HEIGHT,
     SYSTEM_PROMPT_INPUT_HEIGHT,
 )
