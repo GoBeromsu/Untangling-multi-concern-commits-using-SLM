@@ -1,16 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name=phi4_commit_sft      # Job name for identification in queue
-#SBATCH --time=24:00:00                 # Maximum runtime limit (24 hours)
-#SBATCH --partition=gpu                 # Submit to GPU partition
-#SBATCH --gres=gpu:1                    # Request 1 GPU
-#SBATCH --cpus-per-task=16              # Request 16 CPU cores
-#SBATCH --mem=128GB                     # Request 128GB memory
-#SBATCH --nodes=1                       # Use single node
-#SBATCH --ntasks=1                      # Single task
-#SBATCH --output=logs/phi4_training_%j.out  # Standard output log file
-#SBATCH --error=logs/phi4_training_%j.err   # Error log file
+#SBATCH --job-name=phi4_commit_sft
+#SBATCH --time=24:00:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=128GB
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --output=logs/phi4_training_%j.out
+#SBATCH --error=logs/phi4_training_%j.err
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=bkoh3@sheffield.ac.uk   # Email recipient
+#SBATCH --mail-user=bkoh3@sheffield.ac.uk
 
 # Sheffield HPC Stanage - A100 GPU Training
 # Multi-Concern Commit Classification with Phi-4
