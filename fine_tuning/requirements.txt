@@ -10,6 +10,3 @@ trl>=0.8.0                      # Transformers Reinforcement Learning
 
 # Experiment Tracking
 wandb>=0.16.0                   # Weights & Biases for experiment monitoring
-
-# Performance Optimization - A100/H100 GPU optimization
-flash-attn>=2.3.0               # Flash Attention for memory efficiency

@@ -12,5 +12,9 @@ dependencies:
   - ninja # Fast build system for Flash Attention
   - cmake # Build configuration tool
 
+  # Arrow libraries for flash-attn dependencies
+  - libarrow
+  - pyarrow
+
   # Package Management
   - pip
