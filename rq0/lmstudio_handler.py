@@ -1,11 +1,10 @@
 """LM Studio API handler for RQ0 experiments."""
 
 import requests
-import json
 from typing import Dict, Any
 
 # LM Studio configuration
-DEFAULT_LMSTUDIO_URL = "http://localhost:1234"
+DEFAULT_LMSTUDIO_URL = "localhost:1234"
 CONNECTION_TIMEOUT_SECONDS = 60
 
 # Response schema for commit classification

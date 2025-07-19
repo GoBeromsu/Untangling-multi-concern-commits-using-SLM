@@ -9,9 +9,9 @@ from dotenv import load_dotenv
 from utils.prompt import get_system_prompt
 from visual_eval.llms.openai import openai_api_call
 from visual_eval.llms.lmstudio import (
-    check_lmstudio_connection,
-    get_lmstudio_models,
-    lmstudio_api_call,
+    get_models,
+    api_call,
+    load_model,
 )
 from visual_eval.llms.constant import (
     DEFAULT_LMSTUDIO_URL,
@@ -79,8 +79,7 @@ def get_model_response(diff: str, system_prompt: str) -> str:
         return openai_api_call(api_key, diff, system_prompt)
     elif selected_api == "lmstudio":
         model_name = st.session_state.get("selected_model", "")
-        base_url = st.session_state.get("lmstudio_url", DEFAULT_LMSTUDIO_URL)
-        return lmstudio_api_call(model_name, diff, system_prompt, base_url=base_url)
+        return api_call(model_name, diff, system_prompt)
     else:
         raise ValueError(f"Unsupported API provider: {selected_api}")
 
@@ -144,6 +143,19 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
     if df.empty:
         st.error("No test data available for evaluation")
         return
+
+    # Pre-load model if using LM Studio to prevent loading during evaluation
+    selected_api = st.session_state.get("selected_api", "openai")
+    if selected_api == "lmstudio":
+        model_name = st.session_state.get("selected_model", "")
+        if model_name:
+            with st.spinner(f"Loading model {model_name} before evaluation..."):
+                try:
+                    load_model(model_name)
+                    st.success(f"✅ Model {model_name} loaded successfully!")
+                except Exception as e:
+                    st.error(f"❌ Failed to load model: {e}")
+                    return
 
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -411,40 +423,26 @@ def main() -> None:
 
     # Handle LM Studio setup
     else:  # api_provider == "LM Studio"
-        lmstudio_url = st.text_input(
-            "LM Studio URL:",
-            value=DEFAULT_LMSTUDIO_URL,
-            help="Base URL for LM Studio API",
-        )
-
-        # Validate LM Studio connection and load models
-        with st.spinner("Checking LM Studio connection..."):
-            if not check_lmstudio_connection(lmstudio_url):
-                st.error(
-                    "❌ Cannot connect to LM Studio. Please ensure LM Studio is running."
-                )
-                st.stop()
-
-            st.success("✅ LM Studio connection successful")
-
-            # Load available models
+        if "lmstudio_available_models" not in st.session_state:
             with st.spinner("Loading available models..."):
-                models, error_msg = get_lmstudio_models(lmstudio_url)
+                models, error_msg = get_models()
                 if not models:
                     st.error(f"❌ No models available: {error_msg}")
                     st.stop()
+                st.session_state.lmstudio_available_models = models
 
-                selected_model = st.selectbox(
-                    "Select Model:", models, help="Choose a model loaded in LM Studio"
-                )
+        selected_model = st.selectbox(
+            "Select Model:",
+            st.session_state.lmstudio_available_models,
+            help="Choose a model loaded in LM Studio",
+        )
 
-                st.session_state.update(
-                    {
-                        "selected_api": "lmstudio",
-                        "selected_model": selected_model,
-                        "lmstudio_url": lmstudio_url,
-                    }
-                )
+        st.session_state.update(
+            {
+                "selected_api": "lmstudio",
+                "selected_model": selected_model,
+            }
+        )
 
     st.divider()
 

@@ -1,10 +1,22 @@
 from typing import Dict, List, Any
 
 # API Configuration Constants
-DEFAULT_LMSTUDIO_URL: str = "http://localhost:1234"
+DEFAULT_LMSTUDIO_URL: str = "localhost:1234"
 DEFAULT_TEMPERATURE: float = 0.0
 DEFAULT_MAX_TOKENS: int = 16384
 CONNECTION_TIMEOUT_SECONDS: int = 30
+
+# LM Studio Model Load Configuration (based on https://lmstudio.ai/docs/typescript/api-reference/llm-load-model-config)
+LMSTUDIO_MODEL_CONFIG: Dict[str, Any] = {
+    "contextLength": DEFAULT_MAX_TOKENS,
+    "gpu": {
+        "ratio": 1.0,  # Use maximum GPU
+    },
+    "flashAttention": True,  # Enable Flash Attention for better performance
+    "keepModelInMemory": True,  # Keep model in memory for faster access
+    "useFp16ForKVCache": True,  # Use FP16 for KV cache to save memory
+    "evalBatchSize": 512,  # Optimal batch size for evaluation
+}
 
 # UI Configuration Constants
 CODE_DIFF_INPUT_HEIGHT: int = 300

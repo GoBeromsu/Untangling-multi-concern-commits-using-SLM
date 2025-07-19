@@ -1,111 +1,129 @@
-import requests
-import json
-from typing import Any, Dict, List, Tuple
+from typing import List, Tuple, Dict, Any
+import lmstudio as lms
 
 from .constant import (
-    LMSTUDIO_STRUCTURED_OUTPUT_FORMAT,
-    DEFAULT_LMSTUDIO_URL,
+    RESPONSE_SCHEMA,
     DEFAULT_TEMPERATURE,
     DEFAULT_MAX_TOKENS,
-    CONNECTION_TIMEOUT_SECONDS,
+    LMSTUDIO_MODEL_CONFIG,
+    DEFAULT_LMSTUDIO_URL,
 )
 
+# Global state for LM Studio client and models
+client_initialized = False
+loaded_models: Dict[str, Any] = {}
 
-def check_lmstudio_connection(base_url: str = DEFAULT_LMSTUDIO_URL) -> bool:
+
+def init_client() -> None:
+    """Initialize LM Studio client only once."""
+    global client_initialized
+    if not client_initialized:
+        try:
+            lms.configure_default_client(DEFAULT_LMSTUDIO_URL)
+            client_initialized = True
+        except Exception as e:
+            # Client might already be initialized elsewhere
+            if "already created" in str(e):
+                client_initialized = True
+            else:
+                raise e
+
+
+def get_models() -> Tuple[List[str], str]:
     """
-    Check if LM Studio API is accessible.
-
-    Args:
-        base_url: Base URL for LM Studio API
-
-    Returns:
-        True if connection is successful, False otherwise
-    """
-    try:
-        url = f"{base_url}/v1/models"
-        response = requests.get(url, timeout=CONNECTION_TIMEOUT_SECONDS)
-        response.raise_for_status()
-        return True
-    except Exception:
-        return False
-
-
-def get_lmstudio_models(
-    base_url: str = DEFAULT_LMSTUDIO_URL,
-) -> Tuple[List[str], str]:
-    """
-    Get available models from LM Studio API.
-
-    Args:
-        base_url: Base URL for LM Studio API
+    Get available LLM models from LM Studio.
 
     Returns:
         Tuple of (model_names_list, error_message)
-        If successful, error_message is empty
     """
     try:
-        url = f"{base_url}/v1/models"
-        response = requests.get(url, timeout=CONNECTION_TIMEOUT_SECONDS)
-        response.raise_for_status()
+        # Ensure client is initialized
+        init_client()
 
-        models_data = response.json()
-        model_names = [model["id"] for model in models_data.get("data", [])]
-
+        downloaded = lms.list_downloaded_models("llm")
+        model_names = [model.model_key for model in downloaded]
         return model_names, ""
-    except requests.exceptions.RequestException as e:
-        return [], f"Request error: {e}"
     except Exception as e:
         return [], f"Error: {e}"
 
 
-def lmstudio_api_call(
+def load_model(model_name: str) -> Any:
+    """
+    Load model with optimized configuration.
+
+    Args:
+        model_name: Name of the model to load
+
+    Returns:
+        Loaded model instance
+    """
+    # Ensure client is initialized
+    init_client()
+
+    if model_name not in loaded_models:
+        try:
+            model = lms.llm(model_name, config=LMSTUDIO_MODEL_CONFIG)
+            loaded_models[model_name] = model
+        except Exception as e:
+            raise RuntimeError(f"Failed to load model {model_name}: {e}")
+
+    return loaded_models[model_name]
+
+
+def api_call(
     model_name: str,
     diff: str,
     system_prompt: str,
     temperature: float = DEFAULT_TEMPERATURE,
     max_tokens: int = DEFAULT_MAX_TOKENS,
-    base_url: str = DEFAULT_LMSTUDIO_URL,
 ) -> str:
     """
-    Call LM Studio API for commit classification using HTTP requests.
+    Call LM Studio API for commit classification.
 
     Args:
-        model_name: Name of the model to use (e.g., "codellama-7b@f16")
+        model_name: Name of the model to use
         diff: Git diff content to analyze
         system_prompt: System prompt for the model
         temperature: Sampling temperature (0.0 for greedy decoding)
-        max_tokens: Maximum tokens to generate (use -1 for unlimited)
-        base_url: Base URL for LM Studio API
+        max_tokens: Maximum tokens to generate
 
     Returns:
         JSON string containing the structured response
     """
-    url = f"{base_url}/v1/chat/completions"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "model": model_name,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": diff},
-        ],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "stream": False,
-        "response_format": LMSTUDIO_STRUCTURED_OUTPUT_FORMAT,
-    }
+    try:
+        # Load model when actually needed
+        model = load_model(model_name)
 
-    # Try up to 2 times for potential model warm-up
-    for attempt in range(2):
-        try:
-            response = requests.post(
-                url, headers=headers, json=data, timeout=CONNECTION_TIMEOUT_SECONDS
-            )
-            response.raise_for_status()
-            response_json = response.json()
-            return response_json["choices"][0]["message"]["content"]
-        except requests.exceptions.RequestException as e:
-            if attempt == 0:
-                continue
-            return f"An error occurred while calling LM Studio API: {e}"
-        except Exception as e:
-            return f"An error occurred while processing the response: {e}"
+        # Use model.respond() with proper message format
+        response = model.respond(
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": diff},
+            ],
+            config={
+                "temperature": temperature,
+                "maxTokens": max_tokens,
+            },
+            response_format=RESPONSE_SCHEMA,
+        )
+
+        # Handle response based on LM Studio SDK format
+        if hasattr(response, "parsed") and response.parsed:
+            # For structured response, return the parsed JSON as string
+            import json
+
+            return json.dumps(response.parsed)
+        elif hasattr(response, "content") and response.content:
+            # For regular response, return content directly
+            return response.content
+        else:
+            return "No response from model."
+
+    except Exception as e:
+        return f"An error occurred while calling LM Studio: {e}"
+
+
+def clear_cache() -> None:
+    """Clear the model cache."""
+    global loaded_models
+    loaded_models.clear()

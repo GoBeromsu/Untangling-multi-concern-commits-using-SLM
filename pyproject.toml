@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "gobeumsu", email = "gobeumsu@gmail.com" }
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     # Core ML/Data Libraries
     "torch",
@@ -15,25 +15,22 @@ dependencies = [
     "scikit-learn",
     "pandas>=2.1.0",
     "numpy",
-    
     # Hugging Face & API Clients
     "huggingface_hub>=0.19.0",
     "openai>=1.0.0",
     "aiohttp>=3.8.0",
-    
     # Configuration & Utilities
     "pyyaml",
     "python-dotenv>=1.0.0",
     "tqdm>=4.66.0",
     "requests>=2.31.0",
     "tiktoken>=0.4.0",
-    
     # Visualization
     "matplotlib",
     "seaborn",
-    
     # Streamlit
     "streamlit>=1.28.0",
+    "lmstudio",
 ]
 
 [project.optional-dependencies]
@@ -49,3 +46,6 @@ build-backend = "hatchling.build"
 [tool.ruff]
 line-length = 88
 target-version = "py38"
+
+[tool.hatch.build.targets.wheel]
+packages = ["utils", "visual_eval"]
