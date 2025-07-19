@@ -15,7 +15,7 @@ LMSTUDIO_MODEL_CONFIG: Dict[str, Any] = {
     "flashAttention": True,  # Enable Flash Attention for better performance
     "keepModelInMemory": True,  # Keep model in memory for faster access
     "useFp16ForKVCache": True,  # Use FP16 for KV cache to save memory
-    "evalBatchSize": 512,  # Optimal batch size for evaluation
+    "evalBatchSize": 1024,  # Optimal batch size for evaluation
 }
 
 # UI Configuration Constants
