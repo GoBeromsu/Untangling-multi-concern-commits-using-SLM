@@ -1,18 +1,12 @@
 name: phi4_env
 channels:
   - pytorch
-  - nvidia
   - conda-forge
   - defaults
 
 dependencies:
   # Python Base - HPC Stanage compatible
   - python=3.10
-
-  # PyTorch Ecosystem - CUDA 12.1 compatible for Sheffield HPC
-  # Using conda for PyTorch ensures proper CUDA integration
-  - pytorch>=2.1.0
-  - pytorch-cuda=12.1
 
   # Build Tools - Required for Flash Attention compilation on HPC
   - ninja # Fast build system for Flash Attention

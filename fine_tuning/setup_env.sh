@@ -1,24 +1,20 @@
 #!/bin/bash
-#SBATCH --job-name=phi4_commit_sft
-#SBATCH --time=24:00:00
-#SBATCH --partition=gpu
-#SBATCH --qos=gpu
-#SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=64GB
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --output=logs/phi4_training_%j.out
-#SBATCH --error=logs/phi4_training_%j.err
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=bkoh3@sheffield.ac.uk
+#SBATCH --job-name=phi4-env-setup
+#SBATCH --output=logs/setup_env_%j.out
+#SBATCH --error=logs/setup_env_%j.err
+#SBATCH --time=00:60:00
+#SBATCH --mem=32G
+#SBATCH --cpus-per-task=8
 
-# Sheffield HPC Stanage - A100 GPU Training
+# Resource optimization for better HPC job priority:
+# - Memory: 32G (actual usage: 22.57G + buffer) vs default 128G
+# - CPUs: 4 cores (low CPU efficiency: 5.71% with 16 cores)
+# - Walltime: 30min (actual runtime: 22min + buffer)
+
+# Sheffield HPC Stanage - Environment Setup for Phi-4 Fine-tuning
 # Multi-Concern Commit Classification with Phi-4
 
-echo "Starting Phi-4 LoRA fine-tuning job: $SLURM_JOB_ID"
-echo "Node: $SLURM_NODELIST"
-echo "Allocated CPUs: $SLURM_CPUS_PER_TASK, Memory: $SLURM_MEM_PER_NODE MB"
+echo "Setting up Phi-4 LoRA fine-tuning environment..."
 
 # Create logs directory
 mkdir -p logs
@@ -53,19 +49,7 @@ source activate phi4_env
 echo "📦 Installing ML dependencies..."
 pip install -r requirements.txt
 
-# Set environment variables
-export CUDA_VISIBLE_DEVICES=0
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-export TOKENIZERS_PARALLELISM=false
+echo "✅ Environment setup completed successfully!"
+echo "To activate the environment manually: source activate phi4_env"
 
-# Run training
-echo "🔥 Starting training at $(date)"
-python train.py
-
-echo "✅ Training completed at $(date)"
-
-# Display basic job info
-echo "📊 Job Summary:"
-sacct -j $SLURM_JOB_ID --format=JobID,JobName,Elapsed,State,ExitCode
-
-source deactivate
+source deactivate 

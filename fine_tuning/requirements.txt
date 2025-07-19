@@ -1,5 +1,4 @@
-# ML Libraries - PyTorch installed via conda in environment.yml with CUDA 12.1 support
-# All other dependencies installed via pip
+pytorch==2.1.0
 
 # Transformers and ML Core
 transformers>=4.40.0            # AutoModelForCausalLM, AutoTokenizer, TrainingArguments
