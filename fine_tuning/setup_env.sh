@@ -1,19 +1,16 @@
 #!/bin/bash
 #SBATCH --job-name=phi4-env-setup
-#SBATCH --output=logs/setup_env_%j.out
-#SBATCH --error=logs/setup_env_%j.err
-#SBATCH --time=00:60:00
-#SBATCH --mem=32G
-#SBATCH --cpus-per-task=8
+#SBATCH --time=0:60:00
+#SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
-#SBATCH --qos=gpu
-#SBATCH --mail-type=ALL
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32GB
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --output=logs/phi4_env_setup_%j.out
+#SBATCH --error=logs/phi4_env_setup_%j.err
+#SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=bkoh3@sheffield.ac.uk
-
-# Resource optimization for better HPC job priority:
-# - Memory: 32G (actual usage: 22.57G + buffer) vs default 128G
-# - CPUs: 4 cores (low CPU efficiency: 5.71% with 16 cores)
-# - Walltime: 30min (actual runtime: 22min + buffer)
 
 # Sheffield HPC Stanage - Environment Setup for Phi-4 Fine-tuning
 # Multi-Concern Commit Classification with Phi-4
