@@ -1,13 +1,13 @@
 """Evaluation utilities for parsing outputs and calculating metrics."""
 
-from typing import Dict, Any, Set
+from typing import Dict, Any, Set, List, Tuple
 import json
 import re
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
-from sklearn.metrics import precision_recall_fscore_support
+from collections import Counter
 
 
 def load_dataset(dataset_split: str) -> pd.DataFrame:
@@ -25,40 +25,94 @@ def load_dataset(dataset_split: str) -> pd.DataFrame:
     print(f"Loaded {len(df)} samples from {csv_path}")
     return df
 
-def calculate_metrics(df: pd.DataFrame) -> Dict[str, float]:
-    """Calculate F1, Precision, Recall metrics from predictions DataFrame."""
-    # Convert sets to binary vectors for each unique concern
-    all_concerns = set()
-    for pred_set in df["predictions"]:
-        all_concerns.update(pred_set)
-    for gt_set in df["ground_truth"]:
-        all_concerns.update(gt_set)
 
-    all_concerns = sorted(list(all_concerns))
+def calculate_batch_metrics(df: pd.DataFrame) -> Dict[str, float]:
+    """
+    Calculate macro-averaged metrics for batch evaluation.
 
-    # Create binary matrices
-    y_true = []
-    y_pred = []
+    Args:
+        df: DataFrame with 'predictions' and 'ground_truth' columns containing lists
 
+    Returns:
+        Dict with macro-averaged precision, recall, f1
+    """
+    case_metrics = []
     for _, row in df.iterrows():
-        true_vector = [
-            1 if concern in row["ground_truth"] else 0 for concern in all_concerns
-        ]
-        pred_vector = [
-            1 if concern in row["predictions"] else 0 for concern in all_concerns
-        ]
-        y_true.append(true_vector)
-        y_pred.append(pred_vector)
+        metrics = calculate_metrics(row["predictions"], row["ground_truth"])
+        case_metrics.append(metrics)
 
-    # Calculate metrics using sklearn
-    precision, recall, f1, _ = precision_recall_fscore_support(
-        y_true, y_pred, average="micro", zero_division=0
-    )
+    # Macro average: average per-case metrics
+    avg_precision = sum(m["precision"] for m in case_metrics) / len(case_metrics)
+    avg_recall = sum(m["recall"] for m in case_metrics) / len(case_metrics)
+    avg_f1 = sum(m["f1"] for m in case_metrics) / len(case_metrics)
 
     return {
-        "f1_score": float(f1),
-        "precision": float(precision),
-        "recall": float(recall),
+        "f1": avg_f1,
+        "precision": avg_precision,
+        "recall": avg_recall,
+    }
+
+
+def get_tp_fp_fn(
+    predicted_types: List[str], actual_types: List[str]
+) -> Tuple[int, int, int]:
+    """
+    Core logic: Calculate TP, FP, FN using strict multiset matching.
+
+    This exposes the fundamental metric calculation that counts exact occurrences.
+
+    Args:
+        predicted_types: List of predicted concern types
+        actual_types: List of actual concern types
+
+    Returns:
+        Tuple of (true_positives, false_positives, false_negatives)
+    """
+    predicted_counter = Counter(predicted_types)
+    actual_counter = Counter(actual_types)
+
+    all_types = set(predicted_counter.keys()) | set(actual_counter.keys())
+
+    tp = sum(min(predicted_counter[t], actual_counter[t]) for t in all_types)
+    fp = sum(max(0, predicted_counter[t] - actual_counter[t]) for t in all_types)
+    fn = sum(max(0, actual_counter[t] - predicted_counter[t]) for t in all_types)
+
+    return tp, fp, fn
+
+
+def calculate_metrics(
+    predicted_types: List[str], actual_types: List[str]
+) -> Dict[str, float]:
+    """
+    Calculate precision, recall, F1 from predicted and actual types.
+
+    This is the canonical metric calculation function for concern type evaluation.
+
+    Args:
+        predicted_types: List of predicted concern types
+        actual_types: List of actual concern types
+
+    Returns:
+        Dict with precision, recall, f1, and exact_match
+    """
+    tp, fp, fn = get_tp_fp_fn(predicted_types, actual_types)
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = (
+        2 * (precision * recall) / (precision + recall)
+        if (precision + recall) > 0
+        else 0.0
+    )
+
+    # Exact match check
+    exact_match = Counter(predicted_types) == Counter(actual_types)
+
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "exact_match": exact_match,
     }
 
 
@@ -102,7 +156,7 @@ def save_metric_csvs(
             recall_df.loc[i] = None
 
     # Update the specific sample row and model column
-    f1_df.loc[sample_idx, model_name] = metrics["f1_score"]
+    f1_df.loc[sample_idx, model_name] = metrics["f1"]
     precision_df.loc[sample_idx, model_name] = metrics["precision"]
     recall_df.loc[sample_idx, model_name] = metrics["recall"]
 

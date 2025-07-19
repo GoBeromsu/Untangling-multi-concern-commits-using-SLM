@@ -4,7 +4,7 @@ import glob
 import streamlit as st
 import pandas as pd
 from typing import Dict, Any
-from collections import Counter
+
 from dotenv import load_dotenv
 from utils.prompt import get_system_prompt
 from visual_eval.llms.openai import openai_api_call
@@ -25,6 +25,7 @@ from visual_eval.ui.components import (
 from visual_eval.ui.patterns import (
     parse_model_response,
 )
+from utils.eval import calculate_metrics
 
 # Dataset column constants
 DIFF_COLUMN: str = "diff"
@@ -165,38 +166,6 @@ def process_single_case(row: pd.Series, system_prompt: str) -> Dict[str, Any]:
         }
 
 
-def calculate_case_metrics(
-    predicted_types: list, actual_types: list
-) -> Dict[str, float]:
-    """Delegate to pandas/numpy: Calculate precision, recall, F1 for single case."""
-    from collections import Counter
-
-    predicted_counter = Counter(predicted_types)
-    actual_counter = Counter(actual_types)
-
-    # Calculate TP, FP, FN using set operations
-    all_types = set(predicted_counter.keys()) | set(actual_counter.keys())
-    tp = sum(min(predicted_counter[t], actual_counter[t]) for t in all_types)
-    fp = sum(max(0, predicted_counter[t] - actual_counter[t]) for t in all_types)
-    fn = sum(max(0, actual_counter[t] - predicted_counter[t]) for t in all_types)
-
-    # Calculate metrics
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    f1 = (
-        2 * (precision * recall) / (precision + recall)
-        if (precision + recall) > 0
-        else 0.0
-    )
-
-    return {
-        "precision": precision,
-        "recall": recall,
-        "f1": f1,
-        "match": predicted_counter == actual_counter,
-    }
-
-
 def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> None:
     """Execute batch evaluation using streamlit and pandas delegation."""
     if df.empty:
@@ -226,7 +195,7 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
 
         for i, (_, row) in enumerate(df.iterrows()):
             case_result = process_single_case(row, system_prompt)
-            metrics = calculate_case_metrics(
+            metrics = calculate_metrics(
                 case_result["predicted_types"], case_result["actual_types"]
             )
 
@@ -244,7 +213,7 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
                         if case_result["actual_types"]
                         else "None"
                     ),
-                    "Status": "✅T" if metrics["match"] else "❌T",
+                    "Status": "✅T" if metrics["exact_match"] else "❌T",
                     "Model_Reasoning": case_result["model_reasoning"],
                     "Case_Precision": metrics["precision"],
                     "Case_Recall": metrics["recall"],
