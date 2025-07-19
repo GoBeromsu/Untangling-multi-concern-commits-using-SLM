@@ -40,7 +40,6 @@ CSV_SEARCH_PATTERNS = [
 # Direct analysis result columns
 ANALYSIS_RESULT_COLUMNS = [
     "Predicted_Concern_Types",
-    "Predicted_Count",
     "Model_Reasoning",
 ]
 
@@ -49,8 +48,6 @@ EVALUATION_RESULT_COLUMNS = [
     "Test_Index",
     "Predicted_Types",
     "Actual_Types",
-    "Predicted_Count",
-    "Actual_Count",
     "Status",
     "Case_Precision",
     "Case_Recall",
@@ -111,16 +108,7 @@ def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
             "type_precision": 0.0,
             "type_recall": 0.0,
             "type_f1_macro": 0.0,
-            "count_accuracy": 0.0,
         }
-
-    # Count prediction accuracy: exact match between predicted and actual counts
-    count_correct = sum(
-        1
-        for _, row in results_df.iterrows()
-        if row["Predicted_Count"] == row["Actual_Count"]
-    )
-    count_accuracy = count_correct / total_cases
 
     # Macro-average: simply average the pre-calculated case metrics
     macro_precision = results_df["Case_Precision"].mean()
@@ -132,7 +120,6 @@ def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
         "type_precision": macro_precision,
         "type_recall": macro_recall,
         "type_f1_macro": macro_f1,
-        "count_accuracy": count_accuracy,
     }
 
 
@@ -182,20 +169,14 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
 
         # Get model prediction
         model_response = get_model_response(diff, system_prompt)
-        predicted_concern_types, predicted_concern_count, model_reasoning = (
-            parse_model_response(model_response)
-        )
+        predicted_concern_types, model_reasoning = parse_model_response(model_response)
 
         # Calculate evaluation results using Counter once (linear approach)
-        actual_concern_count = len(actual_concern_types)
-
-        # Single Counter calculation for all metrics
         predicted_counter = Counter(predicted_concern_types)
         actual_counter = Counter(actual_concern_types)
 
-        # Type matching and count matching
+        # Type matching
         concern_types_match = predicted_counter == actual_counter
-        concern_count_match = predicted_concern_count == actual_concern_count
 
         # STRICT MULTISET MATCHING: Calculate TP, FP, FN with exact count requirements
         all_types = set(predicted_counter.keys()) | set(actual_counter.keys())
@@ -220,8 +201,7 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
 
         # Create evaluation status display
         types_status_icon = "✅" if concern_types_match else "❌"
-        count_status_icon = "✅" if concern_count_match else "❌"
-        evaluation_status = f"{types_status_icon}T {count_status_icon}C"
+        evaluation_status = f"{types_status_icon}T"
 
         # Format SHA information as comma-separated string
         formatted_shas = ", ".join(shas) if shas else "None"
@@ -233,8 +213,6 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
                 "Test_Index",
                 "Predicted_Types",
                 "Actual_Types",
-                "Predicted_Count",
-                "Actual_Count",
                 "Status",
                 "Model_Reasoning",
                 "Case_Precision",
@@ -250,8 +228,6 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
                 else "None"
             ),
             ", ".join(sorted(actual_concern_types)) if actual_concern_types else "None",
-            predicted_concern_count,
-            actual_concern_count,
             evaluation_status,
             model_reasoning,
             case_precision,
@@ -315,8 +291,8 @@ def show_direct_input() -> None:
         with st.spinner("Analyzing code diff..."):
             model_response = get_model_response(diff, system_prompt)
 
-            predicted_concern_types, predicted_concern_count, model_reasoning = (
-                parse_model_response(model_response)
+            predicted_concern_types, model_reasoning = parse_model_response(
+                model_response
             )
 
             if model_reasoning == "Failed to parse model response":
@@ -335,7 +311,6 @@ def show_direct_input() -> None:
                                 else "None"
                             )
                         ],
-                        "Predicted_Count": [predicted_concern_count],
                         "Model_Reasoning": [model_reasoning],
                     }
                 )

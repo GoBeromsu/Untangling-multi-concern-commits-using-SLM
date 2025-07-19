@@ -10,7 +10,7 @@ from ..llms.constant import RECENT_RESULTS_DISPLAY_LIMIT
 
 def render_evaluation_metrics(metrics: Dict[str, Any], dataset_size: int) -> None:
     """Render evaluation metrics in a structured layout."""
-    col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
 
     with col1:
         st.metric(
@@ -37,14 +37,7 @@ def render_evaluation_metrics(metrics: Dict[str, Any], dataset_size: int) -> Non
         st.metric(
             "Type F1 (Macro)",
             f"{metrics['type_f1_macro']:.1%}",
-            help="Sample-based F1 using strict multiset matching: average of per-case F1 scores. Exact count matching required (feat ≠ feat,feat).",
-        )
-
-    with col5:
-        st.metric(
-            "Count Accuracy",
-            f"{metrics['count_accuracy']:.1%}",
-            help="Percentage of test cases with exact count match between predicted and actual",
+            help="Sample-based F1 using strict multiset matching: average of per-case F1 scores.",
         )
 
 
@@ -56,10 +49,6 @@ def create_column_config(columns: List[str]) -> Dict[str, Any]:
             "Predicted Types", width="medium"
         ),
         "Actual_Types": st.column_config.TextColumn("Actual Types", width="medium"),
-        "Predicted_Count": st.column_config.NumberColumn(
-            "Predicted Count", width="small"
-        ),
-        "Actual_Count": st.column_config.NumberColumn("Actual Count", width="small"),
         "Status": st.column_config.TextColumn("Status", width="small"),
         "Model_Reasoning": st.column_config.TextColumn("Reasoning", width="large"),
         "Predicted_Concern_Types": st.column_config.TextColumn(
@@ -78,8 +67,6 @@ def render_results_table(evaluation_results_df: pd.DataFrame) -> None:
         "Test_Index",
         "Predicted_Types",
         "Actual_Types",
-        "Predicted_Count",
-        "Actual_Count",
         "Status",
         "SHAs",
         "Model_Reasoning",

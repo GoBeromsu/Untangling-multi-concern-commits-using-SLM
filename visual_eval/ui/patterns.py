@@ -7,7 +7,7 @@ import streamlit as st
 from typing import Dict, Any, Tuple, List, Optional
 
 
-def parse_model_response(model_response: str) -> Tuple[List[str], int, str]:
+def parse_model_response(model_response: str) -> Tuple[List[str], str]:
     """
     Parse model response with consistent error handling.
 
@@ -15,16 +15,15 @@ def parse_model_response(model_response: str) -> Tuple[List[str], int, str]:
         model_response: JSON string from model API
 
     Returns:
-        Tuple of (concern_types, count, reasoning)
+        Tuple of (concern_types, reasoning)
     """
     try:
         prediction_data = json.loads(model_response)
         predicted_concern_types = prediction_data.get("types", [])
-        predicted_concern_count = prediction_data.get("count", 0)
         model_reasoning = prediction_data.get("reason", "No reasoning provided")
-        return predicted_concern_types, predicted_concern_count, model_reasoning
+        return predicted_concern_types, model_reasoning
     except json.JSONDecodeError:
-        return [], 0, "Failed to parse model response"
+        return [], "Failed to parse model response"
 
 
 def extract_test_case_data(
