@@ -57,6 +57,16 @@ EVALUATION_RESULT_COLUMNS = [
 ]
 
 
+def render_system_prompt_input(title: str = "System Prompt") -> str:
+    """Render system prompt input widget with consistent styling."""
+    st.subheader(title)
+    return st.text_area(
+        "Modify the system prompt:",
+        value=get_system_prompt(),
+        height=SYSTEM_PROMPT_INPUT_HEIGHT,
+    )
+
+
 def get_model_response(diff: str, system_prompt: str) -> str:
     """
     Get model response based on selected API provider.
@@ -80,6 +90,7 @@ def get_model_response(diff: str, system_prompt: str) -> str:
         raise ValueError(f"Unsupported API provider: {selected_api}")
 
 
+@st.cache_data
 def load_dataset(file_path: str) -> pd.DataFrame:
     """Load concern classification test dataset from CSV file as DataFrame."""
     try:
@@ -123,180 +134,181 @@ def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
-def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> None:
-    """Execute batch evaluation of concern classification with real-time updates using DataFrame."""
-
-    if df.empty:
-        st.error("No test data available for evaluation")
-        return
-
-    # Pre-load model if using LM Studio to prevent loading during evaluation
-    selected_api = st.session_state.get("selected_api", "openai")
-    if selected_api == "lmstudio":
-        model_name = st.session_state.get("selected_model", "")
-        if model_name:
-            with st.spinner(f"Loading model {model_name} before evaluation..."):
-                try:
-                    load_model(model_name)
-                    st.success(f"✅ Model {model_name} loaded successfully!")
-                except Exception as e:
-                    st.error(f"❌ Failed to load model: {e}")
-                    return
-
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    summary_container = st.empty()
-    table_container = st.empty()
-
-    # Initialize evaluation results DataFrame using constants (pre-allocate rows)
-    evaluation_results_df = pd.DataFrame(
-        index=df.index, columns=EVALUATION_RESULT_COLUMNS
-    )
-
-    total_cases = len(df)
-
-    for test_index, row in df.iterrows():
-        status_text.text(f"Evaluating case {test_index+1}/{total_cases}...")
-
-        # Extract data directly from DataFrame row using constants
+def process_single_case(row: pd.Series, system_prompt: str) -> Dict[str, Any]:
+    """Core logic: Process single evaluation case with model prediction."""
+    try:
+        # Extract data from row
         diff = row[DIFF_COLUMN]
-
-        # Parse JSON strings to get actual lists
         actual_concern_types = (
             json.loads(row[TYPES_COLUMN]) if row[TYPES_COLUMN] else []
         )
         shas = json.loads(row[SHAS_COLUMN]) if row[SHAS_COLUMN] else []
 
-        # Get model prediction with error handling
-        try:
-            model_response = get_model_response(diff, system_prompt)
-            predicted_concern_types, model_reasoning = parse_model_response(model_response)
-        except Exception as e:
-            # Continue with next case when API response fails
-            predicted_concern_types = []
-            model_reasoning = f"API Error: {str(e)}"
-            st.warning(f"⚠️ API error for case {test_index+1}: {str(e)}")
+        # Get model prediction
+        model_response = get_model_response(diff, system_prompt)
+        predicted_concern_types, model_reasoning = parse_model_response(model_response)
 
-        # Calculate evaluation results using Counter once (linear approach)
-        predicted_counter = Counter(predicted_concern_types)
-        actual_counter = Counter(actual_concern_types)
+        return {
+            "predicted_types": predicted_concern_types,
+            "actual_types": actual_concern_types,
+            "model_reasoning": model_reasoning,
+            "shas": shas,
+            "success": True,
+        }
+    except Exception as e:
+        return {
+            "predicted_types": [],
+            "actual_types": json.loads(row[TYPES_COLUMN]) if row[TYPES_COLUMN] else [],
+            "model_reasoning": f"API Error: {str(e)}",
+            "shas": json.loads(row[SHAS_COLUMN]) if row[SHAS_COLUMN] else [],
+            "success": False,
+        }
 
-        # Type matching
-        concern_types_match = predicted_counter == actual_counter
 
-        # STRICT MULTISET MATCHING: Calculate TP, FP, FN with exact count requirements
-        all_types = set(predicted_counter.keys()) | set(actual_counter.keys())
-        tp = sum(
-            min(predicted_counter[t], actual_counter[t]) for t in all_types
-        )  # Correctly matched count
-        fp = sum(
-            max(0, predicted_counter[t] - actual_counter[t]) for t in all_types
-        )  # Over-predicted count
-        fn = sum(
-            max(0, actual_counter[t] - predicted_counter[t]) for t in all_types
-        )  # Under-predicted count
+def calculate_case_metrics(
+    predicted_types: list, actual_types: list
+) -> Dict[str, float]:
+    """Delegate to pandas/numpy: Calculate precision, recall, F1 for single case."""
+    from collections import Counter
 
-        # Calculate individual case metrics
-        case_precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-        case_recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        case_f1 = (
-            2 * (case_precision * case_recall) / (case_precision + case_recall)
-            if (case_precision + case_recall) > 0
-            else 0.0
-        )
+    predicted_counter = Counter(predicted_types)
+    actual_counter = Counter(actual_types)
 
-        # Create evaluation status display
-        types_status_icon = "✅" if concern_types_match else "❌"
-        evaluation_status = f"{types_status_icon}T"
+    # Calculate TP, FP, FN using set operations
+    all_types = set(predicted_counter.keys()) | set(actual_counter.keys())
+    tp = sum(min(predicted_counter[t], actual_counter[t]) for t in all_types)
+    fp = sum(max(0, predicted_counter[t] - actual_counter[t]) for t in all_types)
+    fn = sum(max(0, actual_counter[t] - predicted_counter[t]) for t in all_types)
 
-        # Format SHA information as comma-separated string
-        formatted_shas = ", ".join(shas) if shas else "None"
+    # Calculate metrics
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = (
+        2 * (precision * recall) / (precision + recall)
+        if (precision + recall) > 0
+        else 0.0
+    )
 
-        # Update the pre-allocated row for current test_index
-        evaluation_results_df.loc[
-            test_index,
-            [
-                "Test_Index",
-                "Predicted_Types",
-                "Actual_Types",
-                "Status",
-                "Model_Reasoning",
-                "Case_Precision",
-                "Case_Recall",
-                "Case_F1",
-                "SHAs",
-            ],
-        ] = [
-            test_index + 1,
-            (
-                ", ".join(sorted(predicted_concern_types))
-                if predicted_concern_types
-                else "None"
-            ),
-            ", ".join(sorted(actual_concern_types)) if actual_concern_types else "None",
-            evaluation_status,
-            model_reasoning,
-            case_precision,
-            case_recall,
-            case_f1,
-            formatted_shas,
-        ]
-        progress_bar.progress((test_index + 1) / total_cases)
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "match": predicted_counter == actual_counter,
+    }
 
-        # Update evaluation summary (consider only processed rows)
-        processed_df = evaluation_results_df.dropna(subset=["Status"], how="any")
-        metrics = calculate_evaluation_metrics(processed_df)
-        with summary_container.container():
-            render_evaluation_metrics(metrics, total_cases)
 
-        # Update results table (exclude case metrics from display)
-        with table_container.container():
-            render_results_table(evaluation_results_df)
+def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> None:
+    """Execute batch evaluation using streamlit and pandas delegation."""
+    if df.empty:
+        st.error("No test data available for evaluation")
+        return
 
-    # Store final results for analysis
+    # Pre-load LM Studio model if needed
+    selected_api = st.session_state.get("selected_api", "openai")
+    if selected_api == "lmstudio":
+        model_name = st.session_state.get("selected_model", "")
+        if model_name:
+            with st.spinner(f"Loading model {model_name}..."):
+                try:
+                    load_model(model_name)
+                    st.success(f"✅ Model loaded successfully!")
+                except Exception as e:
+                    st.error(f"❌ Failed to load model: {e}")
+                    return
+
+    # Process all cases using pandas delegation
+    with st.status("Running batch evaluation...", expanded=True) as status:
+        st.write(f"Processing {len(df)} test cases...")
+
+        # Use pandas apply for batch processing
+        results = []
+        progress_bar = st.progress(0)
+
+        for i, (_, row) in enumerate(df.iterrows()):
+            case_result = process_single_case(row, system_prompt)
+            metrics = calculate_case_metrics(
+                case_result["predicted_types"], case_result["actual_types"]
+            )
+
+            # Combine results
+            results.append(
+                {
+                    "Test_Index": i + 1,
+                    "Predicted_Types": (
+                        ", ".join(sorted(case_result["predicted_types"]))
+                        if case_result["predicted_types"]
+                        else "None"
+                    ),
+                    "Actual_Types": (
+                        ", ".join(sorted(case_result["actual_types"]))
+                        if case_result["actual_types"]
+                        else "None"
+                    ),
+                    "Status": "✅T" if metrics["match"] else "❌T",
+                    "Model_Reasoning": case_result["model_reasoning"],
+                    "Case_Precision": metrics["precision"],
+                    "Case_Recall": metrics["recall"],
+                    "Case_F1": metrics["f1"],
+                    "SHAs": (
+                        ", ".join(case_result["shas"])
+                        if case_result["shas"]
+                        else "None"
+                    ),
+                }
+            )
+
+            progress_bar.progress((i + 1) / len(df))
+
+            # Show warning for failed cases
+            if not case_result["success"]:
+                st.warning(f"⚠️ API error for case {i+1}")
+
+        # Create results DataFrame using pandas
+        evaluation_results_df = pd.DataFrame(results)
+        status.update(label="Evaluation complete!", state="complete")
+
+    # Display results
+    metrics = calculate_evaluation_metrics(evaluation_results_df)
+    render_evaluation_metrics(metrics, len(df))
+    render_results_table(evaluation_results_df)
+
+    # Store and download results
     st.session_state.final_evaluation_results = evaluation_results_df
 
-    # Single download button for full results CSV
     if not evaluation_results_df.empty:
-        download_df = evaluation_results_df.copy()
-        columns_to_exclude = ["Case_Precision", "Case_Recall", "Case_F1"]
-        download_columns = [
-            col for col in download_df.columns if col not in columns_to_exclude
-        ]
-        download_df = download_df[download_columns]
+        download_df = evaluation_results_df.drop(
+            columns=["Case_Precision", "Case_Recall", "Case_F1"]
+        )
         csv_data = download_df.to_csv(index=False)
         st.download_button(
-            label="📥 Download Full Results as CSV",
+            label="📥 Download Results CSV",
             data=csv_data,
-            file_name=f"concern_evaluation_results_{len(download_df)}_cases.csv",
+            file_name=f"evaluation_results_{len(download_df)}_cases.csv",
             mime="text/csv",
-            key="download_full_results",
             use_container_width=True,
         )
 
 
 def show_direct_input() -> None:
     """Render UI interface for direct code diff input and concern analysis."""
-    diff = st.text_area(
-        "Enter your code diff:",
-        placeholder="Paste the output of `git diff` here...",
-        height=CODE_DIFF_INPUT_HEIGHT,
-    )
+    with st.form("direct_analysis_form"):
+        diff = st.text_area(
+            "Enter your code diff:",
+            placeholder="Paste the output of `git diff` here...",
+            height=CODE_DIFF_INPUT_HEIGHT,
+        )
 
-    st.subheader("System Prompt")
-    system_prompt = st.text_area(
-        "Modify the system prompt:",
-        value=get_system_prompt(),
-        height=SYSTEM_PROMPT_INPUT_HEIGHT,
-        key="direct_input_prompt",
-    )
+        system_prompt = render_system_prompt_input()
 
-    if st.button("Analyze Code Diff", type="primary", use_container_width=True):
+        submitted = st.form_submit_button(
+            "Analyze Code Diff", type="primary", use_container_width=True
+        )
+
+    if submitted and diff.strip():
         st.divider()
         st.header("📊 Analysis Results")
         with st.spinner("Analyzing code diff..."):
             model_response = get_model_response(diff, system_prompt)
-
             predicted_concern_types, model_reasoning = parse_model_response(
                 model_response
             )
@@ -307,7 +319,6 @@ def show_direct_input() -> None:
                 st.text(model_response)
             else:
                 st.subheader("Concern Classification Results")
-
                 analysis_results_df = pd.DataFrame(
                     {
                         "Predicted_Concern_Types": [
@@ -320,14 +331,15 @@ def show_direct_input() -> None:
                         "Model_Reasoning": [model_reasoning],
                     }
                 )
-                column_config = create_column_config(ANALYSIS_RESULT_COLUMNS)
 
                 st.dataframe(
                     analysis_results_df,
                     use_container_width=True,
                     hide_index=True,
-                    column_config=column_config,
+                    column_config=create_column_config(ANALYSIS_RESULT_COLUMNS),
                 )
+    elif submitted and not diff.strip():
+        st.warning("Please enter a code diff to analyze.")
 
 
 def show_csv_input() -> None:
@@ -342,90 +354,77 @@ def show_csv_input() -> None:
         st.error("No CSV test dataset files found in datasets directory")
         st.stop()
 
-    selected_dataset = st.selectbox(
-        "Select concern classification test dataset:",
-        available_dataset_files,
-        format_func=lambda x: f"{os.path.basename(x)} ({os.path.dirname(x)})",
-    )
+    with st.form("batch_evaluation_form"):
+        selected_dataset = st.selectbox(
+            "Select concern classification test dataset:",
+            available_dataset_files,
+            format_func=lambda x: f"{os.path.basename(x)} ({os.path.dirname(x)})",
+        )
 
-    test_dataset = pd.DataFrame()
-    if selected_dataset:
+        system_prompt = render_system_prompt_input("Concern Analysis Prompt Template")
+
+        submitted = st.form_submit_button(
+            "Run Batch Evaluation", type="primary", use_container_width=True
+        )
+
+    if submitted:
         test_dataset = load_dataset(selected_dataset)
         if not test_dataset.empty:
             st.success(
                 f"📊 Loaded **{len(test_dataset)}** test cases from `{selected_dataset}`"
             )
-        else:
-            st.error("❌ Failed to load test dataset")
-
-    st.subheader("Concern Analysis Prompt Template")
-    system_prompt = st.text_area(
-        "Modify the prompt template (use {diff} placeholder):",
-        value=get_system_prompt(),
-        height=SYSTEM_PROMPT_INPUT_HEIGHT,
-        key="batch_evaluation_prompt",
-    )
-
-    if st.button("Run Batch Evaluation", type="primary", use_container_width=True):
-        if test_dataset.empty:
-            st.error("Please select a valid test dataset file first.")
-        else:
             st.divider()
             st.header("📊 Evaluation Results")
             execute_batch_concern_evaluation(test_dataset, system_prompt)
+        else:
+            st.error("❌ Failed to load test dataset")
 
 
 def main() -> None:
     """Main application entry point for concern classification evaluation."""
     st.title("Concern is All You Need")
-
-    st.header("🔧 Setup")
     load_dotenv()
 
-    # API Provider Selection
-    api_provider = st.selectbox(
-        "Select API Provider:",
-        ["OpenAI", "LM Studio"],
-        help="Choose between OpenAI API or local LM Studio",
-    )
+    # Setup in sidebar
+    with st.sidebar:
+        st.header("🔧 Setup")
+        api_provider = st.selectbox(
+            "Select API Provider:",
+            ["OpenAI", "LM Studio"],
+            help="Choose between OpenAI API or local LM Studio",
+        )
 
-    # Handle OpenAI API setup
-    if api_provider == "OpenAI":
-        api_key = os.getenv("OPENAI_API_KEY")
-        if api_key is None:
-            st.error(
-                "❌ No OpenAI API Key found. Please set OPENAI_API_KEY in .env file"
+        # Handle OpenAI API setup
+        if api_provider == "OpenAI":
+            api_key = os.getenv("OPENAI_API_KEY")
+            if api_key is None:
+                st.error(
+                    "❌ No OpenAI API Key found. Please set OPENAI_API_KEY in .env file"
+                )
+                st.stop()
+            st.success("✅ OpenAI API Key detected")
+            st.session_state.update({"selected_api": "openai", "selected_model": None})
+
+        # Handle LM Studio setup
+        else:  # api_provider == "LM Studio"
+            if "lmstudio_available_models" not in st.session_state:
+                with st.spinner("Loading available models..."):
+                    models, error_msg = get_models()
+                    if not models:
+                        st.error(f"❌ No models available: {error_msg}")
+                        st.stop()
+                    st.session_state.lmstudio_available_models = models
+
+            selected_model = st.selectbox(
+                "Select Model:",
+                st.session_state.lmstudio_available_models,
+                help="Choose a model loaded in LM Studio",
             )
-            st.stop()
+            st.session_state.update(
+                {"selected_api": "lmstudio", "selected_model": selected_model}
+            )
 
-        st.success("✅ OpenAI API Key detected")
-        st.session_state.update({"selected_api": "openai", "selected_model": None})
-
-    # Handle LM Studio setup
-    else:  # api_provider == "LM Studio"
-        if "lmstudio_available_models" not in st.session_state:
-            with st.spinner("Loading available models..."):
-                models, error_msg = get_models()
-                if not models:
-                    st.error(f"❌ No models available: {error_msg}")
-                    st.stop()
-                st.session_state.lmstudio_available_models = models
-
-        selected_model = st.selectbox(
-            "Select Model:",
-            st.session_state.lmstudio_available_models,
-            help="Choose a model loaded in LM Studio",
-        )
-
-        st.session_state.update(
-            {
-                "selected_api": "lmstudio",
-                "selected_model": selected_model,
-            }
-        )
-
-    st.divider()
-
+    # Main content
     st.header("📝 Concern Classification Analysis")
     direct_input_tab, batch_evaluation_tab = st.tabs(
         ["Direct Code Diff Analysis", "Batch Dataset Evaluation"]
