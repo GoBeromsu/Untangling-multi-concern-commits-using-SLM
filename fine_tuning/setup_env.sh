@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=phi4-env-setup
-#SBATCH --output=logs/setup_env_%j.out
-#SBATCH --error=logs/setup_env_%j.err
-#SBATCH --time=00:60:00
-#SBATCH --mem=32G
-#SBATCH --cpus-per-task=8
-#SBATCH --gres=gpu:1 # 1 GPU for job
-#SBATCH --qos=gpu
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=bkoh3@sheffield.ac.uk
+#SBATCH --job-name=phi4-env-setup       # Job name for environment setup
+#SBATCH --output=logs/setup_env_%j.out  # Standard output log file
+#SBATCH --error=logs/setup_env_%j.err   # Error log file
+#SBATCH --time=00:60:00                 # Maximum runtime limit (1 hour)
+#SBATCH --mem=32G                       # Request 32GB memory (optimized)
+#SBATCH --cpus-per-task=8               # Request 8 CPU cores
+#SBATCH --gres=gpu:1                    # Request 1 GPU for environment setup
+#SBATCH --qos=gpu                       # GPU Quality of Service
+#SBATCH --mail-type=ALL                 # Email notifications for all job state changes
+#SBATCH --mail-user=bkoh3@sheffield.ac.uk   # Email recipient
 
 # Resource optimization for better HPC job priority:
 # - Memory: 32G (actual usage: 22.57G + buffer) vs default 128G
