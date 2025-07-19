@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=8               # Request 8 CPU cores
 #SBATCH --gres=gpu:1                    # Request 1 GPU for environment setup
 #SBATCH --qos=gpu                       # GPU Quality of Service
-#SBATCH --mail-type=ALL                 # Email notifications for all job state changes
+#SBATCH --mail-type=BEGIN,END,FAIL               # Email notifications for all job state changes
 #SBATCH --mail-user=bkoh3@sheffield.ac.uk   # Email recipient
 
 # Resource optimization for better HPC job priority:
