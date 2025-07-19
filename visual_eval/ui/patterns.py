@@ -22,8 +22,13 @@ def parse_model_response(model_response: str) -> Tuple[List[str], str]:
         predicted_concern_types = prediction_data.get("types", [])
         model_reasoning = prediction_data.get("reason", "No reasoning provided")
         return predicted_concern_types, model_reasoning
-    except json.JSONDecodeError:
-        return [], "Failed to parse model response"
+    except json.JSONDecodeError as e:
+        return (
+            [],
+            f"JSON Parse Error: {str(e)}. Raw response: {model_response[:200]}...",
+        )
+    except Exception as e:
+        return [], f"Parse Error: {str(e)}. Raw response: {model_response[:200]}..."
 
 
 def extract_test_case_data(

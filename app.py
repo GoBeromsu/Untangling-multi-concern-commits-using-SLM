@@ -167,9 +167,15 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
         )
         shas = json.loads(row[SHAS_COLUMN]) if row[SHAS_COLUMN] else []
 
-        # Get model prediction
-        model_response = get_model_response(diff, system_prompt)
-        predicted_concern_types, model_reasoning = parse_model_response(model_response)
+        # Get model prediction with error handling
+        try:
+            model_response = get_model_response(diff, system_prompt)
+            predicted_concern_types, model_reasoning = parse_model_response(model_response)
+        except Exception as e:
+            # Continue with next case when API response fails
+            predicted_concern_types = []
+            model_reasoning = f"API Error: {str(e)}"
+            st.warning(f"⚠️ API error for case {test_index+1}: {str(e)}")
 
         # Calculate evaluation results using Counter once (linear approach)
         predicted_counter = Counter(predicted_concern_types)
