@@ -46,7 +46,11 @@ fi
 echo "🔧 Activating phi4_env..."
 source activate phi4_env
 
-# Install pip dependencies
+# Step 1: Install PyTorch first (required for flash-attn compilation)
+echo "📦 Installing PyTorch with CUDA 12.1 support..."
+pip install torch>=2.1.0 torchvision --index-url https://download.pytorch.org/whl/cu121
+
+# Step 2: Install remaining ML dependencies that depend on torch
 echo "📦 Installing ML dependencies..."
 pip install -r requirements.txt
 

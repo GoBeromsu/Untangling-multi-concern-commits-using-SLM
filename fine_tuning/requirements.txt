@@ -1,5 +1,3 @@
-torch>=2.1.0
-
 # Transformers and ML Core
 transformers>=4.40.0            # AutoModelForCausalLM, AutoTokenizer, TrainingArguments
 datasets>=2.15.0                # load_dataset
