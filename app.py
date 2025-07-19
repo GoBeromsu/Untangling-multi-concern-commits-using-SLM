@@ -1,6 +1,5 @@
 import os
 import json
-import glob
 import streamlit as st
 import pandas as pd
 from typing import Dict, Any
@@ -9,7 +8,6 @@ from dotenv import load_dotenv
 from utils.prompt import get_system_prompt
 from visual_eval.llms.openai import openai_api_call
 from visual_eval.llms.lmstudio import (
-    get_models,
     api_call,
     load_model,
 )
@@ -25,18 +23,20 @@ from visual_eval.ui.components import (
 from visual_eval.ui.patterns import (
     parse_model_response,
 )
+from visual_eval.ui.dataset import (
+    get_available_datasets,
+    load_dataset,
+    DIFF_COLUMN,
+    TYPES_COLUMN,
+    SHAS_COLUMN,
+)
+from visual_eval.ui.session import (
+    get_api_provider,
+    get_model_name,
+    set_evaluation_results,
+)
+from visual_eval.ui.setup import render_api_setup_sidebar
 from utils.eval import calculate_metrics
-
-# Dataset column constants
-DIFF_COLUMN: str = "diff"
-TYPES_COLUMN: str = "types"
-SHAS_COLUMN: str = "shas"
-
-# File search patterns
-CSV_SEARCH_PATTERNS = [
-    "datasets/**/*.csv",
-    "../datasets/**/*.csv",
-]
 
 # Direct analysis result columns
 ANALYSIS_RESULT_COLUMNS = [
@@ -79,36 +79,16 @@ def get_model_response(diff: str, system_prompt: str) -> str:
     Returns:
         JSON string containing the model response
     """
-    selected_api = st.session_state.get("selected_api", "openai")
+    selected_api = get_api_provider()
 
     if selected_api == "openai":
         api_key = os.getenv("OPENAI_API_KEY")
         return openai_api_call(api_key, diff, system_prompt)
     elif selected_api == "lmstudio":
-        model_name = st.session_state.get("selected_model", "")
+        model_name = get_model_name()
         return api_call(model_name, diff, system_prompt)
     else:
         raise ValueError(f"Unsupported API provider: {selected_api}")
-
-
-@st.cache_data
-def load_dataset(file_path: str) -> pd.DataFrame:
-    """Load concern classification test dataset from CSV file as DataFrame."""
-    try:
-        df = pd.read_csv(file_path)
-
-        # Validate required columns exist
-        required_columns = [DIFF_COLUMN, TYPES_COLUMN, SHAS_COLUMN]
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            st.error(f"Missing required columns: {missing_columns}")
-            return pd.DataFrame()
-
-        return df
-
-    except Exception as e:
-        st.error(f"Error loading CSV concern test dataset: {str(e)}")
-        return pd.DataFrame()
 
 
 def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
@@ -173,9 +153,9 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
         return
 
     # Pre-load LM Studio model if needed
-    selected_api = st.session_state.get("selected_api", "openai")
+    selected_api = get_api_provider()
     if selected_api == "lmstudio":
-        model_name = st.session_state.get("selected_model", "")
+        model_name = get_model_name()
         if model_name:
             with st.spinner(f"Loading model {model_name}..."):
                 try:
@@ -242,7 +222,7 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
     render_results_table(evaluation_results_df)
 
     # Store and download results
-    st.session_state.final_evaluation_results = evaluation_results_df
+    set_evaluation_results(evaluation_results_df)
 
     if not evaluation_results_df.empty:
         download_df = evaluation_results_df.drop(
@@ -313,11 +293,7 @@ def show_direct_input() -> None:
 
 def show_csv_input() -> None:
     """Render UI interface for batch evaluation from test dataset files."""
-    available_dataset_files = []
-    for search_pattern in CSV_SEARCH_PATTERNS:
-        matched_files = glob.glob(search_pattern, recursive=True)
-        available_dataset_files.extend([f for f in matched_files])
-    available_dataset_files.sort()
+    available_dataset_files = get_available_datasets()
 
     if not available_dataset_files:
         st.error("No CSV test dataset files found in datasets directory")
@@ -356,42 +332,9 @@ def main() -> None:
 
     # Setup in sidebar
     with st.sidebar:
-        st.header("🔧 Setup")
-        api_provider = st.selectbox(
-            "Select API Provider:",
-            ["OpenAI", "LM Studio"],
-            help="Choose between OpenAI API or local LM Studio",
-        )
-
-        # Handle OpenAI API setup
-        if api_provider == "OpenAI":
-            api_key = os.getenv("OPENAI_API_KEY")
-            if api_key is None:
-                st.error(
-                    "❌ No OpenAI API Key found. Please set OPENAI_API_KEY in .env file"
-                )
-                st.stop()
-            st.success("✅ OpenAI API Key detected")
-            st.session_state.update({"selected_api": "openai", "selected_model": None})
-
-        # Handle LM Studio setup
-        else:  # api_provider == "LM Studio"
-            if "lmstudio_available_models" not in st.session_state:
-                with st.spinner("Loading available models..."):
-                    models, error_msg = get_models()
-                    if not models:
-                        st.error(f"❌ No models available: {error_msg}")
-                        st.stop()
-                    st.session_state.lmstudio_available_models = models
-
-            selected_model = st.selectbox(
-                "Select Model:",
-                st.session_state.lmstudio_available_models,
-                help="Choose a model loaded in LM Studio",
-            )
-            st.session_state.update(
-                {"selected_api": "lmstudio", "selected_model": selected_model}
-            )
+        setup_success = render_api_setup_sidebar()
+        if not setup_success:
+            st.stop()
 
     # Main content
     st.header("📝 Concern Classification Analysis")
