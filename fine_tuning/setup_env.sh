@@ -5,6 +5,10 @@
 #SBATCH --time=00:60:00
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:1 # 1 GPU for job
+#SBATCH --qos=gpu
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=bkoh3@sheffield.ac.uk
 
 # Resource optimization for better HPC job priority:
 # - Memory: 32G (actual usage: 22.57G + buffer) vs default 128G
