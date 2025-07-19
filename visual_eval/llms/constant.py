@@ -3,8 +3,8 @@ from typing import Dict, List, Any
 # API Configuration Constants
 DEFAULT_LMSTUDIO_URL: str = "http://localhost:1234"
 DEFAULT_TEMPERATURE: float = 0.0
-DEFAULT_MAX_TOKENS: int = 1000
-CONNECTION_TIMEOUT_SECONDS: int = 5
+DEFAULT_MAX_TOKENS: int = 16384
+CONNECTION_TIMEOUT_SECONDS: int = 30
 
 # UI Configuration Constants
 CODE_DIFF_INPUT_HEIGHT: int = 300

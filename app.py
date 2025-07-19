@@ -150,8 +150,10 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
     summary_container = st.empty()
     table_container = st.empty()
 
-    # Initialize evaluation results DataFrame using constants
-    evaluation_results_df = pd.DataFrame(columns=EVALUATION_RESULT_COLUMNS)
+    # Initialize evaluation results DataFrame using constants (pre-allocate rows)
+    evaluation_results_df = pd.DataFrame(
+        index=df.index, columns=EVALUATION_RESULT_COLUMNS
+    )
 
     total_cases = len(df)
 
@@ -213,42 +215,44 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
         # Format SHA information as comma-separated string
         formatted_shas = ", ".join(shas) if shas else "None"
 
-        # Add result to DataFrame with case metrics for internal calculation
-        new_evaluation_result = pd.DataFrame(
-            {
-                "Test_Index": [test_index + 1],
-                "Predicted_Types": [
-                    (
-                        ", ".join(sorted(predicted_concern_types))
-                        if predicted_concern_types
-                        else "None"
-                    )
-                ],
-                "Actual_Types": [
-                    (
-                        ", ".join(sorted(actual_concern_types))
-                        if actual_concern_types
-                        else "None"
-                    )
-                ],
-                "Predicted_Count": [predicted_concern_count],
-                "Actual_Count": [actual_concern_count],
-                "Status": [evaluation_status],
-                "Model_Reasoning": [model_reasoning],
-                "Case_Precision": [case_precision],
-                "Case_Recall": [case_recall],
-                "Case_F1": [case_f1],
-                "SHAs": [formatted_shas],
-            }
-        )
-
-        evaluation_results_df = pd.concat(
-            [evaluation_results_df, new_evaluation_result], ignore_index=True
-        )
+        # Update the pre-allocated row for current test_index
+        evaluation_results_df.loc[
+            test_index,
+            [
+                "Test_Index",
+                "Predicted_Types",
+                "Actual_Types",
+                "Predicted_Count",
+                "Actual_Count",
+                "Status",
+                "Model_Reasoning",
+                "Case_Precision",
+                "Case_Recall",
+                "Case_F1",
+                "SHAs",
+            ],
+        ] = [
+            test_index + 1,
+            (
+                ", ".join(sorted(predicted_concern_types))
+                if predicted_concern_types
+                else "None"
+            ),
+            ", ".join(sorted(actual_concern_types)) if actual_concern_types else "None",
+            predicted_concern_count,
+            actual_concern_count,
+            evaluation_status,
+            model_reasoning,
+            case_precision,
+            case_recall,
+            case_f1,
+            formatted_shas,
+        ]
         progress_bar.progress((test_index + 1) / total_cases)
 
-        # Update evaluation summary
-        metrics = calculate_evaluation_metrics(evaluation_results_df)
+        # Update evaluation summary (consider only processed rows)
+        processed_df = evaluation_results_df.dropna(subset=["Status"], how="any")
+        metrics = calculate_evaluation_metrics(processed_df)
         with summary_container.container():
             render_evaluation_metrics(metrics, total_cases)
 
@@ -258,6 +262,24 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
 
     # Store final results for analysis
     st.session_state.final_evaluation_results = evaluation_results_df
+
+    # Single download button for full results CSV
+    if not evaluation_results_df.empty:
+        download_df = evaluation_results_df.copy()
+        columns_to_exclude = ["Case_Precision", "Case_Recall", "Case_F1"]
+        download_columns = [
+            col for col in download_df.columns if col not in columns_to_exclude
+        ]
+        download_df = download_df[download_columns]
+        csv_data = download_df.to_csv(index=False)
+        st.download_button(
+            label="📥 Download Full Results as CSV",
+            data=csv_data,
+            file_name=f"concern_evaluation_results_{len(download_df)}_cases.csv",
+            mime="text/csv",
+            key="download_full_results",
+            use_container_width=True,
+        )
 
 
 def show_direct_input() -> None:

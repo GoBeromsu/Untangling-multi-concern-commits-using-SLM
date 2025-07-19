@@ -85,11 +85,13 @@ def render_results_table(evaluation_results_df: pd.DataFrame) -> None:
         "Model_Reasoning",
     ]
 
+    processed_df = evaluation_results_df.dropna(subset=["Status"], how="any")
+
     # Apply display limit for recent results
     recent_results = (
-        evaluation_results_df.tail(RECENT_RESULTS_DISPLAY_LIMIT)
-        if len(evaluation_results_df) > RECENT_RESULTS_DISPLAY_LIMIT
-        else evaluation_results_df
+        processed_df.tail(RECENT_RESULTS_DISPLAY_LIMIT)
+        if len(processed_df) > RECENT_RESULTS_DISPLAY_LIMIT
+        else processed_df
     )
 
     display_results_df = recent_results[display_columns]
@@ -100,27 +102,8 @@ def render_results_table(evaluation_results_df: pd.DataFrame) -> None:
         use_container_width=True,
         hide_index=True,
         column_config=column_config,
+        height=400,
     )
-
-    # Add CSV download button for complete results
-    if not evaluation_results_df.empty:
-        # Prepare full dataset for download (remove internal calculation columns)
-        download_df = evaluation_results_df.copy()
-        columns_to_exclude = ["Case_Precision", "Case_Recall", "Case_F1"]
-        download_columns = [
-            col for col in download_df.columns if col not in columns_to_exclude
-        ]
-        download_df = download_df[download_columns]
-
-        csv_data = download_df.to_csv(index=False)
-
-        st.download_button(
-            label="📥 Download Full Results as CSV",
-            data=csv_data,
-            file_name=f"concern_evaluation_results_{len(download_df)}_cases.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
 
 
 def render_dataset_metadata(metadata: Dict[str, Any]) -> None:
