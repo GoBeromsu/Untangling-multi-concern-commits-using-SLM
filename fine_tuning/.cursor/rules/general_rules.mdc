@@ -9,14 +9,14 @@ description: "Rules for fine-tuning on Sheffield HPC Stanage"
 - Use `source activate` and `source deactivate` instead of `conda activate/deactivate` when managing environments
 
 ### System Information
-
+- OS : CentOS 7
 - PC : Sheffield HPC Stanage
 - GPU : NVIDIA A100 80GB PCIe
 - CUDA : 12.1.1
 - PyTorch : 2.1.0
 - cuDNN : 8.9.2.26
 - Anaconda : 2022.05
-
+- glibc 2.17
 
 ### Dependencies
 

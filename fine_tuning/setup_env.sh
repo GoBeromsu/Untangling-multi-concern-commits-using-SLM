@@ -54,13 +54,33 @@ pip install "torch>=2.2.0"
 echo "📦 Installing flash-attn prerequisites..."
 pip install packaging ninja
 
-# Step 3: Install flash-attn
-echo "📦 Installing flash-attn..."
-pip install flash-attn --no-build-isolation
+# Step 3: Install prebuilt flash-attn wheel (manylinux2014, GLIBC 2.17)
+# Wheel repo: https://github.com/mjun0812/flash-attention-prebuild-wheels
+# Choose build matching: flash_attn-2.7.3+pt222cu121cxx11abiTRUE-cp310-cp310-linux_x86_64.whl
+FLASH_ATTN_WHEEL_URL = "https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.0.4/flash_attn-2.7.3%2Bpt222cu121cxx11abiTRUE-cp310-cp310-linux_x86_64.whl"
+echo "📦 Downloading & installing flash-attn wheel..."
+if ! pip install --no-cache-dir "$FLASH_ATTN_WHEEL_URL"; then
+    echo "❌ Failed to install flash-attn wheel. Falling back to source build."
+    export FLASH_ATTENTION_FORCE_CUDA=1
+    export TORCH_CUDA_ARCH_LIST="80" # A100 architecture
+    echo "📦 Building flash-attn from source as fallback... (this may take a while)"
+    pip install flash-attn --no-build-isolation  --use-pep517
+fi
 
-# Step 4: Install dependencies including flash-attn
-echo "📦 Installing ML dependencies..."
+# Step 4: Install remaining ML dependencies
+ echo "📦 Installing ML dependencies..."
 pip install -r requirements.txt
+
+# Verify flash-attn installation
+python - <<'PY' > logs/flash_attn_verify_${SLURM_JOB_ID}.log
+import flash_attn, torch, os
+print(
+    f"flash-attn {flash_attn.__version__} ✓  "
+    f"PyTorch {torch.__version__}  "
+    f"CUDA {torch.version.cuda}  "
+    f"CC {os.getenv('TORCH_CUDA_ARCH_LIST', 'default')}"
+)
+PY
 
 echo "✅ Environment setup completed successfully!"
 echo "To activate the environment manually: source activate phi4_env"
