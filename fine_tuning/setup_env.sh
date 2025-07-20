@@ -26,17 +26,15 @@ module load CUDA/12.1.1
 module load Anaconda3/2022.05
 module load cuDNN/8.9.2.26-CUDA-12.1.1
 
-# Remove existing environment if exists
+# Check if environment exists and reuse if available
 if conda env list | grep -q "phi4_env"; then
-    echo "🗑️ Removing existing phi4_env..."
-    conda remove -n phi4_env --all -y
-fi
-
-# Create conda environment
-echo "🏗️ Creating conda environment..."
-if ! conda env create -f environment.yml; then
-    echo "❌ Failed to create conda environment. Exiting..."
-    exit 1
+    echo "♻️ Found existing phi4_env, reusing it..."
+else
+    echo "🏗️ Creating new conda environment..."
+    if ! conda env create -f environment.yml; then
+        echo "❌ Failed to create conda environment. Exiting..."
+        exit 1
+    fi
 fi
 
 # Activate environment using 'source activate' instead of 'conda activate'
