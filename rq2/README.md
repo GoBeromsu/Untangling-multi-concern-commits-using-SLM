@@ -1,22 +1,21 @@
-# RQ2: Accuracy vs. Context Length
+# RQ1: Context Ablation Study
 
-This experiment analyzes the relationship between context length and model accuracy.
+This experiment studies the impact of commit message context on model performance.
 
 ## Description
 
-Evaluates how different context lengths (256, 512, 1024, 2048, 4096 tokens) affect the accuracy of commit untangling.
+Evaluates how removing commit messages affects the ability to untangle commits, using only the diff information.
 
 ## Execution
 
 ```bash
-cd rq2
+cd rq1
 python main.py
 ```
 
 ## Output
 
-Results will be saved to `../results/rq2/`:
+Results will be saved to `../results/rq1/`:
 
-- `predictions.csv`: Model predictions for each context length
-- `metrics.json`: Accuracy metrics for each context length
-- `accuracy_vs_length.png`: Visualization of accuracy vs context length relationship
+- `predictions.csv`: Model predictions without commit message context
+- `metrics.json`: Performance metrics compared to RQ0 baseline

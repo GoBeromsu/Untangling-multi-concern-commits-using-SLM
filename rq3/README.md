@@ -1,22 +1,22 @@
-# RQ3: Latency vs. Context Length
+# RQ2: Accuracy vs. Context Length
 
-This experiment analyzes the relationship between context length and model inference latency.
+This experiment analyzes the relationship between context length and model accuracy.
 
 ## Description
 
-Evaluates how different context lengths (256, 512, 1024, 2048, 4096 tokens) affect the inference latency of commit untangling.
+Evaluates how different context lengths (256, 512, 1024, 2048, 4096 tokens) affect the accuracy of commit untangling.
 
 ## Execution
 
 ```bash
-cd rq3
+cd rq2
 python main.py
 ```
 
 ## Output
 
-Results will be saved to `../results/rq3/`:
+Results will be saved to `../results/rq2/`:
 
-- `predictions.csv`: Model predictions with latency measurements for each context length
-- `metrics.json`: Latency statistics for each context length
-- `latency_vs_length.png`: Visualization of latency vs context length relationship
+- `predictions.csv`: Model predictions for each context length
+- `metrics.json`: Accuracy metrics for each context length
+- `accuracy_vs_length.png`: Visualization of accuracy vs context length relationship

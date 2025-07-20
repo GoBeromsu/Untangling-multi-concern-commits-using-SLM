@@ -1,9 +1,9 @@
-experiment_name: "RQ1_Context_Ablation"
-dataset_name: "your-hf-org/your-dataset"
+experiment_name: "RQ0_Performance_Gap"
+dataset_name: "Berom0227/Untangling-Multi-Concern-Commits-with-Small-Language-Models"
 dataset_split: "test"
 models:
-  - "microsoft/phi-4" # GPT-4 excluded for cost efficiency
-include_message: false # Key difference from RQ0
-output_dir: "../results/rq1"
+  llm:
+    - "gpt-4-turbo"
+output_dir: "../results/rq0"
 temperature: 0
 max_tokens: 16384
