@@ -76,6 +76,7 @@ Label selection must assign exactly one concern from the following unified set:
 - build: Affects the build system (e.g., updates dependencies, changes build configs or scripts).
 """
 
+
 logger = logging.getLogger(__name__)
 
 # Model and dataset configuration
@@ -311,7 +312,7 @@ model = AutoModelForCausalLM.from_pretrained(
 
 args = TrainingArguments(
     output_dir=MODEL_NAME + "-LoRA",
-    evaluation_strategy="steps",
+    eval_strategy="steps",
     do_eval=True,
     optim="adamw_torch",
     per_device_train_batch_size=8,
