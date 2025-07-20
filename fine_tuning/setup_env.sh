@@ -50,7 +50,7 @@ pip install packaging ninja
 
 # Install PyTorch with CUDA 12.1.1 support
 echo "📦 Installing PyTorch with CUDA 12.1 support..."
-pip install torch==2.5.1+cu121--index-url https://download.pytorch.org/whl/cu121
+pip install torch==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
 
 # Install flash-attn with no build isolation
 # Install flash-attn version 2.7.4.post1 without build isolation to ensure compatibility with existing environment
