@@ -46,7 +46,35 @@ from transformers.trainer_utils import get_last_checkpoint
 # 'SFTTrainer' is a class from the 'trl' library that provides a trainer for soft fine-tuning.
 from trl import SFTTrainer
 
-from utils.prompt import get_system_prompt
+
+def get_system_prompt():
+    return """
+You are a software engineer classifying individual code units extracted from a tangled commit.
+Each change unit (e.g., function, method, class, or code block) represents a reviewable atomic change, and must be assigned exactly one label.
+
+Label selection must assign exactly one concern from the following unified set:
+- Purpose labels : the motivation behind making a code change (feat, fix, refactor)
+- Object labels : the essence of the code changes that have been made(docs, test, cicd, build)
+     - Use an object label only when the code unit is fully dedicated to that artifact category (e.g., writing test logic, modifying documentation).
+
+# Instructions
+1. For each code unit, review the change and determine the most appropriate label from the unified set.
+2. If multiple labels seem possible, resolve the overlap by applying the following rule:
+     - **Purpose + Purpose**: Choose the label that best reflects *why* the change was made — `fix` if resolving a bug, `feat` if adding new capability, `refactor` if improving structure without changing behavior.
+     - **Object + Object**: Choose the label that reflects the *functional role* of the artifact being modified — e.g., even if changing build logic, editing a CI script should be labeled as `cicd`.
+     - **Purpose + Object**: If the change is driven by code behavior (e.g., fixing test logic), assign a purpose label; if it is entirely scoped to a support artifact (e.g., adding new tests), assign an object label.
+3. Repeat step 1–2 for each code unit.
+4. Once all code units are labeled, return a unique set of assigned labels for the entire commit
+
+# Labels
+- feat: Introduces new features to the codebase.
+- fix: Fixes bugs or faults in the codebase.
+- refactor: Restructures existing code without changing external behavior (e.g., improves readability, simplifies complexity, removes unused code).
+- docs: Modifies documentation or text (e.g., fixes typos, updates comments or docs).
+- test: Modifies test files (e.g., adds or updates tests).
+- cicd: Updates CI (Continuous Integration) configuration files or scripts (e.g., `.travis.yml`, `.github/workflows`).
+- build: Affects the build system (e.g., updates dependencies, changes build configs or scripts).
+"""
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +242,9 @@ processed_test_dataset = test_dataset_with_messages.map(
 if torch.cuda.is_bf16_supported():
     compute_dtype = torch.bfloat16
     # attn_implementation = "flash_attention_2"
-    attn_implementation = "sdpa"  # Use SDPA instead of flash_attention_2 for CentOS 7 compatibility
+    attn_implementation = (
+        "sdpa"  # Use SDPA instead of flash_attention_2 for CentOS 7 compatibility
+    )
 else:
     compute_dtype = torch.float16
     attn_implementation = "sdpa"
