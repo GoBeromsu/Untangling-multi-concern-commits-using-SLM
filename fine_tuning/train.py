@@ -241,10 +241,7 @@ processed_test_dataset = test_dataset_with_messages.map(
 
 if torch.cuda.is_bf16_supported():
     compute_dtype = torch.bfloat16
-    # attn_implementation = "flash_attention_2"
-    attn_implementation = (
-        "sdpa"  # Use SDPA instead of flash_attention_2 for CentOS 7 compatibility
-    )
+    attn_implementation = "flash_attention_2"
 else:
     compute_dtype = torch.float16
     attn_implementation = "sdpa"
