@@ -1,0 +1,21 @@
+# Accelerate Multi-GPU Configuration for HPC Stanage A100
+# Usage: accelerate launch --config_file accelerate_config.yaml train.py
+# HPC-optimized: Single node, multiple GPUs with efficient data loading
+compute_environment: LOCAL_MACHINE
+distributed_type: MULTI_GPU
+downcast_bf16: "no"
+gpu_ids: all
+machine_rank: 0
+main_training_function: main
+mixed_precision: bf16 # BF16 mixed precision for A100
+num_machines: 1 # Single HPC node (as per HPC best practices)
+num_processes: 2 # Number of GPUs (matches --gres=gpu:2)
+rdzv_backend: static
+same_network: true # HPC single-node optimization
+dataloader_config:
+  split_batches: false # Let each GPU handle full batches
+  dispatch_batches: true # Optimize batch distribution
+tpu_env: []
+tpu_use_cluster: false
+tpu_use_sudo: false
+use_cpu: false

@@ -1,10 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=phi4_commit_sft
+#SBATCH --job-name=phi4_commit_sft_accelerate
 #SBATCH --time=12:00:00
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
+#SBATCH --qos=gpu
+#SBATCH --gres=gpu:2
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=128GB
+#SBATCH --mem=64GB
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --output=logs/phi4_training_%j.out
@@ -12,8 +13,9 @@
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=bkoh3@sheffield.ac.uk
 
-# Sheffield HPC Stanage - A100 GPU Training
+# Sheffield HPC Stanage - Multi-GPU A100 Training (2x80GB)
 # Multi-Concern Commit Classification with Phi-4
+# Setup: SFTTrainer + Accelerate YAML + Multi-GPU DDP
 
 echo "Starting Phi-4 LoRA fine-tuning job: $SLURM_JOB_ID"
 echo "Node: $SLURM_NODELIST"
@@ -29,15 +31,16 @@ module load cuDNN/8.9.2.26-CUDA-12.1.1
 echo "🔧 Activating phi4_env..."
 source activate phi4_env
 
-# Set environment variables
-export CUDA_VISIBLE_DEVICES=0
+# Set environment variables for multi-GPU
+export CUDA_VISIBLE_DEVICES=0,1
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 export TOKENIZERS_PARALLELISM=false
 export FLASH_ATTENTION_FORCE_DISABLED=1  # Disable flash attention for CentOS 7 compatibility
+export NCCL_DEBUG=INFO  # Multi-GPU communication debugging
 
-# Run training
-echo "🔥 Starting training at $(date)"
-python train.py
+# Run distributed training with accelerate
+echo "🔥 Starting multi-GPU training at $(date)"
+accelerate launch --config_file accelerate_config.yaml train.py
 
 echo "✅ Training completed at $(date)"
 
