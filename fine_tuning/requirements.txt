@@ -10,3 +10,6 @@ trl>=0.8.0                      # Transformers Reinforcement Learning
 
 # Experiment Tracking
 wandb>=0.16.0                   # Weights & Biases for experiment monitoring
+
+# Environment Variables
+python-dotenv>=1.0.0            # Load environment variables from .env file
