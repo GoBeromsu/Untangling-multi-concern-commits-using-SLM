@@ -33,6 +33,7 @@ source activate phi4_env
 export CUDA_VISIBLE_DEVICES=0
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 export TOKENIZERS_PARALLELISM=false
+export FLASH_ATTENTION_FORCE_DISABLED=1  # Disable flash attention for CentOS 7 compatibility
 
 # Run training
 echo "🔥 Starting training at $(date)"

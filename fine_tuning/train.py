@@ -13,9 +13,6 @@ import sys
 import logging
 import os
 from typing import Dict, Any
-
-os.environ["FLASH_ATTENTION_FORCE_DISABLED"] = "1"  # Disable flash attention for CentOS 7 compatibility
-
 import torch
 import wandb
 
