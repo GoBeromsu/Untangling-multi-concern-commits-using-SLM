@@ -44,7 +44,7 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 
 # 'SFTTrainer' is a class from the 'trl' library that provides a trainer for soft fine-tuning.
-from trl import SFTTrainer
+from trl import SFTTrainer, SFTConfig
 
 
 def get_system_prompt():
@@ -310,7 +310,7 @@ model = AutoModelForCausalLM.from_pretrained(
 # 'target_modules' (the modules to which LoRA is applied) choosing linear layers except the output layer..
 
 
-args = TrainingArguments(
+args = SFTConfig(
     output_dir=MODEL_NAME + "-LoRA",
     eval_strategy="steps",
     do_eval=True,
@@ -333,6 +333,7 @@ args = TrainingArguments(
     push_to_hub=True,
     hub_strategy="every_save",
     hub_model_id=HF_MODEL_REPO + "-adapter",
+    max_length=MAX_SEQ_LENGTH,
 )
 
 peft_config = LoraConfig(
@@ -346,9 +347,7 @@ peft_config = LoraConfig(
 # 'model' is the model that will be trained.
 # 'train_dataset' and 'eval_dataset' are the datasets that will be used for training and evaluation, respectively.
 # 'peft_config' is the configuration for peft, which is used for instruction tuning.
-# 'dataset_text_field' is set to "text", meaning that the 'text' field of the dataset will be used as the input for the model.
-# 'max_seq_length' is set to 512, meaning that the maximum length of the sequences that will be fed to the model is 512 tokens.
-# 'tokenizer' is the tokenizer that will be used to tokenize the input text.
+# 'processing_class' is the tokenizer that will be used to tokenize the input text.
 # This uses the second tokenizer (training tokenizer) to convert text strings to token IDs
 # 'args' are the training arguments that were defined earlier.
 
@@ -357,9 +356,7 @@ trainer = SFTTrainer(
     train_dataset=processed_train_dataset,
     eval_dataset=processed_test_dataset,
     peft_config=peft_config,
-    dataset_text_field="text",
-    max_seq_length=MAX_SEQ_LENGTH,
-    tokenizer=tokenizer,
+    processing_class=tokenizer,
     args=args,
 )
 
