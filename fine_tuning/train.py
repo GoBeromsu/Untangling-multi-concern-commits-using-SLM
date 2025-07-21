@@ -89,6 +89,18 @@ DATASET_NAME: str = (
 NEW_MODEL: str = "Untangling-Multi-Concern-Commits-with-Small-Language-Models"
 HF_MODEL_REPO: str = "Berom0227/" + NEW_MODEL
 
+# HPC storage configuration - Use fastdata area for large files
+# Reference: Sheffield HPC Storage Guidelines
+# https://docs.hpc.shef.ac.uk/en/latest/hpc/filestore.html
+# Fastdata areas (/mnt/parscratch/users/$USER/) are designed for large files and avoid "Disk quota exceeded" errors in home directories
+USER = os.getenv("USER", "acq24bk")  # Fallback to your username if USER env var not set
+FASTDATA_BASE = f"/mnt/parscratch/users/{USER}"
+MODEL_OUTPUT_DIR = f"{FASTDATA_BASE}/models/{MODEL_NAME}-LoRA"
+MERGED_MODEL_DIR = f"{FASTDATA_BASE}/models/merged_model"
+
+# Create necessary directories
+os.makedirs(f"{FASTDATA_BASE}/models", exist_ok=True)
+
 # Experiment tracking configuration
 WANDB_PROJECT: str = "Untangling-Multi-Concern-Commits-with-Small-Language-Models"
 EXPERIMENT_NAME: str = f"phi4-{NEW_MODEL.lower()}-lora"
@@ -311,7 +323,7 @@ model = AutoModelForCausalLM.from_pretrained(
 
 
 args = SFTConfig(
-    output_dir=MODEL_NAME + "-LoRA",
+    output_dir=MODEL_OUTPUT_DIR,
     eval_strategy="steps",
     do_eval=True,
     optim="adamw_torch",
@@ -411,9 +423,9 @@ merged_model = new_model.merge_and_unload()
 
 # Save the merged model locally
 merged_model.save_pretrained(
-    "merged_model", trust_remote_code=True, safe_serialization=True
+    MERGED_MODEL_DIR, trust_remote_code=True, safe_serialization=True
 )
-tokenizer.save_pretrained("merged_model")
+tokenizer.save_pretrained(MERGED_MODEL_DIR)
 
 # Push the merged model to Hugging Face Hub
 merged_model.push_to_hub(HF_MODEL_REPO)
