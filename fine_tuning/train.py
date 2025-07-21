@@ -5,8 +5,7 @@ Dataset: Untangling Multi-Concern Commits with Small Language Models
 Task: Predict reasoning and concern types from commit messages and diffs
 Input: commit_message, diff → Output: reason, types
 
-Setup: SFTTrainer + Accelerate DDP (Multi-GPU) + LoRA + BF16
-Usage: accelerate launch --config_file accelerate_config.yaml train.py
+Usage: python train.py
 """
 
 # Reference : https://github.com/microsoft/PhiCookBook/blob/main/code/03.Finetuning/Phi-3-finetune-lora-python.ipynb
@@ -37,6 +36,7 @@ from peft import LoraConfig, TaskType
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    TrainingArguments,
     set_seed,
 )
 
@@ -313,8 +313,8 @@ model = AutoModelForCausalLM.from_pretrained(
 args = SFTConfig(
     output_dir=MODEL_NAME + "-LoRA",
     eval_strategy="steps",
-    # do_eval=True,  # Commented: Automatically enabled when eval_strategy is set
-    # optim="adamw_torch",  # Commented: Default optimizer, no need to specify
+    do_eval=True,
+    optim="adamw_torch",
     per_device_train_batch_size=2,
     gradient_accumulation_steps=8,
     per_device_eval_batch_size=2,
@@ -322,21 +322,18 @@ args = SFTConfig(
     save_strategy="epoch",
     logging_steps=100,
     learning_rate=1e-4,
-    # fp16=not torch.cuda.is_bf16_supported(),  # Commented: Accelerate config handles mixed precision
-    # bf16=torch.cuda.is_bf16_supported(),  # Commented: Accelerate config handles mixed precision
+    fp16=not torch.cuda.is_bf16_supported(),
+    bf16=torch.cuda.is_bf16_supported(),
     eval_steps=100,
     num_train_epochs=3,
-    # warmup_ratio=0.1,  # Commented: Default warmup ratio
-    # lr_scheduler_type="linear",  # Commented: Default scheduler type
+    warmup_ratio=0.1,
+    lr_scheduler_type="linear",
     report_to="wandb",
     seed=42,
     push_to_hub=True,
     hub_strategy="every_save",
     hub_model_id=HF_MODEL_REPO + "-adapter",
     max_length=MAX_SEQ_LENGTH,
-    # HPC optimization: Use multiple CPUs for data preprocessing (per HPC docs)
-    dataloader_num_workers=16,  # Utilize allocated CPUs for data loading
-    dataloader_pin_memory=True,  # Faster GPU transfer in HPC environment
 )
 
 peft_config = LoraConfig(
@@ -366,6 +363,7 @@ trainer = SFTTrainer(
 # 'trainer.train()' is a method that starts the training of the model.
 # It uses the training dataset, evaluation dataset, and training arguments that were provided when the trainer was initialized.
 
+# trainer.train() 전에 체크포인트 확인
 last_checkpoint = None
 if os.path.isdir(args.output_dir):
     last_checkpoint = get_last_checkpoint(args.output_dir)
