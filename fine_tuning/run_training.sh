@@ -35,7 +35,6 @@ source activate phi4_env
 export CUDA_VISIBLE_DEVICES=0,1
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 export TOKENIZERS_PARALLELISM=false
-export FLASH_ATTENTION_FORCE_DISABLED=1  # Disable flash attention for CentOS 7 compatibility
 export NCCL_DEBUG=INFO  # Multi-GPU communication debugging
 
 # Run distributed training with accelerate
