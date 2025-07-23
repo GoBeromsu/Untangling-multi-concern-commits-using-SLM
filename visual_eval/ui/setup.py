@@ -2,12 +2,14 @@
 
 import os
 import streamlit as st
-from visual_eval.llms.lmstudio import get_models
+from utils.llms.lmstudio import get_models
+from utils.llms.constant import DEFAULT_OPENAI_MODEL
 from .session import (
     set_api_provider,
     set_available_models,
     has_available_models,
     get_available_models,
+    MODEL_NAME_KEY,
 )
 
 
@@ -24,7 +26,7 @@ def setup_openai_api() -> bool:
         return False
 
     st.success("✅ OpenAI API Key detected")
-    set_api_provider("openai", None)
+    set_api_provider("openai", DEFAULT_OPENAI_MODEL)
     return True
 
 
@@ -45,12 +47,12 @@ def setup_lmstudio_api() -> bool:
             set_available_models(models)
 
     # Model selection
-    selected_model = st.selectbox(
+    st.selectbox(
         "Select Model:",
         get_available_models(),
+        key=MODEL_NAME_KEY,
         help="Choose a model loaded in LM Studio",
     )
-    set_api_provider("lmstudio", selected_model)
     return True
 
 
