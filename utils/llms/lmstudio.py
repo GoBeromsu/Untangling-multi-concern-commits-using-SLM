@@ -52,7 +52,7 @@ def load_model(model_name: str) -> Any:
 
 def api_call(
     model_name: str,
-    diff: str,
+    commit: str,
     system_prompt: str,
     temperature: float = DEFAULT_TEMPERATURE,
     max_tokens: int = DEFAULT_MAX_TOKENS,
@@ -62,7 +62,7 @@ def api_call(
 
     Args:
         model_name: Name of the model to use
-        diff: Git diff content to analyze
+        commit: Commit content to analyze
         system_prompt: System prompt for the model
         temperature: Sampling temperature (0.0 for greedy decoding)
         max_tokens: Maximum tokens to generate
@@ -80,7 +80,7 @@ def api_call(
         messages = {
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": diff},
+                {"role": "user", "content": commit},
             ]
         }
 

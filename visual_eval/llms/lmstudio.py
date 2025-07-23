@@ -29,7 +29,7 @@ def api_call(
     """LM Studio API call wrapper for visual_eval compatibility."""
     return _api_call(
         model_name=model_name,
-        diff=diff,
+        commit=diff,
         system_prompt=system_prompt,
         temperature=temperature,
         max_tokens=max_tokens,

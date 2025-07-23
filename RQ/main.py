@@ -1,7 +1,7 @@
 import sys
 import json
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 import tiktoken
 import pandas as pd
 
@@ -12,31 +12,36 @@ import utils.llms as llms
 import utils.eval as eval_utils
 import utils.prompt as prompt_utils
 
-contextWindow = [1024, 2048, 4096, 8192, 12288]
-model_names = ["microsoft/phi-4", "qwen/qwen3-14b"]
+# contextWindow = [1024, 2048, 4096, 8192, 12288]
+contextWindow = [1024]
+model_names = ["microsoft/phi-4"]
 encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding
 
 
-def count_tokens(text: str) -> int:
-    """Count actual tokens using tiktoken."""
-    return len(encoding.encode(text))
+def truncate_commits(commits: Dict[str, Dict[str, str]], context_window: int) -> str:
+    concern_count = len(commits)
+    available_tokens_per_commit = context_window // concern_count
 
+    messages, diffs = [], []
 
-def truncate_diffs(diffs: List[str], context_window: int) -> str:
-    combined_diff = ""
-    concern_count = len(diffs)
-    available_tokens_per_diff = context_window // concern_count
+    for commit_data in commits.values():
+        message = commit_data["commit_message"]
+        diff = commit_data["git_diff"]
 
-    for diff in diffs:
-        tokens = encoding.encode(diff)
-        if len(tokens) <= available_tokens_per_diff:
-            truncated_diff = diff
-        else:
-            truncated_tokens = tokens[:available_tokens_per_diff]
-            truncated_diff = encoding.decode(truncated_tokens)
-        combined_diff += f"\n{truncated_diff}"
+        message_tokens = encoding.encode(message)
+        remaining_tokens = available_tokens_per_commit - len(message_tokens)
 
-    return combined_diff
+        diff_tokens = encoding.encode(diff)
+        truncated_diff = (
+            diff
+            if len(diff_tokens) <= remaining_tokens
+            else encoding.decode(diff_tokens[:remaining_tokens])
+        )
+
+        messages.append(message)
+        diffs.append(truncated_diff)
+
+    return f"{'Commit Message: ' + '\n'.join(messages)}\n{'Diff: ' + '\n'.join(diffs)}"
 
 
 def create_csv_with_headers(csv_path: Path) -> None:
@@ -85,7 +90,7 @@ if __name__ == "__main__":
             print(f"Failed to setup model: {model_name}")
             continue
 
-        for prompt_type, prompt_func in prompt_types:
+        for prompt_type, get_prompt in prompt_types:
             prompt_dir = Path("results") / prompt_type
             prompt_dir.mkdir(parents=True, exist_ok=True)
 
@@ -100,19 +105,23 @@ if __name__ == "__main__":
 
                 for idx, row in tangled_df.iterrows():
                     shas = json.loads(row["shas"])
-                    diffs = []
-
+                    commits: Dict[str, str] = {}
                     for sha in shas:
                         matching_row = atomic_df[atomic_df["sha"] == sha]
-                        diffs.append(matching_row["git_diff"].values[0])
+                        commit_message = matching_row["masked_commit_message"].values[0]
+                        git_diff = matching_row["git_diff"].values[0]
+                        commits[sha] = {
+                            "commit_message": commit_message,
+                            "git_diff": git_diff,
+                        }
 
-                    system_prompt = prompt_func()
-                    truncated_diff = truncate_diffs(diffs, context_window)
-
+                    system_prompt = get_prompt()
+                    truncated_commit = truncate_commits(commits, context_window)
+                    print(truncated_commit)
                     try:
                         prediction, inference_time = llms.api_call(
                             model_name=model_name,
-                            diff=truncated_diff,
+                            commit=truncated_commit,
                             system_prompt=system_prompt,
                         )
                         predicted_types = llms.parse_model_response(prediction)
