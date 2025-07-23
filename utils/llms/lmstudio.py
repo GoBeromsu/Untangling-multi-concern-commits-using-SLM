@@ -54,7 +54,7 @@ def api_call(
     system_prompt: str,
     temperature: float = DEFAULT_TEMPERATURE,
     max_tokens: int = DEFAULT_MAX_TOKENS,
-) -> Tuple[List[str], float]:
+) -> List[str]:
     """
     Call LM Studio API for commit classification with inference time measurement.
 
@@ -66,7 +66,7 @@ def api_call(
         max_tokens: Maximum tokens to generate
 
     Returns:
-        Tuple of (List of concern types, inference_time_in_seconds)
+        List of concern types
     """
     try:
         model = load_model(model_name)

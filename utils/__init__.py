@@ -4,9 +4,6 @@ Utility modules for commit untangler experiments.
 
 from .model import load_model_and_tokenizer, get_prediction
 from .llms import (
-    openai_api_call,
-    load_openai_client,
-    get_openai_prediction,
     get_models,
     load_model,
     api_call,
@@ -26,9 +23,6 @@ __all__ = [
     "load_model_and_tokenizer",
     "get_prediction",
     # Unified LLM interfaces
-    "openai_api_call",
-    "load_openai_client",
-    "get_openai_prediction",
     "get_models",
     "load_model",
     "api_call",

@@ -1,21 +1,32 @@
+import os
 import sys
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 import tiktoken
 import pandas as pd
+from dotenv import load_dotenv
 
-# Add parent directory to path for imports
+# Load environment variables from .env file
+load_dotenv()
+
 sys.path.append(str(Path(__file__).parent.parent))
 
+from utils.llms import constant
 import utils.llms as llms
 import utils.eval as eval_utils
 import utils.prompt as prompt_utils
 
 # contextWindow = [1024, 2048, 4096, 8192, 12288]
 contextWindow = [1024]
-model_names = ["microsoft/phi-4"]
+model_names = [
+    # "microsoft/phi-4",  # LM Studio model
+    "gpt-4o-mini",  # OpenAI model
+    # "gpt-4o",         # Uncomment for more expensive model
+]
 encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding
+
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
 
 def truncate_commits(commits: Dict[str, Dict[str, str]], context_window: int) -> str:
@@ -47,29 +58,8 @@ def truncate_commits(commits: Dict[str, Dict[str, str]], context_window: int) ->
 def create_csv_with_headers(csv_path: Path) -> None:
     """Create CSV file with headers if it doesn't exist."""
     if not csv_path.exists():
-        headers = [
-            "row_index",
-            "context_window",
-            "predicted_types",
-            "actual_types",
-            "inference_time",
-            "shas",
-        ]
-        df = pd.DataFrame(columns=headers)
+        df = pd.DataFrame(columns=constant.DEFAULT_DF_COLUMNS)
         df.to_csv(csv_path, index=False)
-
-
-def setup_model(model_name: str) -> bool:
-    """Setup and validate LM Studio model."""
-    available_models, _ = llms.get_models()
-    if not available_models or model_name not in available_models:
-        return False
-
-    try:
-        llms.load_model(model_name)
-        return True
-    except Exception:
-        return False
 
 
 if __name__ == "__main__":
@@ -85,10 +75,6 @@ if __name__ == "__main__":
         print(f"\n{'='*50}")
         print(f"Processing Model: {model_name}")
         print(f"{'='*50}")
-
-        if not setup_model(model_name):
-            print(f"Failed to setup model: {model_name}")
-            continue
 
         for prompt_type, get_prompt in prompt_types:
             prompt_dir = Path("results") / prompt_type
@@ -119,28 +105,25 @@ if __name__ == "__main__":
                     truncated_commit = truncate_commits(commits, context_window)
 
                     try:
-
                         api_call = lambda: llms.api_call(
                             model_name=model_name,
                             commit=truncated_commit,
                             system_prompt=system_prompt,
+                            api_key=OPENAI_KEY,
                         )
                         predicted_types, inference_time = (
                             eval_utils.measure_inference_time(api_call)
                         )
                     except Exception as e:
-                        print(f"Error processing row {idx}: {e}")
+                        print(f"Unexpected error processing row {idx}: {e}")
                         predicted_types = []
                         inference_time = 0.0
 
-                    result = {
-                        "row_index": idx,
-                        "context_window": context_window,
-                        "predicted_types": predicted_types,
-                        "actual_types": json.loads(row["types"]),
-                        "inference_time": inference_time,
-                        "shas": shas,
-                    }
+                    result = {column: None for column in constant.DEFAULT_DF_COLUMNS}
+                    result["predicted_types"] = predicted_types
+                    result["actual_types"] = json.loads(row["types"])
+                    result["inference_time"] = inference_time
+                    result["shas"] = shas
 
                     result_df = pd.DataFrame([result])
                     result_df.to_csv(csv_path, mode="a", header=False, index=False)

@@ -2,10 +2,17 @@ from typing import Dict, List, Any
 
 # API Configuration Constants
 DEFAULT_LMSTUDIO_URL: str = "localhost:1234"
+DEFAULT_OPENAI_MODEL: str = "gpt-4.1-2025-04-14"
 DEFAULT_TEMPERATURE: float = 0.0
 DEFAULT_MAX_TOKENS: int = 16384
 CONNECTION_TIMEOUT_SECONDS: int = 30
 
+DEFAULT_DF_COLUMNS: List[str] = [
+    "predicted_types",
+    "actual_types",
+    "inference_time",
+    "shas",
+]
 # LM Studio Model Load Configuration (based on https://lmstudio.ai/docs/typescript/api-reference/llm-load-model-config)
 LMSTUDIO_MODEL_CONFIG: Dict[str, Any] = {
     "contextLength": DEFAULT_MAX_TOKENS,

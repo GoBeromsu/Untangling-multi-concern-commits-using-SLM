@@ -2,13 +2,12 @@ import os
 import json
 import streamlit as st
 import pandas as pd
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from dotenv import load_dotenv
 
 from utils import llms
 from utils.prompt import get_system_prompt
-from utils.llms.openai import openai_api_call
 from utils.llms.constant import (
     CODE_DIFF_INPUT_HEIGHT,
     SYSTEM_PROMPT_INPUT_HEIGHT,
@@ -26,7 +25,6 @@ from visual_eval.ui.dataset import (
     SHAS_COLUMN,
 )
 from visual_eval.ui.session import (
-    get_api_provider,
     get_model_name,
     set_evaluation_results,
 )
@@ -50,6 +48,9 @@ EVALUATION_RESULT_COLUMNS = [
     "SHAs",
 ]
 
+load_dotenv()
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+
 
 def render_system_prompt_input(title: str = "System Prompt") -> str:
     """Render system prompt input widget with consistent styling."""
@@ -59,33 +60,6 @@ def render_system_prompt_input(title: str = "System Prompt") -> str:
         value=get_system_prompt(),
         height=SYSTEM_PROMPT_INPUT_HEIGHT,
     )
-
-
-def get_model_response(diff: str, system_prompt: str) -> List[str]:
-    """
-    Get model response based on selected API provider.
-
-    Args:
-        diff: Code diff to analyze
-        system_prompt: System prompt for the model
-
-    Returns:
-        List of concern types
-    """
-    selected_api = get_api_provider()
-
-    if selected_api == "openai":
-        api_key = os.getenv("OPENAI_API_KEY")
-        model_response = openai_api_call(api_key, diff, system_prompt)
-        # Parse OpenAI response (integrated from parse_model_response)
-        prediction_data = json.loads(model_response)
-        return prediction_data.get("types", [])
-    elif selected_api == "lmstudio":
-        model_name = get_model_name()
-        predicted_types, _ = llms.api_call(model_name, diff, system_prompt)
-        return predicted_types
-    else:
-        raise ValueError(f"Unsupported API provider: {selected_api}")
 
 
 def calculate_evaluation_metrics(results_df: pd.DataFrame) -> Dict[str, Any]:
@@ -123,7 +97,14 @@ def process_single_case(row: pd.Series, system_prompt: str) -> Dict[str, Any]:
         shas = json.loads(row[SHAS_COLUMN]) if row[SHAS_COLUMN] else []
 
         # Get model prediction
-        predicted_concern_types = get_model_response(diff, system_prompt)
+        model_name = get_model_name()
+        print(f"Model name: {model_name}")
+        predicted_concern_types = llms.api_call(
+            model_name=model_name,
+            commit=diff,
+            system_prompt=system_prompt,
+            api_key=OPENAI_KEY,
+        )
 
         return {
             "predicted_types": predicted_concern_types,
@@ -147,17 +128,7 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
         return
 
     # Pre-load LM Studio model if needed
-    selected_api = get_api_provider()
-    if selected_api == "lmstudio":
-        model_name = get_model_name()
-        if model_name:
-            with st.spinner(f"Loading model {model_name}..."):
-                try:
-                    llms.load_model(model_name)
-                    st.success(f"✅ Model loaded successfully!")
-                except Exception as e:
-                    st.error(f"❌ Failed to load model: {e}")
-                    return
+    model_name = get_model_name()
 
     # Process all cases using pandas delegation
     with st.status("Running batch evaluation...", expanded=True) as status:
@@ -187,7 +158,7 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
                         if case_result["actual_types"]
                         else "None"
                     ),
-                    "Exact_Match": "Match" if metrics["exact_match"] else "No Match",
+                    "Status": "Match" if metrics["exact_match"] else "No Match",
                     "Case_Precision": metrics["precision"],
                     "Case_Recall": metrics["recall"],
                     "Case_F1": metrics["f1"],
@@ -250,7 +221,14 @@ def show_direct_input() -> None:
         st.divider()
         st.header("📊 Analysis Results")
         with st.spinner("Analyzing code diff..."):
-            predicted_concern_types = get_model_response(diff, system_prompt)
+            model_name = get_model_name()
+            print(f"Model name: {model_name}")
+            predicted_concern_types = llms.api_call(
+                model_name=model_name,
+                commit=diff,
+                system_prompt=system_prompt,
+                api_key=OPENAI_KEY,
+            )
 
             st.subheader("Concern Classification Results")
             analysis_results_df = pd.DataFrame(

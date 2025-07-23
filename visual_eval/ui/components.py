@@ -69,7 +69,6 @@ def render_results_table(evaluation_results_df: pd.DataFrame) -> None:
         "Actual_Types",
         "Status",
         "SHAs",
-        "Model_Reasoning",
     ]
 
     processed_df = evaluation_results_df.dropna(subset=["Status"], how="any")
