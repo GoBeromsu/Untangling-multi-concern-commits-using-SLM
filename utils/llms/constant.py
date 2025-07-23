@@ -45,9 +45,8 @@ RESPONSE_SCHEMA: Dict[str, Any] = {
                 "enum": COMMIT_TYPES,
             },
         },
-        "reason": {"type": "string"},
     },
-    "required": ["types", "reason"],
+    "required": ["types"],
     "additionalProperties": False,
 }
 

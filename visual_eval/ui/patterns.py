@@ -2,14 +2,7 @@
 Common patterns and utilities following frontend design principles.
 """
 
-# Wrapper for visual_eval compatibility - delegates to unified utils.llms module
-from utils.llms.response import parse_model_response as _parse_model_response
 from typing import Dict, Any, Tuple, List
-
-
-def parse_model_response(model_response: str) -> Tuple[List[str], str]:
-    """Parse model response wrapper for visual_eval compatibility."""
-    return _parse_model_response(model_response)
 
 
 def extract_test_case_data(

@@ -1,10 +1,10 @@
 """Response parsing utilities for LLM outputs (visual_eval standard)."""
 
 import json
-from typing import List, Tuple, Set
+from typing import List, Set
 
 
-def parse_model_response(model_response: str) -> Tuple[List[str], str]:
+def parse_model_response(model_response: str) -> List[str]:
     """
     Parse model response with consistent error handling (visual_eval standard).
 
@@ -12,20 +12,11 @@ def parse_model_response(model_response: str) -> Tuple[List[str], str]:
         model_response: JSON string from model API
 
     Returns:
-        Tuple of (concern_types, reasoning)
+        List of concern types
     """
-    try:
-        prediction_data = json.loads(model_response)
-        predicted_concern_types = prediction_data.get("types", [])
-        model_reasoning = prediction_data.get("reason", "No reasoning provided")
-        return predicted_concern_types, model_reasoning
-    except json.JSONDecodeError as e:
-        return (
-            [],
-            f"JSON Parse Error: {str(e)}. Raw response: {model_response[:200]}...",
-        )
-    except Exception as e:
-        return [], f"Parse Error: {str(e)}. Raw response: {model_response[:200]}..."
+    prediction_data = json.loads(model_response)
+    predicted_concern_types = prediction_data.get("types", [])
+    return predicted_concern_types
 
 
 def parse_prediction_to_set(prediction: str) -> Set[str]:

@@ -69,7 +69,6 @@ def load_openai_client(model_name: str) -> Dict[str, Any]:
         "client": openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY")),
     }
 
-
 def get_openai_prediction(
     model_info: Dict[str, Any],
     user_prompt: str,

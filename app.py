@@ -5,6 +5,7 @@ import pandas as pd
 from typing import Dict, Any
 
 from dotenv import load_dotenv
+from utils.llms.response import parse_model_response
 from utils.prompt import get_system_prompt
 from visual_eval.llms.openai import openai_api_call
 from visual_eval.llms.lmstudio import (
@@ -19,9 +20,6 @@ from visual_eval.ui.components import (
     render_evaluation_metrics,
     render_results_table,
     create_column_config,
-)
-from visual_eval.ui.patterns import (
-    parse_model_response,
 )
 from visual_eval.ui.dataset import (
     get_available_datasets,
@@ -41,7 +39,6 @@ from utils.eval import calculate_metrics
 # Direct analysis result columns
 ANALYSIS_RESULT_COLUMNS = [
     "Predicted_Concern_Types",
-    "Model_Reasoning",
 ]
 
 # Evaluation result columns
@@ -53,7 +50,6 @@ EVALUATION_RESULT_COLUMNS = [
     "Case_Precision",
     "Case_Recall",
     "Case_F1",
-    "Model_Reasoning",
     "SHAs",
 ]
 
@@ -127,12 +123,11 @@ def process_single_case(row: pd.Series, system_prompt: str) -> Dict[str, Any]:
 
         # Get model prediction
         model_response = get_model_response(diff, system_prompt)
-        predicted_concern_types, model_reasoning = parse_model_response(model_response)
+        predicted_concern_types = parse_model_response(model_response)
 
         return {
             "predicted_types": predicted_concern_types,
             "actual_types": actual_concern_types,
-            "model_reasoning": model_reasoning,
             "shas": shas,
             "success": True,
         }
@@ -140,7 +135,6 @@ def process_single_case(row: pd.Series, system_prompt: str) -> Dict[str, Any]:
         return {
             "predicted_types": [],
             "actual_types": json.loads(row[TYPES_COLUMN]) if row[TYPES_COLUMN] else [],
-            "model_reasoning": f"API Error: {str(e)}",
             "shas": json.loads(row[SHAS_COLUMN]) if row[SHAS_COLUMN] else [],
             "success": False,
         }
@@ -193,8 +187,7 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
                         if case_result["actual_types"]
                         else "None"
                     ),
-                    "Status": "✅T" if metrics["exact_match"] else "❌T",
-                    "Model_Reasoning": case_result["model_reasoning"],
+                    "Exact_Match": "Match" if metrics["exact_match"] else "No Match",
                     "Case_Precision": metrics["precision"],
                     "Case_Recall": metrics["recall"],
                     "Case_F1": metrics["f1"],
@@ -258,35 +251,26 @@ def show_direct_input() -> None:
         st.header("📊 Analysis Results")
         with st.spinner("Analyzing code diff..."):
             model_response = get_model_response(diff, system_prompt)
-            predicted_concern_types, model_reasoning = parse_model_response(
-                model_response
+            predicted_concern_types = parse_model_response(model_response)
+
+            st.subheader("Concern Classification Results")
+            analysis_results_df = pd.DataFrame(
+                {
+                    "Predicted_Concern_Types": [
+                        (
+                            ", ".join(sorted(predicted_concern_types))
+                            if predicted_concern_types
+                            else "None"
+                        )
+                    ],
+                }
             )
-
-            if model_reasoning == "Failed to parse model response":
-                st.error("Failed to parse model response")
-                st.write("**Raw Model Response:**")
-                st.text(model_response)
-            else:
-                st.subheader("Concern Classification Results")
-                analysis_results_df = pd.DataFrame(
-                    {
-                        "Predicted_Concern_Types": [
-                            (
-                                ", ".join(sorted(predicted_concern_types))
-                                if predicted_concern_types
-                                else "None"
-                            )
-                        ],
-                        "Model_Reasoning": [model_reasoning],
-                    }
-                )
-
-                st.dataframe(
-                    analysis_results_df,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config=create_column_config(ANALYSIS_RESULT_COLUMNS),
-                )
+            st.dataframe(
+                analysis_results_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config=create_column_config(ANALYSIS_RESULT_COLUMNS),
+            )
     elif submitted and not diff.strip():
         st.warning("Please enter a code diff to analyze.")
 

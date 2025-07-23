@@ -115,9 +115,7 @@ if __name__ == "__main__":
                             diff=truncated_diff,
                             system_prompt=system_prompt,
                         )
-                        predicted_types, reasoning = llms.parse_model_response(
-                            prediction
-                        )
+                        predicted_types = llms.parse_model_response(prediction)
                     except Exception as e:
                         print(f"Error processing row {idx}: {e}")
                         predicted_types = []
