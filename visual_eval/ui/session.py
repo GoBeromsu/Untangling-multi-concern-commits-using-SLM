@@ -40,11 +40,6 @@ def set_available_models(models: List[str]) -> None:
     st.session_state[AVAILABLE_MODELS_KEY] = models
 
 
-def has_available_models() -> bool:
-    """Check if LM Studio models are already loaded in session."""
-    return AVAILABLE_MODELS_KEY in st.session_state
-
-
 def get_evaluation_results() -> Optional[pd.DataFrame]:
     """Get final evaluation results from session."""
     return st.session_state.get(EVALUATION_RESULTS_KEY)

@@ -139,12 +139,6 @@ index d0ee4f3..c2ab83c 100644
  
    private StreamProcessor startStreamProcessor(final StreamProcessorRule streamProcessorRule) {</commit_diff>
 
-<reasoning id="example-1">
-1.  Each code unit was reviewed and identified as either improving code readability (static imports) or enhancing test robustness by removing unused code and using asynchronous assertions.
-2.  These changes restructure the existing test code without altering its external behavior, which aligns perfectly with the definition of `refactor`.
-3.  The modifications are not fixing a bug (`fix`) or introducing a new capability (`feat`), but are solely focused on improving the internal quality and structure of the code.
-4.  Therefore, after evaluating all code units, the single, most appropriate label for the entire commit is `refactor`. 
-</reasoning>
 <label id="example-1">refactor</label>
 """
 
@@ -213,12 +207,6 @@ index 3850919..14fe677 100644
      )
 </commit_diff>
 
-<reasoning id="example-2">
-Step 1: Code Change Analysis
-- The diffs occur in test files for Dask, Pandas, and PySpark backends. The changes replace 'range(0, N)' usages with the simpler 'range(N)', removing the unnecessary '0' start argument. No test logic, expected values, or behaviors are altered—only the call style is improved for clarity and conciseness.
-Step 2: Label Classification Justification
-- According to the rules, 'refactor' is chosen because the code changes improve style and readability while keeping the tests' external behavior unchanged. Though these are test files, the change is not about adding or updating tests but about internal code quality. Thus, 'refactor' is correct, not 'test', since the motivation is structural improvement, not test coverage or logic changes.
-</reasoning>
 <label id="example-2">refactor</label>
 """
 
@@ -243,3 +231,45 @@ def get_system_prompt_with_message() -> str:
 def get_system_prompt_diff_only() -> str:
     """Return system prompt for classification using only diff information."""
     return f"{SYSTEM_PROMPT}\n\n# Examples\n\n{SHOT_1}\n\n{SHOT_2}"
+
+
+def get_zero_shot_prompt(include_message: bool = True) -> str:
+    """Return zero-shot prompt with optional commit message context."""
+    return SYSTEM_PROMPT
+
+
+def get_one_shot_prompt(include_message: bool = True) -> str:
+    """Return one-shot prompt with optional commit message context."""
+    if include_message:
+        shot_1_with_message = (
+            f"<commit_message>{SHOT_1_COMMIT_MESSAGE}</commit_message>\n{SHOT_1}"
+        )
+        return f"{SYSTEM_PROMPT}\n\n# Examples\n\n{shot_1_with_message}"
+    else:
+        return f"{SYSTEM_PROMPT}\n\n# Examples\n\n{SHOT_1}"
+
+
+def get_two_shot_prompt(include_message: bool = True) -> str:
+    """Return two-shot prompt with optional commit message context."""
+    if include_message:
+        shot_1_with_message = (
+            f"<commit_message>{SHOT_1_COMMIT_MESSAGE}</commit_message>\n{SHOT_1}"
+        )
+        shot_2_with_message = (
+            f"<commit_message>{SHOT_2_COMMIT_MESSAGE}</commit_message>\n{SHOT_2}"
+        )
+        return f"{SYSTEM_PROMPT}\n\n# Examples\n\n{shot_1_with_message}\n\n{shot_2_with_message}"
+    else:
+        return f"{SYSTEM_PROMPT}\n\n# Examples\n\n{SHOT_1}\n\n{SHOT_2}"
+
+
+def get_prompt_by_type(shot_type: str, include_message: bool = True) -> str:
+    """Return prompt based on shot type with optional commit message context."""
+    if shot_type == "Zero-shot":
+        return get_zero_shot_prompt(include_message)
+    elif shot_type == "One-shot":
+        return get_one_shot_prompt(include_message)
+    elif shot_type == "Two-shot":
+        return get_two_shot_prompt(include_message)
+    else:
+        return get_two_shot_prompt(include_message)  # Default to two-shot

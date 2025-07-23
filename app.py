@@ -7,7 +7,7 @@ from typing import Dict, Any
 from dotenv import load_dotenv
 
 from utils import llms
-from utils.prompt import get_system_prompt
+from utils.prompt import get_system_prompt_with_message, get_prompt_by_type
 from utils.llms.constant import (
     CODE_DIFF_INPUT_HEIGHT,
     SYSTEM_PROMPT_INPUT_HEIGHT,
@@ -57,7 +57,7 @@ def render_system_prompt_input(title: str = "System Prompt") -> str:
     st.subheader(title)
     return st.text_area(
         "Modify the system prompt:",
-        value=get_system_prompt(),
+        value=get_system_prompt_with_message(),
         height=SYSTEM_PROMPT_INPUT_HEIGHT,
     )
 
@@ -127,95 +127,109 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
         st.error("No test data available for evaluation")
         return
 
+    # Debug: Show prompt info
+    examples_count = system_prompt.count("<commit_diff")
+    has_commit_msg = "<commit_message>" in system_prompt
+    st.write(
+        f"📋 **Prompt Details:** {examples_count} examples, commit messages: {'✅' if has_commit_msg else '❌'}"
+    )
+
     # Pre-load LM Studio model if needed
     model_name = get_model_name()
 
+    # Create containers for stable rendering
+    status_container = st.container()
+    results_container = st.container()
+
     # Process all cases using pandas delegation
-    with st.status("Running batch evaluation...", expanded=True) as status:
-        st.write(f"Processing {len(df)} test cases...")
+    with status_container:
+        with st.status("Running batch evaluation...", expanded=True) as status:
+            st.write(f"Processing {len(df)} test cases...")
 
-        # Use pandas apply for batch processing
-        results = []
-        progress_bar = st.progress(0)
+            # Use pandas apply for batch processing
+            results = []
+            progress_bar = st.progress(0)
 
-        for i, (_, row) in enumerate(df.iterrows()):
-            case_result = process_single_case(row, system_prompt)
-            metrics = calculate_metrics(
-                case_result["predicted_types"], case_result["actual_types"]
+            for i, (_, row) in enumerate(df.iterrows()):
+                case_result = process_single_case(row, system_prompt)
+                metrics = calculate_metrics(
+                    case_result["predicted_types"], case_result["actual_types"]
+                )
+
+                # Combine results
+                results.append(
+                    {
+                        "Test_Index": i + 1,
+                        "Predicted_Types": (
+                            ", ".join(sorted(case_result["predicted_types"]))
+                            if case_result["predicted_types"]
+                            else "None"
+                        ),
+                        "Actual_Types": (
+                            ", ".join(sorted(case_result["actual_types"]))
+                            if case_result["actual_types"]
+                            else "None"
+                        ),
+                        "Status": "Match" if metrics["exact_match"] else "No Match",
+                        "Case_Precision": metrics["precision"],
+                        "Case_Recall": metrics["recall"],
+                        "Case_F1": metrics["f1"],
+                        "SHAs": (
+                            ", ".join(case_result["shas"])
+                            if case_result["shas"]
+                            else "None"
+                        ),
+                    }
+                )
+
+                progress_bar.progress((i + 1) / len(df))
+
+                # Show warning for failed cases
+                if not case_result["success"]:
+                    st.warning(f"⚠️ API error for case {i+1}")
+
+            # Create results DataFrame using pandas
+            evaluation_results_df = pd.DataFrame(results)
+            status.update(label="Evaluation complete!", state="complete")
+
+    # Display results in stable container
+    with results_container:
+        metrics = calculate_evaluation_metrics(evaluation_results_df)
+        render_evaluation_metrics(metrics, len(df))
+        render_results_table(evaluation_results_df)
+
+        # Store and download results
+        set_evaluation_results(evaluation_results_df)
+
+        if not evaluation_results_df.empty:
+            download_df = evaluation_results_df.drop(
+                columns=["Case_Precision", "Case_Recall", "Case_F1"]
             )
-
-            # Combine results
-            results.append(
-                {
-                    "Test_Index": i + 1,
-                    "Predicted_Types": (
-                        ", ".join(sorted(case_result["predicted_types"]))
-                        if case_result["predicted_types"]
-                        else "None"
-                    ),
-                    "Actual_Types": (
-                        ", ".join(sorted(case_result["actual_types"]))
-                        if case_result["actual_types"]
-                        else "None"
-                    ),
-                    "Status": "Match" if metrics["exact_match"] else "No Match",
-                    "Case_Precision": metrics["precision"],
-                    "Case_Recall": metrics["recall"],
-                    "Case_F1": metrics["f1"],
-                    "SHAs": (
-                        ", ".join(case_result["shas"])
-                        if case_result["shas"]
-                        else "None"
-                    ),
-                }
+            csv_data = download_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Results CSV",
+                data=csv_data,
+                file_name=f"evaluation_results_{len(download_df)}_cases.csv",
+                mime="text/csv",
+                use_container_width=True,
             )
-
-            progress_bar.progress((i + 1) / len(df))
-
-            # Show warning for failed cases
-            if not case_result["success"]:
-                st.warning(f"⚠️ API error for case {i+1}")
-
-        # Create results DataFrame using pandas
-        evaluation_results_df = pd.DataFrame(results)
-        status.update(label="Evaluation complete!", state="complete")
-
-    # Display results
-    metrics = calculate_evaluation_metrics(evaluation_results_df)
-    render_evaluation_metrics(metrics, len(df))
-    render_results_table(evaluation_results_df)
-
-    # Store and download results
-    set_evaluation_results(evaluation_results_df)
-
-    if not evaluation_results_df.empty:
-        download_df = evaluation_results_df.drop(
-            columns=["Case_Precision", "Case_Recall", "Case_F1"]
-        )
-        csv_data = download_df.to_csv(index=False)
-        st.download_button(
-            label="📥 Download Results CSV",
-            data=csv_data,
-            file_name=f"evaluation_results_{len(download_df)}_cases.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
 
 
 def show_direct_input() -> None:
     """Render UI interface for direct code diff input and concern analysis."""
-    with st.form("direct_analysis_form"):
-        diff = st.text_area(
-            "Enter your code diff:",
-            placeholder="Paste the output of `git diff` here...",
-            height=CODE_DIFF_INPUT_HEIGHT,
-        )
+    # Get global prompt settings
+    shot_type = st.session_state.get("global_shot_type", "Two-shot")
+    include_message = st.session_state.get("global_include_message", True)
+    system_prompt = get_prompt_by_type(shot_type, include_message)
 
-        system_prompt = render_system_prompt_input()
+    diff = st.text_area(
+        "📝 Code Diff",
+        placeholder="Paste the output of `git diff` here...",
+        height=CODE_DIFF_INPUT_HEIGHT,
+        help="Copy and paste your git diff output for analysis",
+    )
 
-        submitted = st.form_submit_button(
-            "Analyze Code Diff", type="primary", use_container_width=True
-        )
+    submitted = st.button("🎯 Analyze Diff", type="primary", use_container_width=True)
 
     if submitted and diff.strip():
         st.divider()
@@ -260,18 +274,20 @@ def show_csv_input() -> None:
         st.error("No CSV test dataset files found in datasets directory")
         st.stop()
 
-    with st.form("batch_evaluation_form"):
-        selected_dataset = st.selectbox(
-            "Select concern classification test dataset:",
-            available_dataset_files,
-            format_func=lambda x: f"{os.path.basename(x)} ({os.path.dirname(x)})",
-        )
+    # Get global prompt settings
+    shot_type = st.session_state.get("global_shot_type", "Two-shot")
+    include_message = st.session_state.get("global_include_message", True)
+    system_prompt = get_prompt_by_type(shot_type, include_message)
 
-        system_prompt = render_system_prompt_input("Concern Analysis Prompt Template")
+    selected_dataset = st.selectbox(
+        "📊 Test Dataset",
+        available_dataset_files,
+        format_func=lambda x: f"📄 {os.path.basename(x)} ({os.path.dirname(x)})",
+    )
 
-        submitted = st.form_submit_button(
-            "Run Batch Evaluation", type="primary", use_container_width=True
-        )
+    submitted = st.button(
+        "🚀 Start Evaluation", type="primary", use_container_width=True
+    )
 
     if submitted:
         test_dataset = load_dataset(selected_dataset)
@@ -299,8 +315,29 @@ def main() -> None:
 
     # Main content
     st.header("📝 Concern Classification Analysis")
+
+    # Global prompt configuration
+    with st.container():
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            shot_type = st.selectbox(
+                "🎯 Prompt Method",
+                ["Zero-shot", "One-shot", "Two-shot"],
+                index=2,
+                key="global_shot_type",
+            )
+        with col2:
+            include_message = st.toggle(
+                "📝 Commit Messages", value=True, key="global_include_message"
+            )
+
+        # Global prompt preview
+        system_prompt = get_prompt_by_type(shot_type, include_message)
+        with st.expander("🔍 Preview Prompt", expanded=False):
+            st.code(system_prompt, language="text")
+
     direct_input_tab, batch_evaluation_tab = st.tabs(
-        ["Direct Code Diff Analysis", "Batch Dataset Evaluation"]
+        ["🔍 Direct Analysis", "📊 Batch Evaluation"]
     )
 
     with direct_input_tab:

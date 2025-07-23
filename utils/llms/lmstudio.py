@@ -22,11 +22,20 @@ def get_models() -> Tuple[List[str], str]:
         Tuple of (model_names_list, error_message)
     """
     try:
-        downloaded = lms.list_downloaded_models("llm")
-        model_names = [model.model_key for model in downloaded]
-        return model_names, ""
+        downloaded_models = lms.list_downloaded_models()
+        models = [model.model_key for model in downloaded_models]
+        if not models:
+            return (
+                [],
+                "No models downloaded in LM Studio. Please download a model first.",
+            )
+        return models, ""
+    except (ConnectionError, ImportError, AssertionError) as e:
+        error_type = type(e).__name__
+        error_msg = str(e) if str(e) else f"LM Studio {error_type} occurred"
+        return [], f"LM Studio error: {error_msg}"
     except Exception as e:
-        return [], f"Error: {e}"
+        return [], f"LM Studio error: {str(e)}"
 
 
 def load_model(model_name: str) -> Any:

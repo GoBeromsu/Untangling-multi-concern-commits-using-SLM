@@ -6,9 +6,6 @@ from utils.llms.lmstudio import get_models
 from utils.llms.constant import DEFAULT_OPENAI_MODEL
 from .session import (
     set_api_provider,
-    set_available_models,
-    has_available_models,
-    get_available_models,
     get_model_name,
 )
 
@@ -37,26 +34,21 @@ def setup_lmstudio_api() -> bool:
     Returns:
         True if setup successful, False otherwise
     """
-    # Load available models if not already loaded
-    if not has_available_models():
-        with st.spinner("Loading available models..."):
-            models, error_msg = get_models()
-            if not models:
-                st.error(f"❌ No models available: {error_msg}")
-                return False
-            set_available_models(models)
+    with st.spinner("Loading available models..."):
+        models, error_msg = get_models()
 
-    # Model selection with session state key for persistence
-    available_models = get_available_models()
-    if not available_models:
-        st.error("❌ No models available in LM Studio")
-        return False
+        if error_msg:
+            st.warning(f"⚠️ LM Studio auto-detection failed: {error_msg}")
+            st.info("💡 You can still manually enter your model name below")
+        else:
+            st.success(f"✅ Found {len(models)} available models")
 
     selected_model = st.selectbox(
         "Select Model:",
-        available_models,
+        models,
         help="Choose a model loaded in LM Studio",
     )
+
     set_api_provider("lmstudio", selected_model)
     st.success(f"✅ LM Studio configured with model: **{selected_model}**")
     return True
