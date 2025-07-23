@@ -1,5 +1,6 @@
 """Unified LM Studio API utilities for all experiments."""
 
+import json
 from typing import List, Tuple, Dict, Any
 import time
 import lmstudio as lms
@@ -40,12 +41,11 @@ def load_model(model_name: str) -> Any:
     Returns:
         Loaded model instance
     """
-    if model_name not in loaded_models:
-        try:
-            model = lms.llm(model_name, config=LMSTUDIO_MODEL_CONFIG)
-            loaded_models[model_name] = model
-        except Exception as e:
-            raise RuntimeError(f"Failed to load model {model_name}: {e}")
+    try:
+        model = lms.llm(model_name, config=LMSTUDIO_MODEL_CONFIG)
+        loaded_models[model_name] = model
+    except Exception as e:
+        raise RuntimeError(f"Failed to load model {model_name}: {e}")
 
     return loaded_models[model_name]
 
@@ -70,13 +70,9 @@ def api_call(
     Returns:
         Tuple of (JSON string containing structured response, inference_time_in_seconds)
     """
-    start_time = time.time()
-
     try:
-        # Load model when actually needed
         model = load_model(model_name)
 
-        # Prepare messages in correct format for LM Studio
         messages = {
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -84,7 +80,6 @@ def api_call(
             ]
         }
 
-        # Use model.respond() with proper message format and configuration
         response = model.respond(
             messages,
             config={
@@ -97,23 +92,10 @@ def api_call(
             },
         )
 
-        inference_time = time.time() - start_time
-
-        # Handle response based on LM Studio SDK format
-        if hasattr(response, "parsed") and response.parsed:
-            # For structured response, return the parsed JSON as string
-            import json
-
-            return json.dumps(response.parsed), inference_time
-        elif hasattr(response, "content") and response.content:
-            # For regular response, return content directly
-            return response.content, inference_time
-        else:
-            return "No response from model.", inference_time
+        return json.dumps(response.parsed)
 
     except Exception as e:
-        inference_time = time.time() - start_time
-        return f"An error occurred while calling LM Studio: {e}", inference_time
+        return f"An error occurred while calling LM Studio: {e}"
 
 
 def clear_cache() -> None:

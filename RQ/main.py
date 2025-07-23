@@ -117,12 +117,16 @@ if __name__ == "__main__":
 
                     system_prompt = get_prompt()
                     truncated_commit = truncate_commits(commits, context_window)
-                    print(truncated_commit)
+
                     try:
-                        prediction, inference_time = llms.api_call(
+
+                        api_call = lambda: llms.api_call(
                             model_name=model_name,
                             commit=truncated_commit,
                             system_prompt=system_prompt,
+                        )
+                        prediction, inference_time = eval_utils.measure_inference_time(
+                            api_call
                         )
                         predicted_types = llms.parse_model_response(prediction)
                     except Exception as e:

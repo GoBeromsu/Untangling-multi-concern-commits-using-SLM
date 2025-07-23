@@ -1,6 +1,7 @@
 """Evaluation utilities for parsing outputs and calculating metrics."""
 
-from typing import Dict, Any, Set, List, Tuple
+import time
+from typing import Dict, Any, Set, List, Tuple, Callable
 import json
 import re
 import pandas as pd
@@ -8,6 +9,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 from collections import Counter
+
+
+def measure_inference_time(func: Callable) -> Tuple[Any, float]:
+    """Measure the execution time of a function."""
+    start_time = time.time()
+    result = func()
+    execution_time = time.time() - start_time
+    return result, execution_time
 
 
 def load_dataset(dataset_split: str) -> pd.DataFrame:
