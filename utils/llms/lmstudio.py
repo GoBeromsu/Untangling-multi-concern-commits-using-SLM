@@ -57,11 +57,14 @@ def api_call(
 ) -> List[str]:
     """
     Call LM Studio API for commit classification with inference time measurement.
+    
+    Note: system_prompt parameter is kept for compatibility but not used.
+    The system prompt should be configured in LM Studio desktop app's prompt template.
 
     Args:
         model_name: Name of the model to use
         commit: Commit content to analyze
-        system_prompt: System prompt for the model
+        system_prompt: System prompt (kept for compatibility, use LM Studio template instead)
         temperature: Sampling temperature (0.0 for greedy decoding)
         max_tokens: Maximum tokens to generate
 
@@ -71,9 +74,9 @@ def api_call(
     try:
         model = load_model(model_name)
 
+        # Send only user content - system prompt is handled by LM Studio template
         messages = {
             "messages": [
-                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": commit},
             ]
         }
