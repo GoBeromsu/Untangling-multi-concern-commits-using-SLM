@@ -1,8 +1,6 @@
 """Unified LM Studio API utilities for all experiments."""
 
-import json
 from typing import List, Tuple, Dict, Any
-import time
 import lmstudio as lms
 
 from .constant import (
@@ -56,7 +54,7 @@ def api_call(
     system_prompt: str,
     temperature: float = DEFAULT_TEMPERATURE,
     max_tokens: int = DEFAULT_MAX_TOKENS,
-) -> Tuple[str, float]:
+) -> Tuple[List[str], float]:
     """
     Call LM Studio API for commit classification with inference time measurement.
 
@@ -68,7 +66,7 @@ def api_call(
         max_tokens: Maximum tokens to generate
 
     Returns:
-        Tuple of (JSON string containing structured response, inference_time_in_seconds)
+        Tuple of (List of concern types, inference_time_in_seconds)
     """
     try:
         model = load_model(model_name)
@@ -92,10 +90,10 @@ def api_call(
             },
         )
 
-        return json.dumps(response.parsed)
+        return response.parsed.get("types", [])
 
     except Exception as e:
-        return f"An error occurred while calling LM Studio: {e}"
+        raise RuntimeError(f"An error occurred while calling LM Studio: {e}")
 
 
 def clear_cache() -> None:

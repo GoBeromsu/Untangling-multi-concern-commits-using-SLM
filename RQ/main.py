@@ -125,10 +125,9 @@ if __name__ == "__main__":
                             commit=truncated_commit,
                             system_prompt=system_prompt,
                         )
-                        prediction, inference_time = eval_utils.measure_inference_time(
-                            api_call
+                        predicted_types, inference_time = (
+                            eval_utils.measure_inference_time(api_call)
                         )
-                        predicted_types = llms.parse_model_response(prediction)
                     except Exception as e:
                         print(f"Error processing row {idx}: {e}")
                         predicted_types = []

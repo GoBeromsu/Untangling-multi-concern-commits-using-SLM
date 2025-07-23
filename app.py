@@ -2,16 +2,14 @@ import os
 import json
 import streamlit as st
 import pandas as pd
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from dotenv import load_dotenv
-from utils.llms.response import parse_model_response
+
+from utils import llms
 from utils.prompt import get_system_prompt
 from visual_eval.llms.openai import openai_api_call
-from visual_eval.llms.lmstudio import (
-    api_call,
-    load_model,
-)
+from visual_eval.llms.lmstudio import load_model
 from visual_eval.llms.constant import (
     CODE_DIFF_INPUT_HEIGHT,
     SYSTEM_PROMPT_INPUT_HEIGHT,
@@ -64,7 +62,7 @@ def render_system_prompt_input(title: str = "System Prompt") -> str:
     )
 
 
-def get_model_response(diff: str, system_prompt: str) -> str:
+def get_model_response(diff: str, system_prompt: str) -> List[str]:
     """
     Get model response based on selected API provider.
 
@@ -73,16 +71,20 @@ def get_model_response(diff: str, system_prompt: str) -> str:
         system_prompt: System prompt for the model
 
     Returns:
-        JSON string containing the model response
+        List of concern types
     """
     selected_api = get_api_provider()
 
     if selected_api == "openai":
         api_key = os.getenv("OPENAI_API_KEY")
-        return openai_api_call(api_key, diff, system_prompt)
+        model_response = openai_api_call(api_key, diff, system_prompt)
+        # Parse OpenAI response (integrated from parse_model_response)
+        prediction_data = json.loads(model_response)
+        return prediction_data.get("types", [])
     elif selected_api == "lmstudio":
         model_name = get_model_name()
-        return api_call(model_name, diff, system_prompt)
+        predicted_types, _ = llms.api_call(model_name, diff, system_prompt)
+        return predicted_types
     else:
         raise ValueError(f"Unsupported API provider: {selected_api}")
 
@@ -122,8 +124,7 @@ def process_single_case(row: pd.Series, system_prompt: str) -> Dict[str, Any]:
         shas = json.loads(row[SHAS_COLUMN]) if row[SHAS_COLUMN] else []
 
         # Get model prediction
-        model_response = get_model_response(diff, system_prompt)
-        predicted_concern_types = parse_model_response(model_response)
+        predicted_concern_types = get_model_response(diff, system_prompt)
 
         return {
             "predicted_types": predicted_concern_types,
@@ -250,8 +251,7 @@ def show_direct_input() -> None:
         st.divider()
         st.header("📊 Analysis Results")
         with st.spinner("Analyzing code diff..."):
-            model_response = get_model_response(diff, system_prompt)
-            predicted_concern_types = parse_model_response(model_response)
+            predicted_concern_types = get_model_response(diff, system_prompt)
 
             st.subheader("Concern Classification Results")
             analysis_results_df = pd.DataFrame(
