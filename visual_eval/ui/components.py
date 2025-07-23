@@ -5,7 +5,7 @@ Reusable UI components for Streamlit interface.
 import streamlit as st
 import pandas as pd
 from typing import List, Dict, Any
-from ..llms.constant import RECENT_RESULTS_DISPLAY_LIMIT
+from ..constant import RECENT_RESULTS_DISPLAY_LIMIT
 
 
 def render_evaluation_metrics(metrics: Dict[str, Any], dataset_size: int) -> None:

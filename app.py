@@ -8,9 +8,8 @@ from dotenv import load_dotenv
 
 from utils import llms
 from utils.prompt import get_system_prompt
-from visual_eval.llms.openai import openai_api_call
-from visual_eval.llms.lmstudio import load_model
-from visual_eval.llms.constant import (
+from utils.llms.openai import openai_api_call
+from utils.llms.constant import (
     CODE_DIFF_INPUT_HEIGHT,
     SYSTEM_PROMPT_INPUT_HEIGHT,
 )
@@ -154,7 +153,7 @@ def execute_batch_concern_evaluation(df: pd.DataFrame, system_prompt: str) -> No
         if model_name:
             with st.spinner(f"Loading model {model_name}..."):
                 try:
-                    load_model(model_name)
+                    llms.load_model(model_name)
                     st.success(f"✅ Model loaded successfully!")
                 except Exception as e:
                     st.error(f"❌ Failed to load model: {e}")

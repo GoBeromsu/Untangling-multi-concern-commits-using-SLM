@@ -2,7 +2,7 @@
 
 import os
 import streamlit as st
-from visual_eval.llms.lmstudio import get_models
+from utils.llms.lmstudio import get_models
 from .session import (
     set_api_provider,
     set_available_models,

@@ -1,7 +1,7 @@
 """Unified OpenAI API utilities for all experiments."""
 
 import openai
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import os
 from dotenv import load_dotenv
 
@@ -68,6 +68,7 @@ def load_openai_client(model_name: str) -> Dict[str, Any]:
         "model_name": model_name,
         "client": openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY")),
     }
+
 
 def get_openai_prediction(
     model_info: Dict[str, Any],
