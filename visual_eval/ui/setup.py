@@ -37,26 +37,54 @@ def setup_lmstudio_api() -> bool:
     Returns:
         True if setup successful, False otherwise
     """
-    # Load available models if not already loaded
+    # Try to load available models (simple approach like main.py)
     if not has_available_models():
         with st.spinner("Loading available models..."):
-            models, error_msg = get_models()
-            if not models:
-                st.error(f"❌ No models available: {error_msg}")
+            try:
+                models, error_msg = get_models()
+                
+                if models:  # Success - we have models
+                    set_available_models(models)
+                    st.success(f"✅ Found {len(models)} available models")
+                else:
+                    # Show error but also provide manual option
+                    if error_msg:
+                        st.warning(f"⚠️ Auto-detection failed: {error_msg}")
+                    st.info("💡 You can manually enter a model name below")
+                    
+                    # Manual model input as fallback
+                    manual_model = st.text_input(
+                        "Manual Model Name:",
+                        placeholder="e.g., microsoft/phi-4",
+                        help="Enter the exact model name as it appears in LM Studio"
+                    )
+                    
+                    if manual_model.strip():
+                        set_available_models([manual_model.strip()])
+                        st.info(f"Using manual model: {manual_model.strip()}")
+                    else:
+                        return False
+                        
+            except Exception as e:
+                st.error(f"❌ LM Studio setup failed: {str(e)}")
+                st.info("💡 Make sure LM Studio is running with a model loaded")
                 return False
-            set_available_models(models)
 
-    # Model selection with session state key for persistence
+    # Model selection
     available_models = get_available_models()
     if not available_models:
-        st.error("❌ No models available in LM Studio")
         return False
 
-    selected_model = st.selectbox(
-        "Select Model:",
-        available_models,
-        help="Choose a model loaded in LM Studio",
-    )
+    if len(available_models) == 1:
+        selected_model = available_models[0]
+        st.info(f"Using model: **{selected_model}**")
+    else:
+        selected_model = st.selectbox(
+            "Select Model:",
+            available_models,
+            help="Choose a model loaded in LM Studio",
+        )
+    
     set_api_provider("lmstudio", selected_model)
     st.success(f"✅ LM Studio configured with model: **{selected_model}**")
     return True
