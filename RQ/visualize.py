@@ -2,7 +2,7 @@
 
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Final
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -15,9 +15,9 @@ import utils.eval as eval_utils
 
 RESULTS_BASE_DIR = Path("results")
 ANALYSIS_OUTPUT_DIR = Path("results/analysis")
-CONTEXT_LENGTH = [1024, 2048, 4096, 8192, 12288]
-EXPERIMENT_TYPES = ["with_message", "diff_only"]
-DF_COLUMNS = [
+CONTEXT_LENGTH: Final[Tuple[int, ...]] = (1024, 2048, 4096, 8192, 12288)
+EXPERIMENT_TYPES: Final[Tuple[str, ...]] = ("with_message", "diff_only")
+DF_COLUMNS: Final[Tuple[str, ...]] = (
     "predicted_types",
     "actual_types",
     "inference_time",
@@ -29,8 +29,9 @@ DF_COLUMNS = [
     "recall",
     "f1",
     "accuracy",
-]
-METRICS = ["accuracy", "f1", "precision", "recall"]
+)
+METRICS: Final[Tuple[str, ...]] = ("accuracy", "f1", "precision", "recall")
+AGGREGATION_METRICS: Final[Tuple[str, ...]] = (*METRICS, "inference_time")
 
 plt.style.use("default")
 sns.set_palette("husl")
@@ -83,357 +84,94 @@ def preprocess_experimental_data() -> pd.DataFrame:
             df["count"] = df["actual_types"].apply(lambda x: len(eval(x)))
 
             # Calculate metrics for each row
-            predicted_types = df["predicted_types"].apply(eval)
-            actual_types = df["actual_types"].apply(eval)
-
-            # Calculate per-row metrics using eval_utils
-            metrics = eval_utils.calculate_metrics(predicted_types, actual_types)
+            metrics_df = df.apply(
+                lambda row: eval_utils.calculate_metrics(
+                    eval(row["predicted_types"]), eval(row["actual_types"])
+                ),
+                axis=1,
+                result_type="expand",
+            )
 
             # Extract individual metrics
-            df["precision"] = metrics["precision"]
-            df["recall"] = metrics["recall"]
-            df["f1"] = metrics["f1"]
-            df["accuracy"] = metrics["exact_match"]
+            df["precision"] = metrics_df["precision"]
+            df["recall"] = metrics_df["recall"]
+            df["f1"] = metrics_df["f1"]
+            df["accuracy"] = metrics_df["exact_match"]
             all_dataframes.append(df)
 
     result = pd.concat(all_dataframes, ignore_index=True)
     return result
 
 
-def create_metrics_by_context_window(df: pd.DataFrame) -> None:
-    """Create visualization of metrics by context window using calculated metrics."""
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    axes = axes.flatten()
+def create_results_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Create a summary results table with aggregated metrics.
 
-    for i, metric in enumerate(METRICS):
-        ax = axes[i]
+    Args:
+        df: Input DataFrame with raw experimental results
 
-        # Plot for each experiment type
-        for exp_type in EXPERIMENT_TYPES:
-            data = df[df["experiment_type"] == exp_type]
-            if data.empty:
-                continue
-
-            # Group by context window and calculate mean
-            grouped = data.groupby("context_window")[metric].mean().reset_index()
-
-            ax.plot(
-                grouped["context_window"],
-                grouped[metric],
-                marker="o",
-                label=exp_type.replace("_", " ").title(),
-                linewidth=2,
-                markersize=8,
-            )
-
-        ax.set_title(f"{metric.title()} by Context Window", fontsize=14)
-        ax.set_xlabel("Context Window Size", fontsize=12)
-        ax.set_ylabel(metric.title(), fontsize=12)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        ax.set_xscale("log", base=2)
-
-    plt.tight_layout()
-    ANALYSIS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    plt.savefig(
-        ANALYSIS_OUTPUT_DIR / "metrics_by_context_window.png",
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-    # Save as table using eval_utils approach
-    table_data = []
-    for exp_type in EXPERIMENT_TYPES:
-        for context_window in CONTEXT_LENGTH:
-            data = df[
-                (df["experiment_type"] == exp_type)
-                & (df["context_window"] == context_window)
-            ]
-            if not data.empty:
-                row = {"experiment_type": exp_type, "context_window": context_window}
-                for metric in METRICS:
-                    row[metric] = data[metric].mean()
-                table_data.append(row)
-
-    table_df = pd.DataFrame(table_data)
-    eval_utils.save_results(
-        table_df, {}, str(ANALYSIS_OUTPUT_DIR / "metrics_by_context_window")
+    Returns:
+        DataFrame with columns:
+        - Model: Model name
+        - Context Length: Input context length
+        - With Message: Yes/No for message inclusion
+        - Accuracy, F1, Precision, Recall: Aggregated metrics
+        - inference_time: Average inference time in ms
+    """
+    summary_df = (
+        df.groupby(["model", "context_len", "with_message"])
+        .agg({metric: "mean" for metric in AGGREGATION_METRICS})
+        .reset_index()
     )
 
-
-def create_metrics_by_concern_count(df: pd.DataFrame) -> None:
-    """Create visualization of metrics by concern count using actual_types length."""
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    axes = axes.flatten()
-
-    for i, metric in enumerate(METRICS):
-        ax = axes[i]
-
-        # Plot for each experiment type
-        for exp_type in EXPERIMENT_TYPES:
-            data = df[df["experiment_type"] == exp_type]
-            if data.empty:
-                continue
-
-            # Group by actual concern count (calculated from actual_types)
-            grouped = data.groupby("actual_count")[metric].mean().reset_index()
-
-            ax.plot(
-                grouped["actual_count"],
-                grouped[metric],
-                marker="o",
-                label=exp_type.replace("_", " ").title(),
-                linewidth=2,
-                markersize=8,
-            )
-
-        ax.set_title(f"{metric.title()} by Actual Concern Count", fontsize=14)
-        ax.set_xlabel("Number of Concerns", fontsize=12)
-        ax.set_ylabel(metric.title(), fontsize=12)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        ax.set_xticks([1, 2, 3])
-
-    plt.tight_layout()
-    plt.savefig(
-        ANALYSIS_OUTPUT_DIR / "metrics_by_concern_count.png",
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-    # Save as table using eval_utils approach
-    table_data = []
-    for exp_type in EXPERIMENT_TYPES:
-        for concern_count in [1, 2, 3]:
-            data = df[
-                (df["experiment_type"] == exp_type)
-                & (df["actual_count"] == concern_count)
-            ]
-            if not data.empty:
-                row = {"experiment_type": exp_type, "concern_count": concern_count}
-                for metric in METRICS:
-                    row[metric] = data[metric].mean()
-                table_data.append(row)
-
-    table_df = pd.DataFrame(table_data)
-    eval_utils.save_results(
-        table_df, {}, str(ANALYSIS_OUTPUT_DIR / "metrics_by_concern_count")
+    # Transform columns directly (no duplication)
+    summary_df = summary_df.rename(
+        columns={
+            "model": "Model",
+            "context_len": "Context Length",
+            "with_message": "With Message",
+        }
     )
 
+    # Format specific columns
+    summary_df["With Message"] = summary_df["With Message"].map({1: "Yes", 0: "No"})
+    summary_df["Inference Time"] = summary_df["inference_time"]
 
-def create_comparison_plots(df: pd.DataFrame) -> None:
-    """Create comparison plots between with_message and diff_only using calculated metrics."""
-    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-
-    # Calculate average metrics for each experiment type using utils approach
-    comparison_data = []
-    for exp_type in EXPERIMENT_TYPES:
-        data = df[df["experiment_type"] == exp_type]
-        if not data.empty:
-            # Use calculate_batch_metrics for overall performance
-            batch_metrics = eval_utils.calculate_batch_metrics(
-                data[["predicted_types_parsed", "actual_types_parsed"]].rename(
-                    columns={
-                        "predicted_types_parsed": "predictions",
-                        "actual_types_parsed": "ground_truth",
-                    }
-                )
-            )
-            for metric in ["f1", "precision", "recall"]:
-                comparison_data.append(
-                    {
-                        "experiment_type": exp_type,
-                        "metric": metric,
-                        "value": batch_metrics[metric],
-                    }
-                )
-            # Add accuracy manually
-            comparison_data.append(
-                {
-                    "experiment_type": exp_type,
-                    "metric": "accuracy",
-                    "value": data["accuracy"].mean(),
-                }
-            )
-
-    comparison_df = pd.DataFrame(comparison_data)
-
-    # Create grouped bar plot
-    pivot = comparison_df.pivot(
-        index="metric", columns="experiment_type", values="value"
-    )
-    pivot.plot(kind="bar", ax=ax, width=0.8)
-
-    ax.set_title("Average Metrics Comparison: With Message vs Diff Only", fontsize=16)
-    ax.set_xlabel("Metrics", fontsize=12)
-    ax.set_ylabel("Average Score", fontsize=12)
-    ax.legend(title="Experiment Type", labels=["Diff Only", "With Message"])
-    ax.grid(True, alpha=0.3, axis="y")
-
-    # Rotate x-labels for better readability
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=0)
-
-    plt.tight_layout()
-    plt.savefig(
-        ANALYSIS_OUTPUT_DIR / "metrics_comparison.png", dpi=300, bbox_inches="tight"
-    )
-    plt.close()
-
-    # Save comparison table using eval_utils
-    eval_utils.save_results(
-        pivot.reset_index(), {}, str(ANALYSIS_OUTPUT_DIR / "metrics_comparison")
-    )
-
-
-def create_inference_time_vs_metrics(df: pd.DataFrame) -> None:
-    """Create linear visualization showing inference time vs all metrics (concern count agnostic)."""
-    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-
-    # Group by inference time bins and calculate mean for each metric
-    df_sorted = df.sort_values("inference_time")
-
-    # Create 15 equal-sized bins for smoother trend lines
-    num_bins = 15
-    bin_size = len(df_sorted) // num_bins
-
+    # Round metrics to 2 decimal places
     for metric in METRICS:
-        time_points = []
-        metric_points = []
+        summary_df[metric.capitalize()] = summary_df[metric].round(2)
 
-        for i in range(0, len(df_sorted), bin_size):
-            bin_data = df_sorted.iloc[i : i + bin_size]
-            if len(bin_data) > 0:
-                time_points.append(bin_data["inference_time"].mean())
-                metric_points.append(bin_data[metric].mean())
+    # Select and order final columns
+    display_columns = [
+        "Model",
+        "Context Length",
+        "With Message",
+        "Accuracy",
+        "F1",
+        "Precision",
+        "Recall",
+        "Inference Time",
+    ]
 
-        ax.plot(
-            time_points,
-            metric_points,
-            marker="o",
-            label=metric.title(),
-            linewidth=2,
-            markersize=6,
-        )
-
-    ax.set_xlabel("Inference Time (seconds)", fontsize=12)
-    ax.set_ylabel("Metric Score", fontsize=12)
-    ax.set_title("Inference Time vs All Metrics (All Concerns)", fontsize=14)
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    plt.savefig(
-        ANALYSIS_OUTPUT_DIR / "inference_time_vs_metrics.png",
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def create_context_window_vs_metrics(df: pd.DataFrame) -> None:
-    """Create linear visualization showing context window vs all metrics (concern count agnostic)."""
-    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-
-    # Group by context window and calculate mean for each metric
-    for metric in METRICS:
-        context_metrics = df.groupby("context_window")[metric].mean().reset_index()
-
-        ax.plot(
-            context_metrics["context_window"],
-            context_metrics[metric],
-            marker="o",
-            linewidth=2,
-            markersize=8,
-            label=metric.title(),
-        )
-
-    ax.set_xlabel("Context Window Size", fontsize=12)
-    ax.set_ylabel("Metric Score", fontsize=12)
-    ax.set_title("Context Window vs All Metrics (All Concerns)", fontsize=14)
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    ax.set_xscale("log", base=2)
-
-    plt.tight_layout()
-    plt.savefig(
-        ANALYSIS_OUTPUT_DIR / "context_window_vs_metrics.png",
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-    # Save as table with all metrics
-    table_data = []
-    for context_window in CONTEXT_LENGTH:
-        row = {"context_window": context_window}
-        for metric in METRICS:
-            context_data = df[df["context_window"] == context_window]
-            if not context_data.empty:
-                row[metric] = context_data[metric].mean()
-        table_data.append(row)
-
-    context_metrics_table = pd.DataFrame(table_data)
-    eval_utils.save_results(
-        context_metrics_table,
-        {},
-        str(ANALYSIS_OUTPUT_DIR / "context_window_vs_metrics"),
+    return summary_df[display_columns].sort_values(
+        ["Model", "Context Length", "With Message"]
     )
 
 
-def create_summary_statistics(df: pd.DataFrame) -> None:
-    """Create summary statistics table using calculated metrics."""
-    summary_stats = []
+def save_results_table(df: pd.DataFrame, output_path: Path) -> None:
+    """
+    Save the results table to a CSV file.
 
-    # Overall statistics
-    for metric in METRICS:
-        summary_stats.append(
-            {
-                "category": "Overall",
-                "metric": metric,
-                "mean": df[metric].mean(),
-                "std": df[metric].std(),
-                "min": df[metric].min(),
-                "max": df[metric].max(),
-            }
-        )
-
-    # By experiment type
-    for exp_type in EXPERIMENT_TYPES:
-        data = df[df["experiment_type"] == exp_type]
-        if not data.empty:
-            for metric in METRICS:
-                summary_stats.append(
-                    {
-                        "category": exp_type,
-                        "metric": metric,
-                        "mean": data[metric].mean(),
-                        "std": data[metric].std(),
-                        "min": data[metric].min(),
-                        "max": data[metric].max(),
-                    }
-                )
-
-    summary_df = pd.DataFrame(summary_stats)
-    eval_utils.save_results(
-        summary_df, {}, str(ANALYSIS_OUTPUT_DIR / "summary_statistics")
-    )
-
-
-def generate_visualization_report() -> None:
-    """Generate comprehensive visualization report with clear data preprocessing."""
-    df = preprocess_experimental_data()
-
-
-
-    create_metrics_by_context_window(df)
-    create_metrics_by_concern_count(df)
-    create_inference_time_vs_metrics(df)
-    create_context_window_vs_metrics(df)
-    create_comparison_plots(df)
-    create_summary_statistics(df)
+    Args:
+        df: Results DataFrame to save
+        output_path: Path to save the CSV file
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(output_path, index=False)
 
 
 if __name__ == "__main__":
-    generate_visualization_report()
+    """Generate comprehensive visualization report with clear data preprocessing."""
+    df = preprocess_experimental_data()
+    results_table = create_results_table(df)
+    save_results_table(results_table, ANALYSIS_OUTPUT_DIR / "results_table.csv")
