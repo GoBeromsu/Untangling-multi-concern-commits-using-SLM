@@ -17,11 +17,19 @@ import utils.llms as llms
 import utils.eval as eval_utils
 import utils.prompt as prompt_utils
 
-# contextWindow = [1024, 2048, 4096, 8192, 12288]
-contextWindow = [1024]
+# Data key constants
+COMMIT_MESSAGE_KEY = "commit_message"
+GIT_DIFF_KEY = "git_diff"
+MASKED_COMMIT_MESSAGE_KEY = "masked_commit_message"
+SHA_KEY = "sha"
+SHAS_KEY = "shas"
+TYPES_KEY = "types"
+
+contextWindow = [1024, 2048, 4096, 8192, 12288]
+# contextWindow = [1024]
 model_names = [
-    # "microsoft/phi-4",  # LM Studio model
-    "gpt-4o-mini",  # OpenAI model
+    "microsoft/phi-4",  # LM Studio model
+    # "gpt-4o-mini",  # OpenAI model
     # "gpt-4o",         # Uncomment for more expensive model
 ]
 encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding
@@ -29,18 +37,26 @@ encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
 
-def truncate_commits(commits: Dict[str, Dict[str, str]], context_window: int) -> str:
+def truncate_commits(
+    commits: Dict[str, Dict[str, str]],
+    context_window: int,
+    include_message: bool = True,
+) -> str:
     concern_count = len(commits)
     available_tokens_per_commit = context_window // concern_count
 
     messages, diffs = [], []
 
     for commit_data in commits.values():
-        message = commit_data["commit_message"]
-        diff = commit_data["git_diff"]
+        message = commit_data[COMMIT_MESSAGE_KEY]
+        diff = commit_data[GIT_DIFF_KEY]
 
-        message_tokens = encoding.encode(message)
-        remaining_tokens = available_tokens_per_commit - len(message_tokens)
+        if include_message:
+            message_tokens = encoding.encode(message)
+            remaining_tokens = available_tokens_per_commit - len(message_tokens)
+            messages.append(message)
+        else:
+            remaining_tokens = available_tokens_per_commit
 
         diff_tokens = encoding.encode(diff)
         truncated_diff = (
@@ -49,10 +65,12 @@ def truncate_commits(commits: Dict[str, Dict[str, str]], context_window: int) ->
             else encoding.decode(diff_tokens[:remaining_tokens])
         )
 
-        messages.append(message)
         diffs.append(truncated_diff)
 
-    return f"{'Commit Message: ' + '\n'.join(messages)}\n{'Diff: ' + '\n'.join(diffs)}"
+    if include_message:
+        return f"Commit Message: {' '.join(messages)}\nDiff: {' '.join(diffs)}"
+    else:
+        return f"Diff: {' '.join(diffs)}"
 
 
 def create_csv_with_headers(csv_path: Path) -> None:
@@ -67,8 +85,8 @@ if __name__ == "__main__":
     atomic_df = eval_utils.load_dataset("atomic")
 
     prompt_types = [
-        ("with_message", prompt_utils.get_system_prompt_with_message),
-        ("diff_only", prompt_utils.get_system_prompt_diff_only),
+        ("with_message", prompt_utils.get_zero_shot_prompt()),
+        ("diff_only", prompt_utils.get_zero_shot_prompt()),
     ]
 
     for model_name in model_names:
@@ -80,6 +98,9 @@ if __name__ == "__main__":
             prompt_dir = Path("results") / prompt_type
             prompt_dir.mkdir(parents=True, exist_ok=True)
 
+            # Determine if commit message should be included based on prompt type
+            include_message = prompt_type == "with_message"
+
             for context_window in contextWindow:
                 print(
                     f"\n=== Model: {model_name}, Prompt Type: {prompt_type}, Context Window: {context_window} ==="
@@ -90,19 +111,23 @@ if __name__ == "__main__":
                 create_csv_with_headers(csv_path)
 
                 for idx, row in tangled_df.iterrows():
-                    shas = json.loads(row["shas"])
+                    shas = json.loads(row[SHAS_KEY])
                     commits: Dict[str, str] = {}
                     for sha in shas:
-                        matching_row = atomic_df[atomic_df["sha"] == sha]
-                        commit_message = matching_row["masked_commit_message"].values[0]
-                        git_diff = matching_row["git_diff"].values[0]
+                        matching_row = atomic_df[atomic_df[SHA_KEY] == sha]
+                        commit_message = matching_row[MASKED_COMMIT_MESSAGE_KEY].values[
+                            0
+                        ]
+                        git_diff = matching_row[GIT_DIFF_KEY].values[0]
                         commits[sha] = {
-                            "commit_message": commit_message,
-                            "git_diff": git_diff,
+                            COMMIT_MESSAGE_KEY: commit_message,
+                            GIT_DIFF_KEY: git_diff,
                         }
 
-                    system_prompt = get_prompt()
-                    truncated_commit = truncate_commits(commits, context_window)
+                    system_prompt = get_prompt
+                    truncated_commit = truncate_commits(
+                        commits, context_window, include_message
+                    )
 
                     try:
                         api_call = lambda: llms.api_call(
@@ -121,9 +146,9 @@ if __name__ == "__main__":
 
                     result = {column: None for column in constant.DEFAULT_DF_COLUMNS}
                     result["predicted_types"] = predicted_types
-                    result["actual_types"] = json.loads(row["types"])
+                    result["actual_types"] = json.loads(row[TYPES_KEY])
                     result["inference_time"] = inference_time
-                    result["shas"] = shas
+                    result[SHAS_KEY] = shas
 
                     result_df = pd.DataFrame([result])
                     result_df.to_csv(csv_path, mode="a", header=False, index=False)

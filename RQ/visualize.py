@@ -15,7 +15,7 @@ import utils.eval as eval_utils
 
 RESULTS_BASE_DIR = Path("results")
 ANALYSIS_OUTPUT_DIR = Path("results/analysis")
-CONTEXT_WINDOWS = [1024, 2048, 4096, 8192, 12288]
+CONTEXT_LENGTH = [1024, 2048, 4096, 8192, 12288]
 EXPERIMENT_TYPES = ["with_message", "diff_only"]
 METRICS = ["accuracy", "f1", "precision", "recall"]
 
@@ -28,83 +28,70 @@ def load_and_calculate_metrics() -> pd.DataFrame:
     all_data = []
 
     for exp_type in EXPERIMENT_TYPES:
-        for context_window in CONTEXT_WINDOWS:
-            # Try multiple model name patterns
-            for model_pattern in ["microsoft_phi-4", "gpt-4o-mini", "gpt-4o"]:
-                csv_path = (
-                    RESULTS_BASE_DIR / exp_type / f"{model_pattern}_{context_window}.csv"
-                )
-                
-                if not csv_path.exists():
-                    continue
-                
-                df = pd.read_csv(csv_path)
-                
-                # Calculate metrics for each row
-                metrics_list = []
-                for _, row in df.iterrows():
-                    try:
-                        # Parse string representations of lists
-                        predicted_types = eval(row["predicted_types"]) if isinstance(row["predicted_types"], str) else row["predicted_types"]
-                        actual_types = eval(row["actual_types"]) if isinstance(row["actual_types"], str) else row["actual_types"]
-                        
-                        # Calculate metrics using utils.eval
-                        metrics = eval_utils.calculate_metrics(predicted_types, actual_types)
-                        
-                        metrics_list.append({
-                            "model": model_pattern,
-                            "context_window": context_window,
-                            "experiment_type": exp_type,
-                            "predicted_count": len(predicted_types),
-                            "actual_count": len(actual_types),
-                            "accuracy": float(metrics["exact_match"]),
-                            "f1": metrics["f1"],
-                            "precision": metrics["precision"],
-                            "recall": metrics["recall"],
-                            "inference_time": row.get("inference_time", 0.0)
-                        })
-                    except Exception as e:
-                        print(f"Error processing row: {e}")
-                        continue
-                
-                if metrics_list:
-                    all_data.extend(metrics_list)
-
-    return pd.DataFrame(all_data) if all_data else pd.DataFrame()
-
-
-def create_metrics_by_context_window(df: pd.DataFrame) -> None:
-    """Create visualization of metrics by context window."""
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    axes = axes.flatten()
-    
-    for i, metric in enumerate(METRICS):
-        ax = axes[i]
-        
-        # Prepare data for plotting
-        for exp_type in EXPERIMENT_TYPES:
-            data = df[df["experiment_type"] == exp_type]
-            if data.empty:
-                continue
-                
-            grouped = data.groupby("context_window")[metric].mean().reset_index()
-            
-            ax.plot(
-                grouped["context_window"],
-                grouped[metric],
-                marker='o',
-                label=exp_type.replace("_", " ").title(),
-                linewidth=2,
-                markersize=8
+        for context_window in CONTEXT_LENGTH:
+            csv_path = (
+                RESULTS_BASE_DIR / exp_type / f"microsoft_phi-4_{context_window}.csv"
             )
-        
-        ax.set_title(f'{metric.title()} by Context Window', fontsize=14)
-        ax.set_xlabel('Context Window Size', fontsize=12)
-        ax.set_ylabel(metric.title(), fontsize=12)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        ax.set_xscale('log', base=2)
-    
+
+            if not csv_path.exists():
+                continue
+
+            df = pd.read_csv(csv_path)
+
+            # Add experiment metadata
+            df["context_window"] = context_window
+            df["experiment_type"] = exp_type
+
+            all_data.append(df)
+
+    return pd.concat(all_data, ignore_index=True) if all_data else pd.DataFrame()
+
+
+def create_metrics_by_concern_count_visualization(df: pd.DataFrame) -> None:
+    """Create comprehensive visualization of metrics by concern count."""
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+    metrics = ["f1", "precision", "recall"]
+
+    for i, exp_type in enumerate(["with_message", "diff_only"]):
+        data = df[df["experiment_type"] == exp_type]
+
+        for j, metric in enumerate(metrics):
+            ax = axes[i, j]
+
+            count_combinations = []
+            metric_values = []
+            labels = []
+
+            for pred_count in [1, 2, 3]:
+                for actual_count in [1, 2, 3]:
+                    subset = data[
+                        (data["predicted_count"] == pred_count)
+                        & (data["actual_count"] == actual_count)
+                    ]
+
+                    if len(subset) > 0:
+                        count_combinations.append((pred_count, actual_count))
+                        metric_values.append(subset[metric].mean())
+                        labels.append(f"P{pred_count}/A{actual_count}")
+
+            if metric_values:
+                x_pos = np.arange(len(labels))
+                bars = ax.bar(x_pos, metric_values)
+
+                for idx, (pred, actual) in enumerate(count_combinations):
+                    bars[idx].set_color(
+                        "lightgreen" if pred == actual else "lightcoral"
+                    )
+
+                ax.set_title(
+                    f'{metric.title()} by Predicted/Actual Count\n({exp_type.replace("_", " ").title()})'
+                )
+                ax.set_xlabel("Predicted Count / Actual Count")
+                ax.set_ylabel(metric.title())
+                ax.set_xticks(x_pos)
+                ax.set_xticklabels(labels, rotation=45)
+                ax.grid(True, alpha=0.3)
+
     plt.tight_layout()
     ANALYSIS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     plt.savefig(
@@ -117,7 +104,7 @@ def create_metrics_by_context_window(df: pd.DataFrame) -> None:
     # Save as table
     table_data = []
     for exp_type in EXPERIMENT_TYPES:
-        for context_window in CONTEXT_WINDOWS:
+        for context_window in CONTEXT_LENGTH:
             data = df[(df["experiment_type"] == exp_type) & (df["context_window"] == context_window)]
             if not data.empty:
                 row = {"experiment_type": exp_type, "context_window": context_window}

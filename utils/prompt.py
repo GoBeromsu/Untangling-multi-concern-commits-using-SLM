@@ -218,14 +218,15 @@ def get_system_prompt() -> str:
 
 def get_system_prompt_with_message() -> str:
     """Return system prompt that includes commit message context."""
-    shot_1_with_message = (
-        f"<commit_message>{SHOT_1_COMMIT_MESSAGE}</commit_message>\n{SHOT_1}"
-    )
-    shot_2_with_message = (
-        f"<commit_message>{SHOT_2_COMMIT_MESSAGE}</commit_message>\n{SHOT_2}"
-    )
+    # shot_1_with_message = (
+    #     f"<commit_message>{SHOT_1_COMMIT_MESSAGE}</commit_message>\n{SHOT_1}"
+    # )
+    # shot_2_with_message = (
+    #     f"<commit_message>{SHOT_2_COMMIT_MESSAGE}</commit_message>\n{SHOT_2}"
+    # )
 
-    return f"{SYSTEM_PROMPT}\n\n# Examples\n\n{shot_1_with_message}\n\n{shot_2_with_message}"
+    # return f"{SYSTEM_PROMPT}\n\n# Examples\n\n{shot_1_with_message}\n\n{shot_2_with_message}"
+    return f"{SYSTEM_PROMPT}"
 
 
 def get_system_prompt_diff_only() -> str:
@@ -233,7 +234,7 @@ def get_system_prompt_diff_only() -> str:
     return f"{SYSTEM_PROMPT}\n\n# Examples\n\n{SHOT_1}\n\n{SHOT_2}"
 
 
-def get_zero_shot_prompt(include_message: bool = True) -> str:
+def get_zero_shot_prompt() -> str:
     """Return zero-shot prompt with optional commit message context."""
     return SYSTEM_PROMPT
 
