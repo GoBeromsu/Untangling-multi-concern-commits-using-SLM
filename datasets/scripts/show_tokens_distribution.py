@@ -1,395 +1,170 @@
 #!/usr/bin/env python3
 """
-Analyze git diff token distribution by commit type and type combinations.
-Purpose: Find optimal types and combinations for LLM input using precise token measurements.
+Analyze git diff token distribution for tangled commits.
+Purpose: Find token size distribution to optimize LLM input.
 """
 
 import pandas as pd
 import numpy as np
 import tiktoken
-from typing import Dict, List, Tuple, Set
 from pathlib import Path
-import json
-import argparse
+
+# Constants
+ENCODING_NAME = "cl100k_base"
+CSV_FILE = "../data/tangled_ccs_dataset_test.csv"
+DIFF_COLUMN = "diff"
+OUTPUT_FILE = "../token_distribution_results.csv"
 
 
-def count_tokens(text: str, encoding_name: str = "cl100k_base") -> int:
-    """Count tokens in text using tiktoken."""
+def count_tokens(text: str) -> int:
+    """Count tokens using tiktoken."""
     try:
-        encoding = tiktoken.get_encoding(encoding_name)
+        encoding = tiktoken.get_encoding(ENCODING_NAME)
         return len(encoding.encode(text))
     except Exception:
-        # Fallback to character count / 4 if tiktoken fails
         return len(text) // 4
 
 
-def parse_types_from_row(types_value: str) -> List[str]:
-    """Parse commit types from a row value (handles both single types and JSON arrays)."""
-    if pd.isna(types_value):
-        return []
-
-    types_str = str(types_value).strip()
-    if types_str.startswith("["):
-        try:
-            return json.loads(types_str)
-        except json.JSONDecodeError:
-            return [types_str]
+def get_token_range(token_count: int) -> str:
+    """Get token range label."""
+    if token_count <= 1024:
+        return "≤1024"
+    elif token_count <= 2048:
+        return "1025-2048"
+    elif token_count <= 4096:
+        return "2049-4096"
+    elif token_count <= 8192:
+        return "4097-8192"
+    elif token_count <= 16384:
+        return "8193-16384"
+    elif token_count <= 32768:
+        return "16385-32768"
     else:
-        return [types_str]
+        return ">32768"
 
 
-def create_expanded_dataset(
-    df: pd.DataFrame, type_column: str, diff_column: str
-) -> pd.DataFrame:
-    """Create expanded dataset with individual and combination type analysis."""
-    expanded_data = []
+def analyze_token_distribution(df: pd.DataFrame) -> pd.DataFrame:
+    """Analyze token distribution of tangled commits."""
+    results = []
 
-    for _, row in df.iterrows():
-        diff_text = row[diff_column]
-        types_list = parse_types_from_row(row[type_column])
+    for idx, row in df.iterrows():
+        diff_text = row[DIFF_COLUMN]
 
-        if not types_list:
+        if pd.isna(diff_text):
             continue
 
-        # Add individual types
-        for commit_type in types_list:
-            expanded_data.append(
-                {
-                    "type": commit_type,
-                    "type_combination": tuple(sorted(types_list)),
-                    "combination_size": len(types_list),
-                    "diff": diff_text,
-                }
-            )
+        token_count = count_tokens(str(diff_text))
+        token_range = get_token_range(token_count)
 
-    return pd.DataFrame(expanded_data)
+        results.append(
+            {
+                "row_idx": idx,
+                "token_count": token_count,
+                "token_range": token_range,
+            }
+        )
+
+    return pd.DataFrame(results)
 
 
-def calculate_token_ranges() -> List[Tuple[int, int, str]]:
-    """Define token ranges for analysis."""
-    return [
-        (0, 1000, "≤1K"),
-        (1001, 2000, "1K-2K"),
-        (2001, 3000, "2K-3K"),
-        (3001, 4000, "3K-4K"),
-        (4001, 5000, "4K-5K"),
-        (5001, 6000, "5K-6K"),
-        (6001, 7000, "6K-7K"),
-        (7001, 8000, "7K-8K"),
-        (8001, 9000, "8K-9K"),
-        (9001, 10000, "9K-10K"),
-        (10001, float("inf"), ">10K"),
+def create_distribution_summary(results_df: pd.DataFrame) -> pd.DataFrame:
+    """Create token distribution summary."""
+    token_ranges = [
+        "≤1024",
+        "1025-2048",
+        "2049-4096",
+        "4097-8192",
+        "8193-16384",
+        "16385-32768",
+        ">32768",
     ]
 
+    total_count = len(results_df)
+    distribution = results_df["token_range"].value_counts()
+    token_counts = results_df["token_count"].values
 
-def calculate_token_statistics(
-    token_counts: np.ndarray, ranges: List[Tuple[int, int, str]]
-) -> Dict:
-    """Calculate comprehensive token statistics and distribution."""
-    # Calculate distribution by ranges
-    distribution = {}
-    for min_val, max_val, label in ranges:
-        if max_val == float("inf"):
-            count = np.sum(token_counts > min_val)
-        else:
-            count = np.sum((token_counts >= min_val) & (token_counts <= max_val))
+    summary_data = []
+    for range_label in token_ranges:
+        count = distribution.get(range_label, 0)
+        percentage = (count / total_count) * 100
+        summary_data.append(
+            {
+                "token_range": range_label,
+                "count": count,
+                "percentage": round(percentage, 1),
+            }
+        )
 
-        percentage = (count / len(token_counts)) * 100
-        distribution[label] = {"count": int(count), "percentage": percentage}
-
-    return {
-        "total_count": len(token_counts),
-        "mean": float(np.mean(token_counts)),
-        "std": float(np.std(token_counts)),
-        "min": int(np.min(token_counts)),
-        "max": int(np.max(token_counts)),
-        "median": float(np.median(token_counts)),
-        "q25": float(np.percentile(token_counts, 25)),
-        "q75": float(np.percentile(token_counts, 75)),
-        "q90": float(np.percentile(token_counts, 90)),
-        "q95": float(np.percentile(token_counts, 95)),
-        "q99": float(np.percentile(token_counts, 99)),
-        "distribution": distribution,
+    # Add overall statistics
+    stats = {
+        "total_samples": total_count,
+        "median_tokens": int(np.median(token_counts)),
+        "mean_tokens": int(np.mean(token_counts)),
+        "min_tokens": int(np.min(token_counts)),
+        "max_tokens": int(np.max(token_counts)),
     }
 
-
-def analyze_individual_types(expanded_df: pd.DataFrame) -> Dict[str, Dict]:
-    """Analyze token distribution for individual commit types."""
-    print("Analyzing individual commit types...")
-    ranges = calculate_token_ranges()
-    stats_by_type = {}
-
-    for commit_type in sorted(expanded_df["type"].unique()):
-        type_data = expanded_df[expanded_df["type"] == commit_type]["diff"]
-        print(f"  Processing {commit_type}: {len(type_data)} samples...")
-
-        # Calculate token counts
-        token_counts = []
-        for diff_text in type_data:
-            if pd.isna(diff_text):
-                token_count = 0
-            else:
-                token_count = count_tokens(str(diff_text))
-            token_counts.append(token_count)
-
-        token_counts = np.array(token_counts)
-        stats_by_type[commit_type] = calculate_token_statistics(token_counts, ranges)
-
-    return stats_by_type
-
-
-def analyze_type_combinations(expanded_df: pd.DataFrame) -> Dict[str, Dict]:
-    """Analyze token distribution for type combinations."""
-    print("Analyzing type combinations...")
-    ranges = calculate_token_ranges()
-    stats_by_combination = {}
-
-    # Group by unique combinations
-    combination_groups = expanded_df.groupby("type_combination")
-
-    for combination, group in combination_groups:
-        if len(combination) == 1:
-            continue  # Skip individual types (already analyzed)
-
-        combination_str = "+".join(combination)
-        combination_size = len(combination)
-
-        # Get unique diffs for this combination (avoid duplicates)
-        unique_diffs = group["diff"].drop_duplicates()
-
-        print(
-            f"  Processing {combination_str} (size {combination_size}): {len(unique_diffs)} samples..."
-        )
-
-        # Calculate token counts
-        token_counts = []
-        for diff_text in unique_diffs:
-            if pd.isna(diff_text):
-                token_count = 0
-            else:
-                token_count = count_tokens(str(diff_text))
-            token_counts.append(token_count)
-
-        if len(token_counts) > 0:
-            token_counts = np.array(token_counts)
-            stats_by_combination[combination_str] = calculate_token_statistics(
-                token_counts, ranges
-            )
-            stats_by_combination[combination_str]["combination_size"] = combination_size
-
-    return stats_by_combination
-
-
-def generate_summary_report(
-    individual_stats: Dict, combination_stats: Dict, output_file: Path
-) -> None:
-    """Generate comprehensive markdown report with individual and combination analysis."""
-
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write("# Git Diff Token Distribution Analysis\n\n")
-        f.write("## Purpose\n")
-        f.write(
-            "Analysis of git diff sizes using **token count** (via tiktoken) by commit type and type combinations.\n\n"
-        )
-
-        # Add detailed distribution table
-        f.write("## Detailed Token Distribution by Individual Types\n\n")
-        sorted_types = sorted(
-            individual_stats.keys(), key=lambda x: individual_stats[x]["median"]
-        )
-
-        # Create distribution table header
-        f.write(
-            "| Type | Total | ≤1K | 1K-2K | 2K-3K | 3K-4K | 4K-5K | 5K-6K | 6K-7K | 7K-8K | 8K-9K | 9K-10K | >10K | Median |\n"
-        )
-        f.write(
-            "|------|-------|-----|-------|-------|-------|-------|-------|-------|-------|-------|--------|------|--------|\n"
-        )
-
-        for commit_type in sorted_types:
-            s = individual_stats[commit_type]
-            dist = s["distribution"]
-
-            # Format distribution percentages
-            row = f"| **{commit_type}** | {s['total_count']} |"
-            for range_label in [
-                "≤1K",
-                "1K-2K",
-                "2K-3K",
-                "3K-4K",
-                "4K-5K",
-                "5K-6K",
-                "6K-7K",
-                "7K-8K",
-                "8K-9K",
-                "9K-10K",
-                ">10K",
-            ]:
-                percentage = dist.get(range_label, {"percentage": 0})["percentage"]
-                row += f" {percentage:.1f}% |"
-            row += f" {s['median']:,.0f} |\n"
-            f.write(row)
-
-        # Individual types summary
-        f.write("\n## Individual Types Summary (Ranked by Median Token Count)\n\n")
-
-        f.write(
-            "| Rank | Type | Count | Median | Mean | 95th Percentile | ≤3K Tokens | ≤5K Tokens |\n"
-        )
-        f.write(
-            "|------|------|-------|--------|------|----------------|------------|------------|\n"
-        )
-
-        for rank, commit_type in enumerate(sorted_types, 1):
-            s = individual_stats[commit_type]
-            small_count_3k = sum(
-                s["distribution"][r]["count"] for r in ["≤1K", "1K-2K", "2K-3K"]
-            )
-            small_pct_3k = (small_count_3k / s["total_count"]) * 100
-            small_count_5k = sum(
-                s["distribution"][r]["count"]
-                for r in ["≤1K", "1K-2K", "2K-3K", "3K-4K", "4K-5K"]
-            )
-            small_pct_5k = (small_count_5k / s["total_count"]) * 100
-            f.write(
-                f"| {rank} | **{commit_type}** | {s['total_count']} | {s['median']:,.0f} | {s['mean']:,.0f} | {s['q95']:,.0f} | {small_pct_3k:.1f}% | {small_pct_5k:.1f}% |\n"
-            )
-
-        # Type combinations summary
-        if combination_stats:
-            f.write("\n## Type Combinations Summary (Ranked by Median Token Count)\n\n")
-            sorted_combinations = sorted(
-                combination_stats.keys(), key=lambda x: combination_stats[x]["median"]
-            )
-
-            f.write(
-                "| Rank | Combination | Size | Count | Median | Mean | 95th Percentile | ≤3K Tokens | ≤5K Tokens |\n"
-            )
-            f.write(
-                "|------|-------------|------|-------|--------|------|----------------|------------|------------|\n"
-            )
-
-            for rank, combination in enumerate(sorted_combinations, 1):
-                s = combination_stats[combination]
-                small_count_3k = sum(
-                    s["distribution"][r]["count"] for r in ["≤1K", "1K-2K", "2K-3K"]
-                )
-                small_pct_3k = (small_count_3k / s["total_count"]) * 100
-                small_count_5k = sum(
-                    s["distribution"][r]["count"]
-                    for r in ["≤1K", "1K-2K", "2K-3K", "3K-4K", "4K-5K"]
-                )
-                small_pct_5k = (small_count_5k / s["total_count"]) * 100
-                f.write(
-                    f"| {rank} | **{combination}** | {s['combination_size']} | {s['total_count']} | {s['median']:,.0f} | {s['mean']:,.0f} | {s['q95']:,.0f} | {small_pct_3k:.1f}% | {small_pct_5k:.1f}% |\n"
-                )
-
-
-def print_analysis_summary(individual_stats: Dict, combination_stats: Dict) -> None:
-    """Print analysis summary to console."""
-    print("\n" + "=" * 80)
-    print("ANALYSIS SUMMARY")
-    print("=" * 80)
-
-    print("\nIndividual Types (sorted by median token count):")
-    sorted_types = sorted(
-        individual_stats.keys(), key=lambda x: individual_stats[x]["median"]
-    )
-    for commit_type in sorted_types:
-        s = individual_stats[commit_type]
-        small_count_3k = sum(
-            s["distribution"][r]["count"] for r in ["≤1K", "1K-2K", "2K-3K"]
-        )
-        small_count_5k = sum(
-            s["distribution"][r]["count"]
-            for r in ["≤1K", "1K-2K", "2K-3K", "3K-4K", "4K-5K"]
-        )
-        print(
-            f"  {commit_type:12}: median {s['median']:>5,.0f} tokens, {small_count_3k:>3}/{s['total_count']} (≤3K), {small_count_5k:>3}/{s['total_count']} (≤5K)"
-        )
-
-    if combination_stats:
-        print("\nType Combinations (sorted by median token count):")
-        sorted_combinations = sorted(
-            combination_stats.keys(), key=lambda x: combination_stats[x]["median"]
-        )
-        for combination in sorted_combinations:
-            s = combination_stats[combination]
-            small_count_3k = sum(
-                s["distribution"][r]["count"] for r in ["≤1K", "1K-2K", "2K-3K"]
-            )
-            small_count_5k = sum(
-                s["distribution"][r]["count"]
-                for r in ["≤1K", "1K-2K", "2K-3K", "3K-4K", "4K-5K"]
-            )
-            size_info = f"(size {s['combination_size']})"
-            print(
-                f"  {combination:20} {size_info:9}: median {s['median']:>5,.0f} tokens, {small_count_3k:>3}/{s['total_count']} (≤3K), {small_count_5k:>3}/{s['total_count']} (≤5K)"
-            )
-
-    print("=" * 80)
+    return pd.DataFrame(summary_data), stats
 
 
 def main() -> None:
     """Main analysis function."""
-    parser = argparse.ArgumentParser(
-        description="Analyze diff token distribution by commit type and combinations"
-    )
-    parser.add_argument(
-        "--csv-file",
-        default="../data/tangled_ccs_dataset.csv",
-        help="Path to CSV file to analyze",
-    )
-    parser.add_argument(
-        "--type-column", default="types", help="Column name containing commit types"
-    )
-    parser.add_argument(
-        "--diff-column", default="diff", help="Column name containing diff content"
-    )
-    parser.add_argument(
-        "--output",
-        default="../tangled_css_token_distribution_analysis.md",
-        help="Output markdown file name",
-    )
-
-    args = parser.parse_args()
-
-    csv_file = Path(args.csv_file)
-    output_file = Path(args.output)
+    csv_file = Path(CSV_FILE)
+    output_file = Path(OUTPUT_FILE)
 
     if not csv_file.exists():
         print(f"Error: CSV file not found at {csv_file}")
         return
 
-    print(f"Git Diff Token Distribution Analyzer")
+    print(f"Tangled Commits Token Distribution Analyzer")
     print(f"Loading dataset from {csv_file}...")
 
     try:
         df = pd.read_csv(csv_file)
-        print(f"Loaded {len(df)} records")
-        print(f"Using type column: {args.type_column}")
-        print(f"Using diff column: {args.diff_column}")
-        print("Note: Using tiktoken cl100k_base encoding for token counting\n")
+        print(f"Loaded {len(df)} tangled commits")
+        print(f"Using tiktoken {ENCODING_NAME} encoding")
 
-        # Create expanded dataset
-        print("Creating expanded dataset...")
-        expanded_df = create_expanded_dataset(df, args.type_column, args.diff_column)
-        print(f"Expanded to {len(expanded_df)} type-diff pairs")
+        print("Analyzing token distribution...")
+        results_df = analyze_token_distribution(df)
+        print(f"Processed {len(results_df)} diffs")
 
-        # Analyze individual types
-        individual_stats = analyze_individual_types(expanded_df)
+        print("Creating distribution summary...")
+        summary_df, stats = create_distribution_summary(results_df)
 
-        # Analyze type combinations
-        combination_stats = analyze_type_combinations(expanded_df)
-
-        # Generate report
-        print(f"\nGenerating markdown report: {output_file}")
-        generate_summary_report(individual_stats, combination_stats, output_file)
+        # Save detailed results
+        results_df.to_csv(output_file, index=False)
+        print(f"Results saved to {output_file}")
 
         # Print summary
-        print_analysis_summary(individual_stats, combination_stats)
+        print("\nToken Distribution Summary:")
+        print("=" * 60)
+        print(f"Total samples: {stats['total_samples']}")
+        print(f"Median tokens: {stats['median_tokens']}")
+        print(f"Mean tokens: {stats['mean_tokens']}")
+        print(f"Min tokens: {stats['min_tokens']}")
+        print(f"Max tokens: {stats['max_tokens']}")
+        print("-" * 60)
 
-        print(f"\nAnalysis complete! Report saved to {output_file}")
+        for _, row in summary_df.iterrows():
+            print(
+                f"{row['token_range']:>12}: {row['count']:>4} samples ({row['percentage']:>5.1f}%)"
+            )
+
+        # Key thresholds
+        le_1024 = summary_df[summary_df["token_range"] == "≤1024"]["percentage"].iloc[0]
+        le_4096 = summary_df[
+            summary_df["token_range"].isin(["≤1024", "1025-2048", "2049-4096"])
+        ]["percentage"].sum()
+        le_8192 = summary_df[
+            summary_df["token_range"].isin(
+                ["≤1024", "1025-2048", "2049-4096", "4097-8192"]
+            )
+        ]["percentage"].sum()
+
+        print("-" * 60)
+        print(f"≤1024 tokens: {le_1024:.1f}%")
+        print(f"≤4096 tokens: {le_4096:.1f}%")
+        print(f"≤8192 tokens: {le_8192:.1f}%")
 
     except Exception as e:
         print(f"Error processing file: {e}")
