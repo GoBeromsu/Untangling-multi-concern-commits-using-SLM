@@ -17,6 +17,19 @@ RESULTS_BASE_DIR = Path("results")
 ANALYSIS_OUTPUT_DIR = Path("results/analysis")
 CONTEXT_LENGTH = [1024, 2048, 4096, 8192, 12288]
 EXPERIMENT_TYPES = ["with_message", "diff_only"]
+DF_COLUMNS = [
+    "predicted_types",
+    "actual_types",
+    "inference_time",
+    "shas",
+    "context_len",
+    "with_message",
+    "model",
+    "precision",
+    "recall",
+    "f1",
+    "accuracy",
+]
 METRICS = ["accuracy", "f1", "precision", "recall"]
 
 plt.style.use("default")
@@ -69,7 +82,20 @@ def preprocess_experimental_data() -> pd.DataFrame:
             df["model"] = model
             df["count"] = df["actual_types"].apply(lambda x: len(eval(x)))
 
+            # Calculate metrics for each row
+            predicted_types = df["predicted_types"].apply(eval)
+            actual_types = df["actual_types"].apply(eval)
+
+            # Calculate per-row metrics using eval_utils
+            metrics = eval_utils.calculate_metrics(predicted_types, actual_types)
+
+            # Extract individual metrics
+            df["precision"] = metrics["precision"]
+            df["recall"] = metrics["recall"]
+            df["f1"] = metrics["f1"]
+            df["accuracy"] = metrics["exact_match"]
             all_dataframes.append(df)
+
     result = pd.concat(all_dataframes, ignore_index=True)
     return result
 
@@ -398,6 +424,8 @@ def create_summary_statistics(df: pd.DataFrame) -> None:
 def generate_visualization_report() -> None:
     """Generate comprehensive visualization report with clear data preprocessing."""
     df = preprocess_experimental_data()
+
+
 
     create_metrics_by_context_window(df)
     create_metrics_by_concern_count(df)
