@@ -67,6 +67,7 @@ def preprocess_experimental_data() -> pd.DataFrame:
             df["context_len"] = context_len
             df["with_message"] = with_message
             df["model"] = model
+            df["count"] = df["actual_types"].apply(lambda x: len(eval(x)))
 
             all_dataframes.append(df)
     result = pd.concat(all_dataframes, ignore_index=True)
