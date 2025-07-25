@@ -2,7 +2,7 @@ import os
 import sys
 import json
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 import tiktoken
 import pandas as pd
 from dotenv import load_dotenv
@@ -14,21 +14,18 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from utils.llms import constant
 import utils.llms as llms
-import utils.eval as eval_utils
-import utils.prompt as prompt_utils
+import utils.eval as eval
+import utils.prompt as prompt
 
 # Data key constants
-COMMIT_MESSAGE_KEY = "commit_message"
-GIT_DIFF_KEY = "git_diff"
+COMMIT_MESSAGE = "commit_message"
+GIT_DIFF = "git_diff"
 MASKED_COMMIT_MESSAGE_KEY = "masked_commit_message"
-SHA_KEY = "sha"
-SHAS_KEY = "shas"
 TYPES_KEY = "types"
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
 CONTEXT_WINDOW = [1024, 2048, 4096, 8192, 12288]
 
-# contextWindow = [1024]
 MODEL_NAMES = [
     # "microsoft/phi-4",  # LM Studio model
     # "gpt-4o-mini",  # OpenAI model
@@ -42,24 +39,25 @@ def truncate_commits(
     context_window: int,
     include_message: bool = True,
 ) -> str:
-    concern_count = len(commits)
-    available_tokens_per_commit = context_window // concern_count
+    concern_count: int = len(commits)
+    available_tokens_per_commit: int = context_window // concern_count
 
-    messages, diffs = [], []
+    messages: List[str] = []
+    diffs: List[str] = []
 
     for commit_data in commits.values():
-        message = commit_data[COMMIT_MESSAGE_KEY]
-        diff = commit_data[GIT_DIFF_KEY]
+        message: str = commit_data[COMMIT_MESSAGE]
+        diff: str = commit_data[GIT_DIFF]
 
         if include_message:
-            message_tokens = encoding.encode(message)
-            remaining_tokens = available_tokens_per_commit - len(message_tokens)
+            message_tokens: List[int] = encoding.encode(message)
+            remaining_tokens: int = available_tokens_per_commit - len(message_tokens)
             messages.append(message)
         else:
-            remaining_tokens = available_tokens_per_commit
+            remaining_tokens: int = available_tokens_per_commit
 
-        diff_tokens = encoding.encode(diff)
-        truncated_diff = (
+        diff_tokens: List[int] = encoding.encode(diff)
+        truncated_diff: str = (
             diff
             if len(diff_tokens) <= remaining_tokens
             else encoding.decode(diff_tokens[:remaining_tokens])
@@ -74,59 +72,39 @@ def truncate_commits(
 
 
 def measure(
-    model_name,
-    prompt_type,
-    context_window,
-    commit_type,
-    tangled_df,
-    atomic_df,
-    prompt_dir,
-):
-    print(
-        f"\n=== Model: {model_name}, Prompt Type: {commit_type}, Prompt: {prompt_type}, Context Window: {context_window} ==="
-    )
+    model_name: str,
+    truncated_dataset: pd.DataFrame,
+    system_prompt: str,
+    csv_path: Path,
+) -> None:
 
-    file_name = f"{model_name.replace('/', '_')}_{prompt_type.replace('-', '_')}_{context_window}.csv"
-    csv_path = prompt_dir / file_name
-    create_csv_with_headers(csv_path)
-
-    for idx, row in tangled_df.iterrows():
-        shas = json.loads(row[SHAS_KEY])
-        commits: Dict[str, str] = {}
-        for sha in shas:
-            matching_row = atomic_df[atomic_df[SHA_KEY] == sha]
-            commit_message = matching_row[MASKED_COMMIT_MESSAGE_KEY].values[0]
-            git_diff = matching_row[GIT_DIFF_KEY].values[0]
-            commits[sha] = {
-                COMMIT_MESSAGE_KEY: commit_message,
-                GIT_DIFF_KEY: git_diff,
-            }
-
-        system_prompt = prompt_utils.get_prompt_by_type(prompt_type, include_message)
-        truncated_commit = truncate_commits(commits, context_window, include_message)
-
+    for idx, row in truncated_dataset.iterrows():
+        commit: str = row["truncated_commit"]
+        actual_types: List[str] = json.loads(row[TYPES_KEY])
         try:
             api_call = lambda: llms.api_call(
                 model_name=model_name,
-                commit=truncated_commit,
+                commit=commit,
                 system_prompt=system_prompt,
                 api_key=OPENAI_KEY,
             )
-            predicted_types, inference_time = eval_utils.measure_inference_time(
-                api_call
-            )
+
+            predicted_types, inference_time = eval.measure_inference_time(api_call)
         except Exception as e:
             print(f"Unexpected error processing row {idx}: {e}")
             predicted_types = []
             inference_time = 0.0
 
-        result = {column: None for column in constant.DEFAULT_DF_COLUMNS}
-        result["predicted_types"] = predicted_types
-        result["actual_types"] = json.loads(row[TYPES_KEY])
-        result["inference_time"] = inference_time
-        result[SHAS_KEY] = shas
+        result_df = pd.DataFrame(
+            {
+                "predicted_types": [predicted_types],
+                "actual_types": [actual_types],
+                "inference_time": [inference_time],
+                "shas": [row["shas"]],
+            },
+            columns=constant.DEFAULT_DF_COLUMNS,
+        )
 
-        result_df = pd.DataFrame([result])
         result_df.to_csv(csv_path, mode="a", header=False, index=False)
 
         print(
@@ -141,34 +119,78 @@ def create_csv_with_headers(csv_path: Path) -> None:
         df.to_csv(csv_path, index=False)
 
 
-def main():
-    tangled_df = eval_utils.load_dataset("test")
-    atomic_df = eval_utils.load_dataset("atomic")
+def truncate_dataset(
+    atomic_df: pd.DataFrame,
+    tangled_df: pd.DataFrame,
+    context_window: int,
+    include_message: bool,
+) -> pd.DataFrame:
+    truncated_commits: List[Dict[str, any]] = []
+    for _, row in tangled_df.iterrows():
+        shas: List[str] = json.loads(row["shas"])
+        commits: Dict[str, Dict[str, str]] = {}
+        for sha in shas:
+            matching_row: pd.DataFrame = atomic_df[atomic_df["sha"] == sha]
+            commit_message: str = matching_row[MASKED_COMMIT_MESSAGE_KEY].values[0]
+            git_diff: str = matching_row[GIT_DIFF].values[0]
+            commits[sha] = {
+                COMMIT_MESSAGE: commit_message,
+                GIT_DIFF: git_diff,
+            }
+        truncated_commit: str = truncate_commits(
+            commits, context_window, include_message
+        )
+        truncated_commits.append(
+            {
+                "shas": shas,
+                "truncated_commit": truncated_commit,
+                TYPES_KEY: row[TYPES_KEY],
+            }
+        )
+    return pd.DataFrame(truncated_commits)
 
-    commit_types = ["with_message", "diff_only"]
-    prompt_types = ["Zero-shot", "One-shot", "Two-shot"]
+
+def main() -> None:
+    tangled_df: pd.DataFrame = eval.load_dataset("test_small")
+    atomic_df: pd.DataFrame = eval.load_dataset("atomic")
+
+    commit_types: List[str] = ["with_message", "diff_only"]
+    prompt_types: List[str] = ["Zero-shot", "One-shot", "Two-shot"]
     for model_name in MODEL_NAMES:
         print(f"\n{'='*50}")
         print(f"Processing Model: {model_name}")
         print(f"{'='*50}")
 
         for commit_type in commit_types:
-            prompt_dir = Path("results") / commit_type
+            prompt_dir: Path = Path("results") / commit_type
             prompt_dir.mkdir(parents=True, exist_ok=True)
 
             # Determine if commit message should be included based on prompt type
-            include_message = commit_type == "with_message"
+            include_message: bool = commit_type == "with_message"
 
             for prompt_type in prompt_types:
                 for context_window in CONTEXT_WINDOW:
+                    system_prompt: str = prompt.get_prompt_by_type(
+                        prompt_type, include_message
+                    )
+                    truncated_dataset: pd.DataFrame = truncate_dataset(
+                        atomic_df, tangled_df, context_window, include_message
+                    )
+                    file_name: str = (
+                        f"{model_name.replace('/', '_')}_{prompt_type.replace('-', '_')}_{context_window}_test.csv"
+                    )
+                    csv_path: Path = prompt_dir / file_name
+                    create_csv_with_headers(csv_path)
+
+                    print(
+                        f"\n=== Model: {model_name}, Prompt Type: {commit_type}, Prompt: {prompt_type}, Context Window: {context_window} ==="
+                    )
+
                     measure(
                         model_name,
-                        prompt_type,
-                        context_window,
-                        commit_type,
-                        tangled_df,
-                        atomic_df,
-                        prompt_dir,
+                        truncated_dataset,
+                        system_prompt,
+                        csv_path,
                     )
 
         llms.clear_cache()
