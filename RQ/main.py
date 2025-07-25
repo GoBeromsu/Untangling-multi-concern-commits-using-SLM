@@ -22,16 +22,22 @@ COMMIT_MESSAGE = "commit_message"
 GIT_DIFF = "git_diff"
 MASKED_COMMIT_MESSAGE_KEY = "masked_commit_message"
 TYPES_KEY = "types"
+
+# API configuration
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
-CONTEXT_WINDOW = [1024, 2048, 4096, 8192, 12288]
-
+# Model configuration
 MODEL_NAMES = [
     # "microsoft/phi-4",  # LM Studio model
     # "gpt-4o-mini",  # OpenAI model
     "gpt-4.1-2025-04-14",
 ]
-encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding
+
+# Context window sizes for testing
+CONTEXT_WINDOW = [1024, 2048, 4096, 8192, 12288]
+
+# Encoding configuration
+ENCODING_NAME = "cl100k_base"  # GPT-4 encoding
 
 
 def truncate_commits(
@@ -39,6 +45,7 @@ def truncate_commits(
     context_window: int,
     include_message: bool = True,
 ) -> str:
+    encoding = tiktoken.get_encoding(ENCODING_NAME)
     concern_count: int = len(commits)
     available_tokens_per_commit: int = context_window // concern_count
 
@@ -169,10 +176,11 @@ def main() -> None:
             include_message: bool = commit_type == "with_message"
 
             for prompt_type in prompt_types:
+                system_prompt: str = prompt.get_prompt_by_type(
+                    prompt_type, include_message
+                )
                 for context_window in CONTEXT_WINDOW:
-                    system_prompt: str = prompt.get_prompt_by_type(
-                        prompt_type, include_message
-                    )
+                    print(f"Processing {model_name} {prompt_type} {context_window}")
                     truncated_dataset: pd.DataFrame = truncate_dataset(
                         atomic_df, tangled_df, context_window, include_message
                     )
